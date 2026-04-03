@@ -45,6 +45,7 @@ jobs:
           FORCE_AUTH: ${{ secrets.FORCE_AUTH }}
           BASE_URL: ${{ secrets.BASE_URL }}
           ENCRYPTED_PASSWORD: ${{ secrets.ENCRYPTED_PASSWORD }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
 
       - name: Restore previous published site
         if: always()
