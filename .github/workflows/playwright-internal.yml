@@ -31,36 +31,6 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
-      - name: Debug BASE_URL reachability
-        shell: powershell
-        run: |
-          Write-Host "Testing BASE_URL..."
-          try {
-            curl.exe -I -L --max-time 30 $env:BASE_URL
-          } catch {
-            Write-Host "HEAD request failed"
-          }
-
-          Write-Host ""
-          Write-Host "Testing simple fetch..."
-          try {
-            $response = curl.exe -L --max-time 30 $env:BASE_URL
-            $response | Select-Object -First 20
-          } catch {
-            Write-Host "Fetch request failed"
-          }
-        env:
-          BASE_URL: ${{ secrets.BASE_URL }}
-
-      - name: Debug BASE_URL host
-        shell: powershell
-        run: |
-          $u = [System.Uri]$env:BASE_URL
-          Write-Host "Host: $($u.Host)"
-          Write-Host "Scheme: $($u.Scheme)"
-        env:
-          BASE_URL: ${{ secrets.BASE_URL }}
-
       - name: Run Playwright tests
         id: playwright
         run: npm run test:e2e
