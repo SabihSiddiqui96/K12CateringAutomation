@@ -11,13 +11,11 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
-      - name: Checkout main branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -42,6 +40,76 @@ jobs:
           ENCRYPTED_PASSWORD: ${{ secrets.ENCRYPTED_PASSWORD }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
 
+      - name: Build summary from Playwright JSON
+        if: always()
+        shell: powershell
+        run: |
+          if (!(Test-Path "test-results/results.json")) {
+            Add-Content $env:GITHUB_STEP_SUMMARY "# Playwright Internal Report"
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY "- No results.json found."
+            exit 0
+          }
+
+          $json = Get-Content "test-results/results.json" -Raw | ConvertFrom-Json
+
+          $counts = @{
+            total = 0
+            passed = 0
+            failed = 0
+            skipped = 0
+            flaky = 0
+          }
+
+          function Walk-Suite($suite) {
+            if ($suite.specs) {
+              foreach ($spec in $suite.specs) {
+                if ($spec.tests) {
+                  foreach ($test in $spec.tests) {
+                    $counts.total++
+                    $status = $null
+                    if ($test.results -and $test.results.Count -gt 0) {
+                      $status = $test.results[-1].status
+                    } else {
+                      $status = "skipped"
+                    }
+
+                    switch ($status) {
+                      "passed" { $counts.passed++ }
+                      "failed" { $counts.failed++ }
+                      "skipped" { $counts.skipped++ }
+                      "flaky"  { $counts.flaky++ }
+                    }
+                  }
+                }
+              }
+            }
+
+            if ($suite.suites) {
+              foreach ($child in $suite.suites) {
+                Walk-Suite $child
+              }
+            }
+          }
+
+          foreach ($suite in $json.suites) {
+            Walk-Suite $suite
+          }
+
+          Add-Content $env:GITHUB_STEP_SUMMARY "# Playwright Internal Report"
+          Add-Content $env:GITHUB_STEP_SUMMARY ""
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Metric | Count |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "|---|---:|"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Total | $($counts.total) |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Passed | $($counts.passed) |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Failed | $($counts.failed) |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Flaky | $($counts.flaky) |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Skipped | $($counts.skipped) |"
+          Add-Content $env:GITHUB_STEP_SUMMARY ""
+          Add-Content $env:GITHUB_STEP_SUMMARY "- Branch: $env:GITHUB_REF_NAME"
+          Add-Content $env:GITHUB_STEP_SUMMARY "- Run: $env:GITHUB_RUN_NUMBER"
+          Add-Content $env:GITHUB_STEP_SUMMARY "- Commit: $env:GITHUB_SHA"
+
       - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -51,28 +119,6 @@ jobs:
             playwright-report
             test-results
           retention-days: 30
-
-      - name: Add workflow summary
-        if: always()
-        shell: bash
-        run: |
-          echo "# Playwright Internal Report" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Repository: $GITHUB_REPOSITORY" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Branch: $GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Run number: $GITHUB_RUN_NUMBER" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "## Artifact" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Download \`playwright-report-${GITHUB_RUN_NUMBER}\` from this run." >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          if [ -f test-results/results.json ]; then
-            echo "## Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "- JSON results file found at \`test-results/results.json\`." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "## Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "- No JSON results file was found." >> "$GITHUB_STEP_SUMMARY"
-          fi
 
       - name: Fail job if tests failed
         if: steps.playwright.outcome == 'failure'
