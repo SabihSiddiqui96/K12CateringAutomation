@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getPlaywrightBaseUrl } from './utils/baseUrl';
-import { login } from './utils/login';
+import { loginToPrimeroEdge } from './utils/helpers';
 import { getAuthMetaPath, getAuthStoragePath } from './utils/authStorage';
 
 dotenv.config();
@@ -44,7 +44,7 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   const page = await context.newPage();
 
   try {
-    await login(page);
+    await loginToPrimeroEdge(page);
     await context.storageState({ path: stateFile });
     fs.writeFileSync(metaFile, username, 'utf8');
   } finally {

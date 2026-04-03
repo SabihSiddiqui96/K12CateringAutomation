@@ -1,4 +1,5 @@
 import { Locator, Page } from '@playwright/test';
+import { getPlaywrightBaseUrl } from '../utils/baseUrl';
 
 export class LoginPage {
   private readonly usernameInput: Locator;
@@ -12,13 +13,25 @@ export class LoginPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto('/');
+    await this.page.goto(getPlaywrightBaseUrl());
+  }
+
+  async enterUsername(username: string): Promise<void> {
+    await this.usernameInput.fill(username);
+  }
+
+  async enterPassword(password: string): Promise<void> {
+    await this.passwordInput.fill(password);
+  }
+
+  async clickLogin(): Promise<void> {
+    await this.loginButton.click();
   }
 
   async login(username: string, password: string): Promise<void> {
-    await this.usernameInput.fill(username);
-    await this.passwordInput.fill(password);
-    await this.loginButton.click();
+    await this.enterUsername(username);
+    await this.enterPassword(password);
+    await this.clickLogin();
   }
 }
 

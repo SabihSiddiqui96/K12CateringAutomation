@@ -1,10 +1,17 @@
-import { test, expect } from '@playwright/test';
-import { login } from '../utils/login';
+import { test } from '@playwright/test';
+import {
+  loginToK12Catering,
+  scrollUntilVisible,
+} from '../utils/helpers';
 
-// This spec performs a real login; do not reuse saved session from globalSetup.
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test('Login Test', async ({ page }) => {
-  await login(page);
-  await expect(page).not.toHaveURL(/login\.aspx/);
+test('Login Into K12', async ({ page }) => {
+  const catering = await loginToK12Catering(page);
+
+  await catering.getByRole('button', { name: 'Settings' }).click();
+
+  await scrollUntilVisible(catering, {
+    target: catering.getByText('District Contacts', { exact: true }),
+  });
 });
