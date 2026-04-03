@@ -197,3 +197,46 @@ export async function scrollUntilVisibleAndClick(
 
   await locator.click();
 }
+
+export async function getTextFromLocator(
+  page: Page,
+  target: Locator | string
+): Promise<string> {
+  const locator = toLocator(page, target).first();
+  await expect(locator).toBeVisible();
+
+  const text = await locator.textContent();
+
+  if (text == null) {
+    throw new Error(`No text content found for locator: ${String(target)}`);
+  }
+
+  return text.trim();
+}
+
+export async function getInputValueFromLocator(
+  page: Page,
+  target: Locator | string
+): Promise<string> {
+  const locator = toLocator(page, target).first();
+  await expect(locator).toBeVisible();
+
+  const value = await locator.inputValue();
+  return value.trim();
+}
+
+export async function clickAndCaptureNewTab(
+  page: Page,
+  target: Locator | string,
+  timeoutMs = 15000
+): Promise<Page> {
+  const locator = toLocator(page, target).first();
+
+  const [newTab] = await Promise.all([
+    page.context().waitForEvent('page', { timeout: timeoutMs }),
+    locator.click(),
+  ]);
+
+  await newTab.waitForLoadState('domcontentloaded');
+  return newTab;
+}
