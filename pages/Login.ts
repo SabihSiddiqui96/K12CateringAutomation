@@ -13,7 +13,10 @@ export class LoginPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(getPlaywrightBaseUrl());
+    await this.page.goto(getPlaywrightBaseUrl(), {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
   }
 
   async enterUsername(username: string): Promise<void> {
