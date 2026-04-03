@@ -8,7 +8,8 @@ export default defineConfig({
   globalSetup: require.resolve('./global-setup'),
   testDir: './tests',
   timeout: 30000,
-  fullyParallel: true,
+  workers: 1,
+  fullyParallel: false,
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['json', { outputFile: 'test-results/results.json' }],
