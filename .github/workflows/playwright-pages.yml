@@ -41,7 +41,7 @@ jobs:
         run: npm run test:e2e
         continue-on-error: true
         env:
-          PE_USERNAME: ${{ secrets.PE_USERNAME2 }}
+          PE_USERNAME2: ${{ secrets.PE_USERNAME2 }}
           FORCE_AUTH: ${{ secrets.FORCE_AUTH }}
           BASE_URL: ${{ secrets.BASE_URL }}
           ENCRYPTED_PASSWORD: ${{ secrets.ENCRYPTED_PASSWORD }}
