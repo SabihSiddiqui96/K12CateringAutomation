@@ -1,0 +1,126 @@
+{
+  "config": {
+    "configFile": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/playwright.config.ts",
+    "rootDir": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/tests",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "ci": {
+        "commitHref": "https://github.com/SabihSiddiqui96/K12CateringAutomation/commit/20a58594fa57966470ebf899ff08b5d270f67062",
+        "commitHash": "20a58594fa57966470ebf899ff08b5d270f67062",
+        "buildHref": "https://github.com/SabihSiddiqui96/K12CateringAutomation/actions/runs/23950199422"
+      },
+      "gitCommit": {
+        "shortHash": "20a5859",
+        "hash": "20a58594fa57966470ebf899ff08b5d270f67062",
+        "subject": "added ENCRYPTION_KEY:  to .yaml file",
+        "body": "added ENCRYPTION_KEY:  to .yaml file\n",
+        "author": {
+          "name": "SabihSiddiqui96",
+          "email": "sabih-1337@live.com",
+          "time": 1775227474000
+        },
+        "committer": {
+          "name": "SabihSiddiqui96",
+          "email": "sabih-1337@live.com",
+          "time": 1775227474000
+        },
+        "branch": "main"
+      }
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/SabihSiddiqui96/K12CateringAutomation/commit/20a58594fa57966470ebf899ff08b5d270f67062",
+            "commitHash": "20a58594fa57966470ebf899ff08b5d270f67062",
+            "buildHref": "https://github.com/SabihSiddiqui96/K12CateringAutomation/actions/runs/23950199422"
+          },
+          "gitCommit": {
+            "shortHash": "20a5859",
+            "hash": "20a58594fa57966470ebf899ff08b5d270f67062",
+            "subject": "added ENCRYPTION_KEY:  to .yaml file",
+            "body": "added ENCRYPTION_KEY:  to .yaml file\n",
+            "author": {
+              "name": "SabihSiddiqui96",
+              "email": "sabih-1337@live.com",
+              "time": 1775227474000
+            },
+            "committer": {
+              "name": "SabihSiddiqui96",
+              "email": "sabih-1337@live.com",
+              "time": 1775227474000
+            },
+            "branch": "main"
+          }
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.59.1",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [],
+  "errors": [
+    {
+      "message": "TimeoutError: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://qa.primeroedge.co/login.aspx\", waiting until \"load\"\n",
+      "stack": "TimeoutError: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://qa.primeroedge.co/login.aspx\", waiting until \"load\"\n\n    at LoginPage.goto (/home/runner/work/K12CateringAutomation/K12CateringAutomation/pages/Login.ts:16:21)\n    at loginToPrimeroEdge (/home/runner/work/K12CateringAutomation/K12CateringAutomation/utils/helpers.ts:70:19)\n    at globalSetup (/home/runner/work/K12CateringAutomation/K12CateringAutomation/global-setup.ts:47:29)",
+      "location": {
+        "file": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/pages/Login.ts",
+        "column": 21,
+        "line": 16
+      },
+      "snippet": "   at ../pages/Login.ts:16\n\n\u001b[0m \u001b[90m 14 |\u001b[39m\n \u001b[90m 15 |\u001b[39m   \u001b[36masync\u001b[39m goto()\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 16 |\u001b[39m     \u001b[36mawait\u001b[39m \u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpage\u001b[33m.\u001b[39mgoto(getPlaywrightBaseUrl())\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                     \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 17 |\u001b[39m   }\n \u001b[90m 18 |\u001b[39m\n \u001b[90m 19 |\u001b[39m   \u001b[36masync\u001b[39m enterUsername(username\u001b[33m:\u001b[39m string)\u001b[33m:\u001b[39m \u001b[33mPromise\u001b[39m\u001b[33m<\u001b[39m\u001b[36mvoid\u001b[39m\u001b[33m>\u001b[39m {\u001b[0m"
+    }
+  ],
+  "stats": {
+    "startTime": "2026-04-03T14:49:44.546Z",
+    "duration": 30436.457,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

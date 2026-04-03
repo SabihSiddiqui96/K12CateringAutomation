@@ -1,0 +1,126 @@
+{
+  "config": {
+    "configFile": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/playwright.config.ts",
+    "rootDir": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/tests",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "ci": {
+        "commitHref": "https://github.com/SabihSiddiqui96/K12CateringAutomation/commit/96f0fa24b2ee8fc4aa5a3d7947f6b7a73dc5e7a5",
+        "commitHash": "96f0fa24b2ee8fc4aa5a3d7947f6b7a73dc5e7a5",
+        "buildHref": "https://github.com/SabihSiddiqui96/K12CateringAutomation/actions/runs/23949215518"
+      },
+      "gitCommit": {
+        "shortHash": "96f0fa2",
+        "hash": "96f0fa24b2ee8fc4aa5a3d7947f6b7a73dc5e7a5",
+        "subject": "update username2",
+        "body": "update username2\n",
+        "author": {
+          "name": "SabihSiddiqui96",
+          "email": "sabih-1337@live.com",
+          "time": 1775225596000
+        },
+        "committer": {
+          "name": "SabihSiddiqui96",
+          "email": "sabih-1337@live.com",
+          "time": 1775225596000
+        },
+        "branch": "main"
+      }
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/SabihSiddiqui96/K12CateringAutomation/commit/96f0fa24b2ee8fc4aa5a3d7947f6b7a73dc5e7a5",
+            "commitHash": "96f0fa24b2ee8fc4aa5a3d7947f6b7a73dc5e7a5",
+            "buildHref": "https://github.com/SabihSiddiqui96/K12CateringAutomation/actions/runs/23949215518"
+          },
+          "gitCommit": {
+            "shortHash": "96f0fa2",
+            "hash": "96f0fa24b2ee8fc4aa5a3d7947f6b7a73dc5e7a5",
+            "subject": "update username2",
+            "body": "update username2\n",
+            "author": {
+              "name": "SabihSiddiqui96",
+              "email": "sabih-1337@live.com",
+              "time": 1775225596000
+            },
+            "committer": {
+              "name": "SabihSiddiqui96",
+              "email": "sabih-1337@live.com",
+              "time": 1775225596000
+            },
+            "branch": "main"
+          }
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.59.1",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [],
+  "errors": [
+    {
+      "message": "Error: globalSetup: set PE_USERNAME in .env (or the environment) before running tests.",
+      "stack": "Error: globalSetup: set PE_USERNAME in .env (or the environment) before running tests.\n    at globalSetup (/home/runner/work/K12CateringAutomation/K12CateringAutomation/global-setup.ts:14:11)",
+      "location": {
+        "file": "/home/runner/work/K12CateringAutomation/K12CateringAutomation/global-setup.ts",
+        "column": 11,
+        "line": 14
+      },
+      "snippet": "   at ../global-setup.ts:14\n\n\u001b[0m \u001b[90m 12 |\u001b[39m   \u001b[36mconst\u001b[39m username \u001b[33m=\u001b[39m process\u001b[33m.\u001b[39menv\u001b[33m.\u001b[39m\u001b[33mPE_USERNAME\u001b[39m\u001b[33m?\u001b[39m\u001b[33m.\u001b[39mtrim()\u001b[33m;\u001b[39m\n \u001b[90m 13 |\u001b[39m   \u001b[36mif\u001b[39m (\u001b[33m!\u001b[39musername) {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 14 |\u001b[39m     \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m'globalSetup: set PE_USERNAME in .env (or the environment) before running tests.'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 15 |\u001b[39m   }\n \u001b[90m 16 |\u001b[39m\n \u001b[90m 17 |\u001b[39m   \u001b[36mconst\u001b[39m stateFile \u001b[33m=\u001b[39m getAuthStoragePath()\u001b[33m;\u001b[39m\u001b[0m"
+    }
+  ],
+  "stats": {
+    "startTime": "2026-04-03T14:14:40.373Z",
+    "duration": 194.1479999999999,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
