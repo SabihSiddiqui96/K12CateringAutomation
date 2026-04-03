@@ -18,13 +18,13 @@ const SHORT_URL_SUCCESS_MESSAGE = 'District short name saved successfully!';
 
 function generateRandomShortSlug(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let randomPart = '';
+  let randomURLTexts = '';
 
   for (let i = 0; i < 6; i++) {
-    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+    randomURLTexts += chars.charAt(Math.floor(Math.random() * chars.length));
   }
 
-  return `sabihtest${randomPart}`;
+  return `sabihtest${randomURLTexts}`;
 }
 
 function getSlugFromUrlText(urlText: string): string {

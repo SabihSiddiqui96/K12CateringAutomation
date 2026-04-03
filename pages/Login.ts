@@ -19,13 +19,16 @@ export class LoginPage {
         timeout: 60000,
       });
     } catch (error) {
+      const fs = await import('fs');
+  
+      fs.mkdirSync('test-results', { recursive: true });
+  
       await this.page.screenshot({
         path: 'test-results/login-goto-failed.png',
         fullPage: true,
       }).catch(() => {});
   
       const html = await this.page.content().catch(() => '');
-      const fs = await import('fs');
       fs.writeFileSync('test-results/login-goto-failed.html', html);
   
       throw error;
