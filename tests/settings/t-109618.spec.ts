@@ -8,7 +8,7 @@ import {
   getTextFromLocator,
   getInputValueFromLocator,
   clickAndCaptureNewTab,
-} from '../utils/helpers';
+} from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
