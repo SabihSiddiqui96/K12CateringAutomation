@@ -3,7 +3,7 @@ import { LoginPage } from '../pages/Login';
 import { decryptPassword } from './crypto';
 import { getRequiredEnvVar } from './env';
 
-const MERCER_COUNTY_SCHOOLS_SELECTOR = '[value="MERCER COUNTY SCHOOLS"]';
+const merverCountySelector = '[value="MERCER COUNTY SCHOOLS"]';
 
 type ScrollUntilVisibleOptions = {
   target?: Locator | string;
@@ -86,19 +86,63 @@ async function openK12CateringApp(page: Page): Promise<Page> {
   return openedPage ?? page;
 }
 
-export async function loginToK12Catering(page: Page): Promise<Page> {
+type K12CateringNavItem =
+  | 'Dashboard'
+  | 'Menu'
+  | 'Guest Menu'
+  | 'Orders'
+  | 'Accounts'
+  | 'Reports'
+  | 'Districts'
+  | 'Address Book'
+  | 'Check Availability'
+  | 'Settings'
+  | 'Notifications'
+  | 'Manage Notifications'
+  | 'My Profile'
+  | 'Contact Us'
+  | "What's New?";
+
+type LoginToK12CateringOptions = {
+  navigateTo?: K12CateringNavItem;
+};
+
+export async function loginToK12Catering(
+  page: Page,
+  options: LoginToK12CateringOptions = {}
+): Promise<Page> {
+  const { navigateTo } = options;
+
   await loginToPrimeroEdge(page);
 
-  await expect(page.locator(MERCER_COUNTY_SCHOOLS_SELECTOR)).toBeVisible();
+  await expect(page.locator(merverCountySelector)).toBeVisible();
 
   const cateringPage = await openK12CateringApp(page);
   await cateringPage.waitForLoadState('domcontentloaded');
 
   await expect(
-    cateringPage.getByRole('navigation', { name: 'Main navigation menu' })
+    cateringPage.locator('aside[aria-label="Main navigation"]')
   ).toBeVisible();
-//test
+
+  if (navigateTo) {
+    await navigateK12CateringMenu(cateringPage, navigateTo);
+  }
+
   return cateringPage;
+}
+
+export async function navigateK12CateringMenu(
+  page: Page,
+  menuItem: K12CateringNavItem
+): Promise<void> {
+  const sidebar = page.locator('aside[aria-label="Main navigation"]');
+
+  await expect(sidebar).toBeVisible({ timeout: 10000 });
+
+  const menuButton = sidebar.getByLabel(`Navigate to ${menuItem}`);
+
+  await expect(menuButton).toBeVisible({ timeout: 10000 });
+  await menuButton.click();
 }
 
 export async function scrollUntilVisible(
