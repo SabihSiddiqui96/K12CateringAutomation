@@ -9,6 +9,10 @@ import {
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+const DISTRICT_SHORT_NAME_SELECTOR = '#district-short-name';
+const SHORT_URL_TEXT_SELECTOR = 'span.font-mono.break-all';
+const SHORT_URL_SUCCESS_MESSAGE = 'District short name saved successfully!';
+
 function generateRandomShortSlug(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let randomPart = '';
@@ -18,6 +22,16 @@ function generateRandomShortSlug(): string {
   }
 
   return `sabihtest${randomPart}`;
+}
+
+function getSlugFromUrlText(urlText: string): string {
+  return (
+    urlText
+      .trim()
+      .split('/')
+      .filter(Boolean)
+      .pop() ?? ''
+  );
 }
 
 test('Catering - Settings - Add editable District Short URL', async ({ page }) => {
@@ -36,52 +50,43 @@ test('Catering - Settings - Add editable District Short URL', async ({ page }) =
 
   const displayedShortUrlText = await getTextFromLocator(
     catering,
-    catering.locator('span.font-mono.break-all').first()
+    catering.locator(SHORT_URL_TEXT_SELECTOR).first()
   );
 
-  const originalDisplayedShortUrlSlug = displayedShortUrlText
-    .trim()
-    .split('/')
-    .filter(Boolean)
-    .pop() ?? '';
+  const originalDisplayedShortUrlSlug = getSlugFromUrlText(displayedShortUrlText);
 
   await catering.getByLabel('Edit Short URL').click();
 
-  const shortNameInput = catering.locator('#district-short-name');
+  const shortNameInput = catering.locator(DISTRICT_SHORT_NAME_SELECTOR);
   await expect(shortNameInput).toBeVisible();
 
   const originalDialogShortUrl = await getInputValueFromLocator(
     catering,
-    '#district-short-name'
+    DISTRICT_SHORT_NAME_SELECTOR
   );
 
   const newShortUrlSlug = generateRandomShortSlug();
 
-  await shortNameInput.click();
-  await shortNameInput.clear();
+  await shortNameInput.fill('');
   await shortNameInput.fill(newShortUrlSlug);
 
   const updatedDialogShortUrl = await getInputValueFromLocator(
     catering,
-    '#district-short-name'
+    DISTRICT_SHORT_NAME_SELECTOR
   );
 
   await catering.getByRole('button', { name: 'Save District Short Name' }).click();
 
-  await expect(
-    catering.getByText('District short name saved successfully!', { exact: true })
-  ).toBeVisible({ timeout: 10000 });
+  await expect(catering.getByText(SHORT_URL_SUCCESS_MESSAGE, { exact: true })).toBeVisible({
+    timeout: 10000,
+  });
 
   const updatedDisplayedShortUrlText = await getTextFromLocator(
     catering,
-    catering.locator('span.font-mono.break-all').first()
+    catering.locator(SHORT_URL_TEXT_SELECTOR).first()
   );
 
-  const updatedDisplayedShortUrlSlug = updatedDisplayedShortUrlText
-    .trim()
-    .split('/')
-    .filter(Boolean)
-    .pop() ?? '';
+  const updatedDisplayedShortUrlSlug = getSlugFromUrlText(updatedDisplayedShortUrlText);
 
   expect(updatedDialogShortUrl).toBe(newShortUrlSlug);
   expect(updatedDisplayedShortUrlSlug).toBe(newShortUrlSlug);
@@ -92,27 +97,22 @@ test('Catering - Settings - Add editable District Short URL', async ({ page }) =
   );
 
   const headingLocator = shortUrlTab.locator('h2').first();
+  await expect(headingLocator).toBeVisible();
+  const expectedHeading = switchDistrictValue.trim();
 
-await expect(headingLocator).toBeVisible();
+  await expect
+    .poll(
+      async () => {
+        return (await headingLocator.textContent())?.trim() ?? '';
+      },
+      {
+        timeout: 15000,
+        intervals: [500, 1000],
+      }
+    )
+    .toBe(expectedHeading);
 
-await expect
-  .poll(async () => {
-    return (await headingLocator.textContent())?.trim() ?? '';
-  }, {
-    timeout: 15000,
-    intervals: [500, 1000],
-  })
-  .toBe(switchDistrictValue.trim());
-
-const shortUrlPageHeading = ((await headingLocator.textContent()) ?? '').trim();
-
-  console.log('switchDistrictValue:', switchDistrictValue);
-  console.log('originalDisplayedShortUrlSlug:', originalDisplayedShortUrlSlug);
-  console.log('originalDialogShortUrl:', originalDialogShortUrl);
-  console.log('newShortUrlSlug:', newShortUrlSlug);
-  console.log('updatedDialogShortUrl:', updatedDialogShortUrl);
-  console.log('updatedDisplayedShortUrlSlug:', updatedDisplayedShortUrlSlug);
-  console.log('shortUrlPageHeading:', shortUrlPageHeading);
+  const shortUrlPageHeading = ((await headingLocator.textContent()) ?? '').trim();
 
   await test.info().attach('short-url-update-values', {
     body: [
@@ -127,5 +127,5 @@ const shortUrlPageHeading = ((await headingLocator.textContent()) ?? '').trim();
     contentType: 'text/plain',
   });
 
-  expect(shortUrlPageHeading.trim()).toBe(switchDistrictValue.trim());
+  expect(shortUrlPageHeading).toBe(expectedHeading);
 });

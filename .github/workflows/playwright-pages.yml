@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -46,7 +46,7 @@ jobs:
           BASE_URL: ${{ secrets.BASE_URL }}
           ENCRYPTED_PASSWORD: ${{ secrets.ENCRYPTED_PASSWORD }}
 
-      - name: Restore previous Pages content
+      - name: Restore previous published site
         if: always()
         run: |
           mkdir -p site
@@ -69,7 +69,16 @@ jobs:
         if: always()
         run: touch site/.nojekyll
 
-      - name: Publish to gh-pages
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-${{ github.run_number }}
+          path: |
+            playwright-report
+            test-results
+
+      - name: Prepare gh-pages history branch
         if: always()
         run: |
           cd site
@@ -81,3 +90,22 @@ jobs:
           git commit -m "Publish Playwright report ${RUN_ID}" || echo "No changes to commit"
           git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push --force origin gh-pages
+
+      - name: Upload Pages artifact
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    if: always()
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
