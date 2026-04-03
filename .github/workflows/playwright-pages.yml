@@ -44,6 +44,7 @@ jobs:
           PE_USERNAME: ${{ secrets.PE_USERNAME2 }}
           FORCE_AUTH: ${{ secrets.FORCE_AUTH }}
           BASE_URL: ${{ secrets.BASE_URL }}
+          ENCRYPTED_PASSWORD: ${{ secrets.ENCRYPTED_PASSWORD }}
 
       - name: Restore previous Pages content
         if: always()
