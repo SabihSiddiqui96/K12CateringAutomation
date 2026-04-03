@@ -2,9 +2,6 @@ name: Playwright Internal Reports
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
