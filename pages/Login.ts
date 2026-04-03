@@ -13,10 +13,23 @@ export class LoginPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(getPlaywrightBaseUrl(), {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000,
-    });
+    try {
+      await this.page.goto(getPlaywrightBaseUrl(), {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000,
+      });
+    } catch (error) {
+      await this.page.screenshot({
+        path: 'test-results/login-goto-failed.png',
+        fullPage: true,
+      }).catch(() => {});
+  
+      const html = await this.page.content().catch(() => '');
+      const fs = await import('fs');
+      fs.writeFileSync('test-results/login-goto-failed.html', html);
+  
+      throw error;
+    }
   }
 
   async enterUsername(username: string): Promise<void> {
