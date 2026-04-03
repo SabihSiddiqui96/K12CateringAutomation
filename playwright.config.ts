@@ -9,7 +9,10 @@ export default defineConfig({
   testDir: './tests',
   timeout: 30000,
   fullyParallel: true,
-  reporter: 'html',
+  reporter: [
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+    ['json', { outputFile: 'test-results/results.json' }],
+  ],
   use: {
     baseURL: getPlaywrightBaseUrl(),
     headless: false,
