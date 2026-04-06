@@ -47,9 +47,9 @@ stages:
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d '{
-                  "text": "K12 Catering QA automation started. Pipeline: $(Build.DefinitionName) Run: $(Build.BuildNumber) Branch: $(Build.SourceBranchName)"
+                  "text": "Initial run started for K12Catering Automation.\nSee: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId) to monitor the run."
                 }'
-            displayName: Notify RingCentral - Automation started
+            displayName: Notify RingCentral - Started
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
@@ -88,23 +88,62 @@ stages:
               publishLocation: "pipeline"
 
           - script: |
-              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
-                -H "Content-Type: application/json" \
-                -d '{
-                  "text": "K12 Catering QA automation passed. Pipeline: $(Build.DefinitionName) Run: $(Build.BuildNumber) Branch: $(Build.SourceBranchName)"
-                }'
-            displayName: Notify RingCentral - Passed
-            condition: succeeded()
-            env:
-              RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
+              node -e "
+              const fs = require('fs');
+              const path = 'test-results/results.json';
+
+              if (!fs.existsSync(path)) {
+                console.log('##vso[task.setvariable variable=TEST_TOTAL]0');
+                console.log('##vso[task.setvariable variable=TEST_PASSED]0');
+                console.log('##vso[task.setvariable variable=TEST_FAILED]0');
+                process.exit(0);
+              }
+
+              const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+              let total = 0;
+              let passed = 0;
+              let failed = 0;
+
+              function walkSuite(suite) {
+                if (suite.specs) {
+                  for (const spec of suite.specs) {
+                    for (const test of (spec.tests || [])) {
+                      total++;
+                      const results = test.results || [];
+                      const hasPassed = results.some(r => r.status === 'passed');
+                      const hasFailed = results.some(r =>
+                        ['failed', 'timedOut', 'interrupted'].includes(r.status)
+                      );
+
+                      if (hasPassed) passed++;
+                      else if (hasFailed) failed++;
+                    }
+                  }
+                }
+
+                for (const child of (suite.suites || [])) {
+                  walkSuite(child);
+                }
+              }
+
+              for (const suite of (data.suites || [])) {
+                walkSuite(suite);
+              }
+
+              console.log('##vso[task.setvariable variable=TEST_TOTAL]' + total);
+              console.log('##vso[task.setvariable variable=TEST_PASSED]' + passed);
+              console.log('##vso[task.setvariable variable=TEST_FAILED]' + failed);
+              "
+            displayName: Calculate Playwright totals
+            condition: succeededOrFailed()
 
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d '{
-                  "text": "K12 Catering QA automation failed. Pipeline: $(Build.DefinitionName) Run: $(Build.BuildNumber) Branch: $(Build.SourceBranchName)"
+                  "text": "K12Catering Automation run completed.\nTotal: $(TEST_TOTAL)\nPassed: $(TEST_PASSED)\nFailed: $(TEST_FAILED)\nSee results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"
                 }'
-            displayName: Notify RingCentral - Failed
-            condition: failed()
+            displayName: Notify RingCentral - Completed
+            condition: succeededOrFailed()
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
