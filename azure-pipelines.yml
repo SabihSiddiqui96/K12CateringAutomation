@@ -1,4 +1,7 @@
-trigger: none
+trigger:
+  branches:
+    include:
+      - main
 
 pool:
   vmImage: "ubuntu-latest"
@@ -40,14 +43,6 @@ stages:
           - script: npx playwright install --with-deps
             displayName: Install Playwright browsers
 
-          - script: echo "BASE_URL=$(BASE_URL)"
-            displayName: Print BASE_URL
-
-          - script: |
-              echo "Checking QA site..."
-              curl -I -L --max-time 60 "$(BASE_URL)" || true
-            displayName: Check QA URL reachability
-
           - script: npm run test:e2e:qa
             displayName: Run Playwright tests
             env:
@@ -56,7 +51,6 @@ stages:
               ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
               ENCRYPTION_KEY: $(ENCRYPTION_KEY)
               HEADLESS: "true"
-              DEBUG: pw:api
 
           - task: PublishTestResults@2
             displayName: Publish JUnit test results
