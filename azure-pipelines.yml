@@ -55,6 +55,7 @@ stages:
               PE_USERNAME: $(PE_USERNAME)
               ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
               ENCRYPTION_KEY: $(ENCRYPTION_KEY)
+              HEADLESS: "true"
               DEBUG: pw:api
 
           - task: PublishTestResults@2

@@ -16,7 +16,7 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.BASE_URL?.trim() || 'https://qa.primeroedge.co',
-    headless: !!process.env.CI,
+    headless: process.env.HEADLESS !== 'false',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
