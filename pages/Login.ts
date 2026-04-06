@@ -12,6 +12,8 @@ export class LoginPage {
   }
 
   async goto(): Promise<void> {
+    console.log('LOGIN DEBUG: using updated goto()');
+
     const gotoPromise = this.page
       .goto('/login.aspx', {
         waitUntil: 'commit',
@@ -20,6 +22,8 @@ export class LoginPage {
       .catch((error) => {
         console.log('page.goto error ignored during CI warmup:', error);
       });
+
+    console.log('LOGIN DEBUG: waitForFunction timeout = 120000');
 
     await this.page.waitForFunction(
       () => {
