@@ -12,57 +12,25 @@ export class LoginPage {
   }
 
   async goto(): Promise<void> {
-    const fs = await import('fs');
+    await this.page.goto('/login.aspx', {
+      waitUntil: 'commit',
+      timeout: 120000,
+    });
 
-    try {
-      await this.page.goto('/login.aspx', {
-        waitUntil: 'commit',
-        timeout: 30000,
-      }).catch(() => {
-        console.log('page.goto timed out or returned early, continuing...');
-      });
+    await this.usernameInput.waitFor({
+      state: 'visible',
+      timeout: 60000,
+    });
 
-      await this.page.waitForTimeout(3000);
+    await this.passwordInput.waitFor({
+      state: 'visible',
+      timeout: 60000,
+    });
 
-      await this.page.waitForFunction(() => {
-        return !!document.querySelector('#UserNameTextBox');
-      }, { timeout: 30000 });
-
-      await this.page.waitForFunction(() => {
-        return !!document.querySelector('#PasswordTextBox');
-      }, { timeout: 30000 });
-
-      await this.page.waitForFunction(() => {
-        return !!document.querySelector('#LoginButton');
-      }, { timeout: 30000 });
-    } catch (error) {
-      console.log('Current URL:', this.page.url());
-
-      try {
-        console.log('Page title:', await this.page.title());
-      } catch {
-        console.log('Page title: unavailable');
-      }
-
-      try {
-        await this.page.screenshot({
-          path: 'test-results/login-page-failure.png',
-          fullPage: true,
-          timeout: 5000,
-        });
-      } catch (screenshotError) {
-        console.log('Screenshot capture failed:', screenshotError);
-      }
-
-      try {
-        const html = await this.page.content();
-        fs.writeFileSync('test-results/login-page-failure.html', html);
-      } catch (htmlError) {
-        console.log('HTML capture failed:', htmlError);
-      }
-
-      throw error;
-    }
+    await this.loginButton.waitFor({
+      state: 'visible',
+      timeout: 60000,
+    });
   }
 
   async enterUsername(username: string): Promise<void> {
