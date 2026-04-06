@@ -47,8 +47,8 @@ stages:
             displayName: Run Playwright tests
             env:
               BASE_URL: $(BASE_URL)
-              QA_USERNAME: $(QA_USERNAME)
-              QA_PASSWORD: $(QA_PASSWORD)
+              PE_USERNAME: $(PE_USERNAME)
+              ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
 
           - task: PublishTestResults@2
             displayName: Publish JUnit test results

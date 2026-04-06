@@ -14,23 +14,23 @@ export class LoginPage {
 
   async goto(): Promise<void> {
     try {
-      await this.page.goto(getPlaywrightBaseUrl(), {
+      await this.page.goto('/login.aspx', {
         waitUntil: 'domcontentloaded',
         timeout: 60000,
       });
     } catch (error) {
       const fs = await import('fs');
-  
+
       fs.mkdirSync('test-results', { recursive: true });
-  
+
       await this.page.screenshot({
         path: 'test-results/login-goto-failed.png',
         fullPage: true,
-      }).catch(() => {});
-  
+      }).catch(() => { });
+
       const html = await this.page.content().catch(() => '');
       fs.writeFileSync('test-results/login-goto-failed.html', html);
-  
+
       throw error;
     }
   }
