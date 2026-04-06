@@ -19,6 +19,11 @@ export class LoginPage {
         timeout: 120000,
       });
     } catch (error) {
+      await this.page.screenshot({
+        path: 'test-results/login-page-failure.png',
+        fullPage: true,
+      });
+
       const fs = await import('fs');
 
       fs.mkdirSync('test-results', { recursive: true });
