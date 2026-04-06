@@ -22,26 +22,9 @@ export class LoginPage {
         console.log('page.goto timed out or returned early, continuing...');
       });
 
-      console.log('username count:', await this.page.locator('#UserNameTextBox').count());
-      console.log('password count:', await this.page.locator('#PasswordTextBox').count());
-      console.log('login button count:', await this.page.locator('#LoginButton').count());
-
-      await this.page.locator('#UserNameTextBox').waitFor({
-        state: 'attached',
-        timeout: 30000,
-      });
-
-      await this.page.locator('#PasswordTextBox').waitFor({
-        state: 'attached',
-        timeout: 30000,
-      });
-
-      await this.page.locator('#LoginButton').waitFor({
-        state: 'attached',
-        timeout: 30000,
-      });
-
-      await this.page.waitForTimeout(2000);
+      await this.usernameInput.waitFor({ state: 'attached', timeout: 30000 });
+      await this.passwordInput.waitFor({ state: 'attached', timeout: 30000 });
+      await this.loginButton.waitFor({ state: 'attached', timeout: 30000 });
     } catch (error) {
       console.log('Current URL:', this.page.url());
 
