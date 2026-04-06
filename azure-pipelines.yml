@@ -43,6 +43,14 @@ stages:
           - script: npx playwright install --with-deps
             displayName: Install Playwright browsers
 
+          - script: echo "BASE_URL=$(BASE_URL)"
+            displayName: Print BASE_URL
+
+          - script: |
+              echo "Checking QA site..."
+              curl -I -L --max-time 60 "$(BASE_URL)" || true
+            displayName: Check QA URL reachability
+
           - script: npm run test:e2e:qa
             displayName: Run Playwright tests
             env:

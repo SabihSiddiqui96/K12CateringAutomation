@@ -16,7 +16,7 @@ export class LoginPage {
     try {
       await this.page.goto('/login.aspx', {
         waitUntil: 'domcontentloaded',
-        timeout: 60000,
+        timeout: 120000,
       });
     } catch (error) {
       const fs = await import('fs');
