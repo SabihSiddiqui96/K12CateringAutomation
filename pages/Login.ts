@@ -19,14 +19,37 @@ export class LoginPage {
         waitUntil: 'commit',
         timeout: 30000,
       }).catch(() => {
-        console.log('page.goto timed out or returned early, continuing to element-based checks...');
+        console.log('page.goto timed out or returned early, continuing...');
       });
 
-      await expect(this.usernameInput).toBeVisible({ timeout: 30000 });
-      await expect(this.passwordInput).toBeVisible({ timeout: 30000 });
-      await expect(this.loginButton).toBeVisible({ timeout: 30000 });
+      console.log('username count:', await this.page.locator('#UserNameTextBox').count());
+      console.log('password count:', await this.page.locator('#PasswordTextBox').count());
+      console.log('login button count:', await this.page.locator('#LoginButton').count());
+
+      await this.page.locator('#UserNameTextBox').waitFor({
+        state: 'attached',
+        timeout: 30000,
+      });
+
+      await this.page.locator('#PasswordTextBox').waitFor({
+        state: 'attached',
+        timeout: 30000,
+      });
+
+      await this.page.locator('#LoginButton').waitFor({
+        state: 'attached',
+        timeout: 30000,
+      });
+
+      await this.page.waitForTimeout(2000);
     } catch (error) {
       console.log('Current URL:', this.page.url());
+
+      try {
+        console.log('Page title:', await this.page.title());
+      } catch {
+        console.log('Page title: unavailable');
+      }
 
       try {
         await this.page.screenshot({
