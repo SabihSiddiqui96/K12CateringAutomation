@@ -7,20 +7,24 @@ import { getPlaywrightBaseUrl } from './utils/baseUrl';
 export default defineConfig({
   globalSetup: require.resolve('./global-setup'),
   testDir: './tests',
-  timeout: 30000,
+  timeout: 30_000,
   workers: 1,
   fullyParallel: false,
+
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
+    ['junit', { outputFile: 'test-results/results.xml' }],
     ['json', { outputFile: 'test-results/results.json' }],
   ],
+
   use: {
-    baseURL: getPlaywrightBaseUrl(),
-    headless: process.env.CI ? true : false,
+    baseURL: process.env.BASE_URL || getPlaywrightBaseUrl(),
+    headless: !!process.env.CI,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
+
   projects: [
     {
       name: 'chromium',

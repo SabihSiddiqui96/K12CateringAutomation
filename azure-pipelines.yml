@@ -1,0 +1,76 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  NODE_VERSION: "20.x"
+  BASE_URL: "https://qa.primeroedge.co/login.aspx"
+
+stages:
+  - stage: Deploy_QA
+    displayName: Deploy to QA
+    jobs:
+      - job: Deploy
+        displayName: Deploy application to QA
+        steps:
+          - checkout: self
+          - script: echo "Deploying application to QA..."
+            displayName: Deploy app to QA
+
+  - stage: Run_Playwright_QA
+    displayName: Run Playwright smoke tests on QA
+    dependsOn: Deploy_QA
+    condition: succeeded()
+    jobs:
+      - job: PlaywrightTests
+        displayName: Playwright smoke tests
+        timeoutInMinutes: 30
+        steps:
+          - checkout: self
+
+          - task: NodeTool@0
+            inputs:
+              versionSpec: "$(NODE_VERSION)"
+            displayName: Install Node.js
+
+          - script: npm ci
+            displayName: Install npm packages
+
+          - script: npx playwright install --with-deps
+            displayName: Install Playwright browsers
+
+          - script: npm run test:e2e:qa
+            displayName: Run Playwright tests
+            env:
+              BASE_URL: $(BASE_URL)
+              QA_USERNAME: $(QA_USERNAME)
+              QA_PASSWORD: $(QA_PASSWORD)
+
+          - task: PublishTestResults@2
+            displayName: Publish JUnit test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: "JUnit"
+              testResultsFiles: "test-results/results.xml"
+              failTaskOnFailedTests: true
+              testRunTitle: "Playwright QA Smoke"
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish Playwright HTML report
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: "playwright-report"
+              artifact: "playwright-report"
+              publishLocation: "pipeline"
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish traces and other test artifacts
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: "test-results"
+              artifact: "playwright-test-results"
+              publishLocation: "pipeline"
