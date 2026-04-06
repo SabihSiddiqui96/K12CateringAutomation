@@ -1,5 +1,4 @@
-import { Locator, Page } from '@playwright/test';
-import { getPlaywrightBaseUrl } from '../utils/baseUrl';
+import { expect, Locator, Page } from '@playwright/test';
 
 export class LoginPage {
   private readonly usernameInput: Locator;
@@ -13,15 +12,19 @@ export class LoginPage {
   }
 
   async goto(): Promise<void> {
+    const fs = await import('fs');
+
     try {
       await this.page.goto('/login.aspx', {
         waitUntil: 'commit',
-        timeout: 120000,
+        timeout: 30000,
+      }).catch(() => {
+        console.log('page.goto timed out or returned early, continuing to element-based checks...');
       });
 
-      await this.usernameInput.waitFor({ state: 'visible', timeout: 30000 });
-      await this.passwordInput.waitFor({ state: 'visible', timeout: 30000 });
-      await this.loginButton.waitFor({ state: 'visible', timeout: 30000 });
+      await expect(this.usernameInput).toBeVisible({ timeout: 30000 });
+      await expect(this.passwordInput).toBeVisible({ timeout: 30000 });
+      await expect(this.loginButton).toBeVisible({ timeout: 30000 });
     } catch (error) {
       console.log('Current URL:', this.page.url());
 
@@ -37,7 +40,6 @@ export class LoginPage {
       });
 
       const html = await this.page.content();
-      const fs = await import('fs');
       fs.writeFileSync('test-results/login-page-failure.html', html);
 
       throw error;
