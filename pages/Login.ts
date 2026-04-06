@@ -22,9 +22,19 @@ export class LoginPage {
         console.log('page.goto timed out or returned early, continuing...');
       });
 
-      await this.usernameInput.waitFor({ state: 'attached', timeout: 30000 });
-      await this.passwordInput.waitFor({ state: 'attached', timeout: 30000 });
-      await this.loginButton.waitFor({ state: 'attached', timeout: 30000 });
+      await this.page.waitForTimeout(3000);
+
+      await this.page.waitForFunction(() => {
+        return !!document.querySelector('#UserNameTextBox');
+      }, { timeout: 30000 });
+
+      await this.page.waitForFunction(() => {
+        return !!document.querySelector('#PasswordTextBox');
+      }, { timeout: 30000 });
+
+      await this.page.waitForFunction(() => {
+        return !!document.querySelector('#LoginButton');
+      }, { timeout: 30000 });
     } catch (error) {
       console.log('Current URL:', this.page.url());
 
