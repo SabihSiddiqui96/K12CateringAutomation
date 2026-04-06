@@ -49,6 +49,7 @@ stages:
               BASE_URL: $(BASE_URL)
               PE_USERNAME: $(PE_USERNAME)
               ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
+              ENCRYPTION_KEY: $(ENCRYPTION_KEY)
 
           - task: PublishTestResults@2
             displayName: Publish JUnit test results
