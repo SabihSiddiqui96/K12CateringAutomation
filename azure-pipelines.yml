@@ -47,7 +47,7 @@ stages:
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d '{
-                  "text": "Initial run started for K12Catering Automation.\n\nSee: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId) to monitor the run."
+                  "text": "Initial run started for K12Catering Automation.\nSee: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId) to monitor the run."
                 }'
             displayName: Notify RingCentral - Started
             env:
