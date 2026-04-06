@@ -11,9 +11,9 @@ import {
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const districtShortName = "#district-short-name";
-const shortURLTextSelector = "span.font-mono.break-all";
-const urlUpdatedSuccessfully = "District short name saved successfully!";
+const districtShortNameSelector = "#district-short-name";
+const shortUrlTextSelector = "span.font-mono.break-all";
+const shortUrlUpdatedSuccessMessage = "District short name saved successfully!";
 
 function generateRandomShortSlug(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -46,7 +46,7 @@ test("Catering - Settings - Add editable District Short URL", async ({
 
   const displayedShortUrlText = await getTextFromLocator(
     catering,
-    catering.locator(shortURLTextSelector).first(),
+    catering.locator(shortUrlTextSelector).first(),
   );
 
   const originalDisplayedShortUrlSlug = getSlugFromUrlText(
@@ -55,12 +55,12 @@ test("Catering - Settings - Add editable District Short URL", async ({
 
   await catering.getByLabel("Edit Short URL").click();
 
-  const shortNameInput = catering.locator(districtShortName);
+  const shortNameInput = catering.locator(districtShortNameSelector);
   await expect(shortNameInput).toBeVisible();
 
   const originalDialogShortUrl = await getInputValueFromLocator(
     catering,
-    districtShortName,
+    districtShortNameSelector,
   );
 
   const newShortUrlSlug = generateRandomShortSlug();
@@ -70,7 +70,7 @@ test("Catering - Settings - Add editable District Short URL", async ({
 
   const updatedDialogShortUrl = await getInputValueFromLocator(
     catering,
-    districtShortName,
+    districtShortNameSelector,
   );
 
   await catering
@@ -78,14 +78,14 @@ test("Catering - Settings - Add editable District Short URL", async ({
     .click();
 
   await expect(
-    catering.getByText(urlUpdatedSuccessfully, { exact: true }),
+    catering.getByText(shortUrlUpdatedSuccessMessage, { exact: true }),
   ).toBeVisible({
     timeout: 10000,
   });
 
   const updatedDisplayedShortUrlText = await getTextFromLocator(
     catering,
-    catering.locator(shortURLTextSelector).first(),
+    catering.locator(shortUrlTextSelector).first(),
   );
 
   const updatedDisplayedShortUrlSlug = getSlugFromUrlText(

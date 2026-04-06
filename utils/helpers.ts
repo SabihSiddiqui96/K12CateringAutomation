@@ -3,7 +3,7 @@ import { LoginPage } from '../pages/Login';
 import { decryptPassword } from './crypto';
 import { getRequiredEnvVar } from './env';
 
-const merverCountySelector = '[value="MERCER COUNTY SCHOOLS"]';
+const mercerCountySelector = '[value="MERCER COUNTY SCHOOLS"]';
 
 type ScrollUntilVisibleOptions = {
   target?: Locator | string;
@@ -115,7 +115,7 @@ export async function loginToK12Catering(
 
   await loginToPrimeroEdge(page);
 
-  await expect(page.locator(merverCountySelector)).toBeVisible();
+  await expect(page.locator(mercerCountySelector)).toBeVisible();
 
   const cateringPage = await openK12CateringApp(page);
   await cateringPage.waitForLoadState('domcontentloaded');
