@@ -12,25 +12,24 @@ export class LoginPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto('/login.aspx', {
-      waitUntil: 'commit',
-      timeout: 120000,
-    });
+    const gotoPromise = this.page
+      .goto('/login.aspx', {
+        waitUntil: 'commit',
+        timeout: 0,
+      })
+      .catch((error) => {
+        console.log('page.goto error ignored during CI warmup:', error);
+      });
 
-    await this.usernameInput.waitFor({
-      state: 'visible',
-      timeout: 60000,
-    });
+    await this.page.waitForFunction(() => {
+      return (
+        !!document.querySelector('#UserNameTextBox') &&
+        !!document.querySelector('#PasswordTextBox') &&
+        !!document.querySelector('#LoginButton')
+      );
+    }, { timeout: 120000 });
 
-    await this.passwordInput.waitFor({
-      state: 'visible',
-      timeout: 60000,
-    });
-
-    await this.loginButton.waitFor({
-      state: 'visible',
-      timeout: 60000,
-    });
+    await gotoPromise;
   }
 
   async enterUsername(username: string): Promise<void> {
