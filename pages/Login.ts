@@ -15,9 +15,13 @@ export class LoginPage {
   async goto(): Promise<void> {
     try {
       await this.page.goto('/login.aspx', {
-        waitUntil: 'domcontentloaded',
+        waitUntil: 'commit',
         timeout: 120000,
       });
+
+      await this.usernameInput.waitFor({ state: 'visible', timeout: 30000 });
+      await this.passwordInput.waitFor({ state: 'visible', timeout: 30000 });
+      await this.loginButton.waitFor({ state: 'visible', timeout: 30000 });
     } catch (error) {
       console.log('Current URL:', this.page.url());
 
@@ -32,17 +36,9 @@ export class LoginPage {
         fullPage: true,
       });
 
+      const html = await this.page.content();
       const fs = await import('fs');
-
-      fs.mkdirSync('test-results', { recursive: true });
-
-      await this.page.screenshot({
-        path: 'test-results/login-goto-failed.png',
-        fullPage: true,
-      }).catch(() => { });
-
-      const html = await this.page.content().catch(() => '');
-      fs.writeFileSync('test-results/login-goto-failed.html', html);
+      fs.writeFileSync('test-results/login-page-failure.html', html);
 
       throw error;
     }
