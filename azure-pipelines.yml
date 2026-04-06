@@ -58,6 +58,7 @@ stages:
               PE_USERNAME: $(PE_USERNAME)
               ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
               ENCRYPTION_KEY: $(ENCRYPTION_KEY)
+              DEBUG: pw:api
 
           - task: PublishTestResults@2
             displayName: Publish JUnit test results

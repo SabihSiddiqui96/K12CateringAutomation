@@ -19,6 +19,14 @@ export class LoginPage {
         timeout: 120000,
       });
     } catch (error) {
+      console.log('Current URL:', this.page.url());
+
+      try {
+        console.log('Page title:', await this.page.title());
+      } catch {
+        console.log('Page title: unavailable');
+      }
+
       await this.page.screenshot({
         path: 'test-results/login-page-failure.png',
         fullPage: true,
