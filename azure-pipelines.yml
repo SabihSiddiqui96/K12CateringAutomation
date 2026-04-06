@@ -8,7 +8,7 @@ pool:
 
 variables:
   NODE_VERSION: "20.x"
-  BASE_URL: "https://qa.primeroedge.co/login.aspx"
+  BASE_URL: "https://qa.primeroedge.co"
 
 stages:
   - stage: Deploy_QA
