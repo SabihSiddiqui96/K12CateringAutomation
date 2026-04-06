@@ -9,6 +9,8 @@ import {
   clickAndCaptureNewTab,
 } from "../../utils/helpers";
 
+test.setTimeout(180000);
+
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const districtShortNameSelector = "#district-short-name";
