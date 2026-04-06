@@ -43,6 +43,16 @@ stages:
           - script: npx playwright install --with-deps
             displayName: Install Playwright browsers
 
+          - script: |
+              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "text": "K12 Catering QA automation started. Pipeline: $(Build.DefinitionName) Run: $(Build.BuildNumber) Branch: $(Build.SourceBranchName)"
+                }'
+            displayName: Notify RingCentral - Automation started
+            env:
+              RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
+
           - script: npm run test:e2e:qa
             displayName: Run Playwright tests
             env:
@@ -76,3 +86,25 @@ stages:
               targetPath: "test-results"
               artifact: "playwright-test-results"
               publishLocation: "pipeline"
+
+          - script: |
+              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "text": "K12 Catering QA automation passed. Pipeline: $(Build.DefinitionName) Run: $(Build.BuildNumber) Branch: $(Build.SourceBranchName)"
+                }'
+            displayName: Notify RingCentral - Passed
+            condition: succeeded()
+            env:
+              RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
+
+          - script: |
+              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "text": "K12 Catering QA automation failed. Pipeline: $(Build.DefinitionName) Run: $(Build.BuildNumber) Branch: $(Build.SourceBranchName)"
+                }'
+            displayName: Notify RingCentral - Failed
+            condition: failed()
+            env:
+              RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
