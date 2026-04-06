@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test:e2e": "npx playwright test",
+    "test:e2e:qa": "npx playwright test",
     "report:show": "npx playwright show-report",
     "report:build-site": "node scripts/build-report-site.js"
   },
