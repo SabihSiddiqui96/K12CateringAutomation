@@ -15,19 +15,22 @@ export class LoginPage {
     const gotoPromise = this.page
       .goto('/login.aspx', {
         waitUntil: 'commit',
-        timeout: 0,
+        timeout: 120000,
       })
       .catch((error) => {
         console.log('page.goto error ignored during CI warmup:', error);
       });
 
-    await this.page.waitForFunction(() => {
-      return (
-        !!document.querySelector('#UserNameTextBox') &&
-        !!document.querySelector('#PasswordTextBox') &&
-        !!document.querySelector('#LoginButton')
-      );
-    }, { timeout: 120000 });
+    await this.page.waitForFunction(
+      () => {
+        return (
+          !!document.querySelector('#UserNameTextBox') &&
+          !!document.querySelector('#PasswordTextBox') &&
+          !!document.querySelector('#LoginButton')
+        );
+      },
+      { timeout: 120000 }
+    );
 
     await gotoPromise;
   }
