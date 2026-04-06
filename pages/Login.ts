@@ -29,18 +29,21 @@ export class LoginPage {
       console.log('Current URL:', this.page.url());
 
       try {
-        console.log('Page title:', await this.page.title());
-      } catch {
-        console.log('Page title: unavailable');
+        await this.page.screenshot({
+          path: 'test-results/login-page-failure.png',
+          fullPage: true,
+          timeout: 5000,
+        });
+      } catch (screenshotError) {
+        console.log('Screenshot capture failed:', screenshotError);
       }
 
-      await this.page.screenshot({
-        path: 'test-results/login-page-failure.png',
-        fullPage: true,
-      });
-
-      const html = await this.page.content();
-      fs.writeFileSync('test-results/login-page-failure.html', html);
+      try {
+        const html = await this.page.content();
+        fs.writeFileSync('test-results/login-page-failure.html', html);
+      } catch (htmlError) {
+        console.log('HTML capture failed:', htmlError);
+      }
 
       throw error;
     }
