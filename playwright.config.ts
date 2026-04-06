@@ -4,7 +4,6 @@ dotenv.config();
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  globalSetup: require.resolve('./global-setup'),
   testDir: './tests',
   timeout: 180_000,
   workers: 1,
