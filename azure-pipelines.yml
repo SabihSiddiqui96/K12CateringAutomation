@@ -86,6 +86,13 @@ stages:
               targetPath: "test-results"
               artifact: "playwright-test-results"
               publishLocation: "pipeline"
+              
+          - task: publishhtmlreport@1
+            displayName: Publish Playwright HTML Report Tab
+            condition: succeededOrFailed()
+            inputs:
+              htmlType: "genericHTML"
+              htmlPath: "playwright-report/index.html"
 
           - script: |
               node -e "
