@@ -87,12 +87,20 @@ stages:
               artifact: "playwright-test-results"
               publishLocation: "pipeline"
               
+          - script: |
+              echo "Current directory:"
+              pwd
+              echo "Listing playwright-report:"
+              ls -R playwright-report || true
+            displayName: Debug Playwright report files
+            condition: succeededOrFailed()    
           - task: publishhtmlreport@1
             displayName: Publish Playwright HTML Report Tab
             condition: succeededOrFailed()
             inputs:
               htmlType: "genericHTML"
               htmlPath: "playwright-report/index.html"
+              reportDir: "playwright-report"
 
           - script: |
               node -e "
