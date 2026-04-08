@@ -27,3 +27,5 @@ Thumbs.db
 
 # Local-only / legacy scratch (use scripts/encryptPassword.ts)
 /test-encrypt.js
+/tests/placeholder/
+/tests/placeholder/placeholder.ts

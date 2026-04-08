@@ -86,14 +86,7 @@ stages:
               targetPath: "test-results"
               artifact: "playwright-test-results"
               publishLocation: "pipeline"
-              
-          - script: |
-              echo "Current directory:"
-              pwd
-              echo "Listing playwright-report:"
-              ls -R playwright-report || true
-            displayName: Debug Playwright report files
-            condition: succeededOrFailed()    
+
           - task: publishhtmlreport@1
             displayName: Publish Playwright HTML Report Tab
             condition: succeededOrFailed()
@@ -107,17 +100,35 @@ stages:
               const fs = require('fs');
               const path = 'test-results/results.json';
 
-              if (!fs.existsSync(path)) {
-                console.log('##vso[task.setvariable variable=TEST_TOTAL]0');
-                console.log('##vso[task.setvariable variable=TEST_PASSED]0');
-                console.log('##vso[task.setvariable variable=TEST_FAILED]0');
-                process.exit(0);
-              }
-
-              const data = JSON.parse(fs.readFileSync(path, 'utf8'));
               let total = 0;
               let passed = 0;
               let failed = 0;
+              let firstError = '';
+
+              function clean(text) {
+                return String(text || '')
+                  .replace(/\r?\n/g, ' | ')
+                  .replace(/'/g, '')
+                  .replace(/\"/g, '')
+                  .trim();
+              }
+
+              function captureError(result) {
+                if (!result || firstError) return;
+
+                if (result.error && result.error.message) {
+                  firstError = clean(result.error.message);
+                  return;
+                }
+
+                if (Array.isArray(result.errors) && result.errors.length) {
+                  const msg =
+                    result.errors[0]?.message ||
+                    result.errors[0]?.value ||
+                    JSON.stringify(result.errors[0]);
+                  firstError = clean(msg);
+                }
+              }
 
               function walkSuite(suite) {
                 if (suite.specs) {
@@ -132,6 +143,10 @@ stages:
 
                       if (hasPassed) passed++;
                       else if (hasFailed) failed++;
+
+                      for (const result of results) {
+                        captureError(result);
+                      }
                     }
                   }
                 }
@@ -141,24 +156,43 @@ stages:
                 }
               }
 
-              for (const suite of (data.suites || [])) {
-                walkSuite(suite);
+              if (fs.existsSync(path)) {
+                const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+                for (const suite of (data.suites || [])) {
+                  walkSuite(suite);
+                }
+              }
+
+              if (!firstError && failed > 0) {
+                firstError = 'One or more tests failed. Open the test results link for details.';
               }
 
               console.log('##vso[task.setvariable variable=TEST_TOTAL]' + total);
               console.log('##vso[task.setvariable variable=TEST_PASSED]' + passed);
               console.log('##vso[task.setvariable variable=TEST_FAILED]' + failed);
+              console.log('##vso[task.setvariable variable=TEST_ERROR]' + firstError);
               "
-            displayName: Calculate Playwright totals
+            displayName: Calculate Playwright totals and error
             condition: succeededOrFailed()
 
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d '{
-                  "text": "K12Catering Automation run completed.\n\nPassed: $(TEST_PASSED)\nFailed: $(TEST_FAILED)\nTotal: $(TEST_TOTAL)\nTest results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\nPipeline run: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+                  "text": "K12Catering Automation run completed.\n\nPassed: $(TEST_PASSED)\nFailed: $(TEST_FAILED)\nTotal: $(TEST_TOTAL)\n\nTest results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\nPipeline run: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
                 }'
-            displayName: Notify RingCentral - Completed
-            condition: succeededOrFailed()
+            displayName: Notify RingCentral - Completed Success
+            condition: succeeded()
+            env:
+              RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
+
+          - script: |
+              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "text": "K12Catering Automation pipeline failed.\n\nPassed: $(TEST_PASSED)\nFailed: $(TEST_FAILED)\nTotal: $(TEST_TOTAL)\n\nError: $(TEST_ERROR)\n\nTest results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\nPipeline run: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+                }'
+            displayName: Notify RingCentral - Failed
+            condition: failed()
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)

@@ -38,7 +38,11 @@ export class LoginPage {
   }
 
   async enterPassword(password: string): Promise<void> {
-    await this.passwordInput.fill(password);
+    await this.passwordInput.fill(password, { noWaitAfter: true });
+
+    await this.page.locator('#PasswordTextBox').evaluate((el, value) => {
+      (el as HTMLInputElement).value = value;
+    }, password);
   }
 
   async clickLogin(): Promise<void> {

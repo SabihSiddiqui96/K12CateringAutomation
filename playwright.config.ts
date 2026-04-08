@@ -15,10 +15,10 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.BASE_URL?.trim() || 'https://qa.primeroedge.co',
-    headless: process.env.HEADLESS !== 'false',
+    headless: false,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'on',
+    video: 'retain-on-failure',
   },
   projects: [
     {
