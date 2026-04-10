@@ -4,11 +4,11 @@ trigger:
       - main
 
 pool:
-  vmImage: "ubuntu-latest"
+  vmImage: 'ubuntu-latest'
 
 variables:
-  NODE_VERSION: "20.x"
-  BASE_URL: "https://qa.primeroedge.co"
+  NODE_VERSION: '20.x'
+  BASE_URL: 'https://qa.primeroedge.co'
 
 stages:
   - stage: Deploy_QA
@@ -34,7 +34,7 @@ stages:
 
           - task: NodeTool@0
             inputs:
-              versionSpec: "$(NODE_VERSION)"
+              versionSpec: '$(NODE_VERSION)'
             displayName: Install Node.js
 
           - script: npm ci
@@ -60,32 +60,32 @@ stages:
               PE_USERNAME: $(PE_USERNAME)
               ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
               ENCRYPTION_KEY: $(ENCRYPTION_KEY)
-              HEADLESS: "true"
+              HEADLESS: 'true'
 
           - task: PublishTestResults@2
             displayName: Publish JUnit test results
             condition: succeededOrFailed()
             inputs:
-              testResultsFormat: "JUnit"
-              testResultsFiles: "test-results/results.xml"
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'test-results/results.xml'
               failTaskOnFailedTests: true
-              testRunTitle: "Playwright QA Smoke"
+              testRunTitle: 'Playwright QA Smoke'
 
           - task: PublishPipelineArtifact@1
             displayName: Publish Playwright HTML report
             condition: succeededOrFailed()
             inputs:
-              targetPath: "playwright-report"
-              artifact: "playwright-report"
-              publishLocation: "pipeline"
+              targetPath: 'playwright-report'
+              artifact: 'playwright-report'
+              publishLocation: 'pipeline'
 
           - task: PublishPipelineArtifact@1
             displayName: Publish traces and other test artifacts
             condition: succeededOrFailed()
             inputs:
-              targetPath: "test-results"
-              artifact: "playwright-test-results"
-              publishLocation: "pipeline"
+              targetPath: 'test-results'
+              artifact: 'playwright-test-results'
+              publishLocation: 'pipeline'
 
           - script: |
               node -e "
@@ -174,9 +174,9 @@ stages:
               curl --fail-with-body -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d '{
-                  "text": "K12Catering Automation run completed.\n\nPassed: $(TEST_PASSED)\nFailed: $(TEST_FAILED)\nTotal: $(TEST_TOTAL)\n\nTest results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\nPipeline run: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+                  "text": "✅ K12Catering Automation passed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"
                 }'
-            displayName: Notify RingCentral - Completed Success
+            displayName: Notify RingCentral - Success
             condition: succeeded()
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
@@ -185,7 +185,7 @@ stages:
               curl --fail-with-body -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d '{
-                  "text": "K12Catering Automation pipeline failed.\n\nPassed: $(TEST_PASSED)\nFailed: $(TEST_FAILED)\nTotal: $(TEST_TOTAL)\n\nError: $(TEST_ERROR)\n\nTest results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\nPipeline run: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+                  "text": "❌ K12Catering Automation failed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\nError: $(TEST_ERROR)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"
                 }'
             displayName: Notify RingCentral - Failed
             condition: failed()
