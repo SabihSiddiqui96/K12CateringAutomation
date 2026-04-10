@@ -723,37 +723,36 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await expect(catering.locator('#email-input')).toBeVisible();
   await loginToK12CateringAsDistrictUser(catering);
 
-  const districtCatering = await openK12CateringApp(catering);
-  await districtCatering.waitForLoadState('domcontentloaded');
+  await catering.waitForLoadState('domcontentloaded');
 
   await expect(
-    districtCatering.locator('aside[aria-label="Main navigation"]'),
+    catering.locator('aside[aria-label="Main navigation"]'),
   ).toBeVisible();
 
   // ── Verify District User Cannot Change Accounting String Expression ───────
 
-  await navigateK12CateringMenu(districtCatering, 'Settings');
+  await navigateK12CateringMenu(catering, 'Settings');
 
-  await scrollUntilVisible(districtCatering, {
-    target: districtCatering.getByText(paymentFieldFormatRequirementsLabel, {
+  await scrollUntilVisible(catering, {
+    target: catering.getByText(paymentFieldFormatRequirementsLabel, {
       exact: false,
     }),
   });
 
   await clickEditButtonForSetting(
-    districtCatering,
+    catering,
     paymentFieldFormatRequirementsLabel,
     'Edit accounting string requirements',
   );
 
   await expect(
-    districtCatering.getByRole('heading', {
+    catering.getByRole('heading', {
       name: editFormatRequirementsDialogTitle,
     }),
   ).toBeVisible();
 
   await expect(
-    districtCatering.getByText(
+    catering.getByText(
       'Only a Cybersoft Admin can change this expression. To switch to a standard rule, select a format above and save.',
       { exact: false },
     ),
