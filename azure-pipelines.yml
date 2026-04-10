@@ -177,7 +177,7 @@ stages:
                   "text": "✅ K12Catering Automation passed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"
                 }'
             displayName: Notify RingCentral - Success
-            condition: succeeded()
+            condition: and(succeeded(), eq(variables['TEST_FAILED'], '0'))
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
@@ -188,6 +188,6 @@ stages:
                   "text": "❌ K12Catering Automation failed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\nError: $(TEST_ERROR)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"
                 }'
             displayName: Notify RingCentral - Failed
-            condition: failed()
+            condition: or(failed(), ne(variables['TEST_FAILED'], '0'))
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
