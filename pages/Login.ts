@@ -1,4 +1,4 @@
-import { expect, Locator, Page } from '@playwright/test';
+import { Locator, Page } from '@playwright/test';
 
 export class LoginPage {
   private readonly usernameInput: Locator;
@@ -6,9 +6,17 @@ export class LoginPage {
   private readonly loginButton: Locator;
 
   constructor(private readonly page: Page) {
-    this.usernameInput = page.locator('#UserNameTextBox');
-    this.passwordInput = page.locator('#PasswordTextBox');
-    this.loginButton = page.locator('#LoginButton');
+    this.usernameInput = page.locator('#UserNameTextBox, #email-input');
+    this.passwordInput = page.locator('#PasswordTextBox, #password-input');
+    this.loginButton = page.getByRole('button', {
+      name: /sign in|log in/i,
+    }).or(
+      page.getByLabel("Sign in to your account")
+    ).or(
+      page.locator('#LoginButton')
+    ).or(
+      page.locator('button[type="submit"]')
+    );
   }
 
   async goto(): Promise<void> {
@@ -38,11 +46,7 @@ export class LoginPage {
   }
 
   async enterPassword(password: string): Promise<void> {
-    await this.passwordInput.fill(password, { noWaitAfter: true });
-
-    await this.page.locator('#PasswordTextBox').evaluate((el, value) => {
-      (el as HTMLInputElement).value = value;
-    }, password);
+    await this.passwordInput.fill(password);
   }
 
   async clickLogin(): Promise<void> {

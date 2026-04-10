@@ -3,7 +3,7 @@ import { LoginPage } from '../pages/Login';
 import { decryptPassword } from './crypto';
 import { getRequiredEnvVar } from './env';
 
-const mercerCountySelector = '[value="MERCER COUNTY SCHOOLS"]';
+export const mercerCountySelector = '[value="MERCER COUNTY SCHOOLS"], [value="Mercer County School District"]';
 
 type ScrollUntilVisibleOptions = {
   target?: Locator | string;
@@ -74,7 +74,19 @@ export async function loginToPrimeroEdge(page: Page): Promise<void> {
   await page.waitForURL(/(?!.*login\.aspx).*/);
 }
 
-async function openK12CateringApp(page: Page): Promise<Page> {
+// Login with new user
+export async function loginToK12CateringAsDistrictUser(page: Page): Promise<void> {
+  const username = getRequiredEnvVar('PE_DISTRICT_EMAIL');
+  const encryptedPassword = getRequiredEnvVar('PE_DISTRICT_ENCRYPTED_PASSWORD');
+  const password = decryptPassword(encryptedPassword);
+
+  const loginPage = new LoginPage(page);
+  await loginPage.enterUsername(username);
+  await loginPage.enterPassword(password);
+  await loginPage.clickLogin();
+}
+
+export async function openK12CateringApp(page: Page): Promise<Page> {
   const newTabPromise = page
     .context()
     .waitForEvent('page', { timeout: 15_000 })
