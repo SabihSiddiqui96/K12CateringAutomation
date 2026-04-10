@@ -182,11 +182,11 @@ stages:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
           - script: |
-              curl --fail-with-body -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
+              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d '{
                   "text": "❌ K12Catering Automation failed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\nError: $(TEST_ERROR)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"
-                }'
+                }' || true
             displayName: Notify RingCentral - Failed
             condition: or(failed(), ne(variables['TEST_FAILED'], '0'))
             env:
