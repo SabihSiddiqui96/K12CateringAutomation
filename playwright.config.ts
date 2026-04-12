@@ -7,7 +7,7 @@ export default defineConfig({
   testDir: './tests',
   timeout: 180_000,
   workers: 1,
-  fullyParallel: false,
+  fullyParallel: true,
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['junit', { outputFile: 'test-results/results.xml' }],
