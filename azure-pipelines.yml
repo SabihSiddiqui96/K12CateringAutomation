@@ -88,6 +88,26 @@ stages:
               publishLocation: 'pipeline'
 
           - script: |
+              sudo apt-get install -y ffmpeg
+              files=$(find test-results -name "*.webm" -o -name "*.mp4" | sort)
+              if [ -z "$files" ]; then
+                echo "No video files found, skipping merge"
+                exit 0
+              fi
+              while IFS= read -r file; do echo "file '$(pwd)/$file'"; done <<< "$files" > ffmpeg_list.txt
+              ffmpeg -f concat -safe 0 -i ffmpeg_list.txt -c copy test-results/merged-recording.mp4
+            displayName: Merge Playwright recordings
+            condition: succeededOrFailed()
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish merged recording
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: 'test-results/merged-recording.mp4'
+              artifact: 'merged-recording'
+              publishLocation: 'pipeline'
+
+          - script: |
               node -e "
               const fs = require('fs');
               const path = 'test-results/results.json';
