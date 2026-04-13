@@ -54,12 +54,11 @@ const downloadInvoiceBtn = /Download Invoice/i;
 
 // ─── Toast Messages ───────────────────────────────────────────────────────────
 
-const updateRequirementsSuccessTitle = 'Accounting String requirements updated';
-const updateRequirementsSuccessBody =
-  'Validation pattern has been saved successfully.';
-const updateDescriptionSuccessTitle = 'Accounting String description updated';
+const updateRequirementsSuccessTitle = 'Format rules saved';
+const updateRequirementsSuccessBody = 'Validation rules for';
+const updateDescriptionSuccessTitle = 'Payment display label saved';
 const updateDescriptionSuccessBody =
-  'The payment method label has been saved for this district.';
+  'will be shown wherever this payment type appears for your district.';
 const orderPlacedSuccessTitle = 'Order Placed Successfully!';
 
 // ─── Custom Validation Messages ───────────────────────────────────────────────
