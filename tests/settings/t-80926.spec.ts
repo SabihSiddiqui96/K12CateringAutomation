@@ -365,6 +365,9 @@ test('Catering - Settings - Add district customization settings for Payment disp
 }) => {
   const catering = await loginToK12Catering(page, { navigateTo: 'Settings' });
 
+  await catering.waitForLoadState('networkidle');
+  await catering.waitForTimeout(2000);
+
   // ── Payment Display Label ──────────────────────────────────────────────────
 
   await scrollUntilVisible(catering, {
