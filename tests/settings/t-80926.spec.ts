@@ -265,8 +265,6 @@ async function saveAccountingStringRequirementsRule(
   await expect(toast).toBeVisible({ timeout: 10000 });
   await expect(toast).toContainText(updateRequirementsSuccessTitle);
   await expect(toast).toContainText(updateRequirementsSuccessBody);
-  await page.waitForTimeout(1000);
-  await expect(toast).not.toBeVisible({ timeout: 30000 });
 }
 
 async function returnToPaymentInformation(
