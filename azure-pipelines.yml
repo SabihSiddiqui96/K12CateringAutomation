@@ -53,14 +53,15 @@ stages:
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
-          - script: npm run test:e2e:qa
-            displayName: Run Playwright tests
+          - script: npm run test:e2e:browserstack
+            displayName: Run Playwright tests on BrowserStack
             env:
               BASE_URL: $(BASE_URL)
               PE_USERNAME: $(PE_USERNAME)
               ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
               ENCRYPTION_KEY: $(ENCRYPTION_KEY)
-              HEADLESS: 'true'
+              BROWSERSTACK_USERNAME: $(BROWSERSTACK_USERNAME)
+              BROWSERSTACK_ACCESS_KEY: $(BROWSERSTACK_ACCESS_KEY)
 
           - task: PublishTestResults@2
             displayName: Publish JUnit test results

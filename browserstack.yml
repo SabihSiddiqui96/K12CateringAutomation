@@ -1,0 +1,17 @@
+userName: ${BROWSERSTACK_USERNAME}
+accessKey: ${BROWSERSTACK_ACCESS_KEY}
+
+browsers:
+  - browser: chrome
+    browser_version: latest
+    os: Windows
+    os_version: 11
+
+testFramework:
+  name: playwright
+
+parallelsPerPlatform: 1
+browserstackLocal: false
+
+buildName: K12Catering-QA-TestAutomation
+projectName: K12Catering-QA-TestAutomation

@@ -6,6 +6,7 @@
   "scripts": {
     "test:e2e": "npx playwright test",
     "test:e2e:qa": "npx playwright test",
+    "test:e2e:browserstack": "browserstack-node-sdk playwright test",
     "report:show": "npx playwright show-report",
     "report:build-site": "node scripts/build-report-site.js"
   },
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@types/node": "^25.5.0",
+    "browserstack-node-sdk": "^1.50.11",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2"
   },
