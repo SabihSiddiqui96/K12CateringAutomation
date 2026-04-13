@@ -140,7 +140,7 @@ stages:
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
-                -d '{"text": "✅ K12Catering Automation passed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"}' || true
+                -d "{\"text\": \"✅ K12Catering Automation passed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\"}" || true
             displayName: Notify RingCentral - Success
             condition: and(succeeded(), eq(variables['TEST_FAILED'], '0'))
             env:
