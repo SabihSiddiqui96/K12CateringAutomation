@@ -7,7 +7,7 @@ export default defineConfig({
   testDir: './tests',
   timeout: 180_000,
   workers: 1,
-  fullyParallel: false,
+  fullyParallel: true,
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['junit', { outputFile: 'test-results/results.xml' }],
@@ -15,7 +15,7 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.BASE_URL?.trim() || 'https://qa.primeroedge.co',
-    headless: false,
+    headless: true,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
