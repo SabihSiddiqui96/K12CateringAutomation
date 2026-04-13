@@ -60,6 +60,8 @@ stages:
               PE_USERNAME: $(PE_USERNAME)
               ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
               ENCRYPTION_KEY: $(ENCRYPTION_KEY)
+              PE_DISTRICT_EMAIL: $(PE_DISTRICT_EMAIL)
+              PE_DISTRICT_ENCRYPTED_PASSWORD: $(PE_DISTRICT_ENCRYPTED_PASSWORD)
               HEADLESS: 'true'
 
           - task: PublishTestResults@2
