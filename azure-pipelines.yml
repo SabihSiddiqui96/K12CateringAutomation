@@ -28,7 +28,7 @@ stages:
     jobs:
       - job: PlaywrightTests
         displayName: Playwright smoke tests
-        timeoutInMinutes: 30
+        timeoutInMinutes: 60
         steps:
           - checkout: self
 
@@ -44,11 +44,9 @@ stages:
             displayName: Install Playwright browsers
 
           - script: |
-              curl --fail-with-body -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
+              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
-                -d '{
-                  "text": "Initial run started for K12Catering Automation.\nSee: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId) to monitor the run."
-                }'
+                -d '{"text": "🚀 K12Catering Automation started.\n\n🔗 Monitor: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"}' || true
             displayName: Notify RingCentral - Started
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
@@ -82,7 +80,7 @@ stages:
               publishLocation: 'pipeline'
 
           - task: PublishPipelineArtifact@1
-            displayName: Publish traces and other test artifacts
+            displayName: Publish test artifacts
             condition: succeededOrFailed()
             inputs:
               targetPath: 'test-results'
@@ -90,114 +88,59 @@ stages:
               publishLocation: 'pipeline'
 
           - script: |
-              sudo apt-get install -y ffmpeg
-              files=$(find test-results -name "*.webm" -o -name "*.mp4" | sort)
-              if [ -z "$files" ]; then
-                echo "No video files found, skipping merge"
-                exit 0
-              fi
-              while IFS= read -r file; do echo "file '$(pwd)/$file'"; done <<< "$files" > ffmpeg_list.txt
-              ffmpeg -f concat -safe 0 -i ffmpeg_list.txt -c copy test-results/merged-recording.mp4
-            displayName: Merge Playwright recordings
-            condition: succeededOrFailed()
-
-          - task: PublishPipelineArtifact@1
-            displayName: Publish merged recording
-            condition: succeededOrFailed()
-            inputs:
-              targetPath: 'test-results/merged-recording.mp4'
-              artifact: 'merged-recording'
-              publishLocation: 'pipeline'
-
-          - script: |
               node -e "
               const fs = require('fs');
               const path = 'test-results/results.json';
-
-              let total = 0;
-              let passed = 0;
-              let failed = 0;
-              let firstError = '';
+              let total = 0, passed = 0, failed = 0, firstError = '';
 
               function clean(text) {
                 return String(text || '')
                   .replace(/\r?\n/g, ' | ')
-                  .replace(/\"/g, '')
-                  .replace(/'/g, '')
-                  .replace(/[{}[\]]/g, '')
-                  .replace(/\s+/g, ' ')
-                  .trim()
-                  .slice(0, 500);
+                  .replace(/\"/g, '').replace(/'/g, '')
+                  .replace(/[{}[\]]/g, '').replace(/\s+/g, ' ')
+                  .trim().slice(0, 500);
               }
 
               function captureError(result) {
                 if (!result || firstError) return;
-
-                if (result.error && result.error.message) {
-                  firstError = clean(result.error.message);
-                  return;
-                }
-
+                if (result.error?.message) { firstError = clean(result.error.message); return; }
                 if (Array.isArray(result.errors) && result.errors.length) {
-                  const msg =
-                    result.errors[0]?.message ||
-                    result.errors[0]?.value ||
-                    JSON.stringify(result.errors[0]);
-                  firstError = clean(msg);
+                  firstError = clean(result.errors[0]?.message || result.errors[0]?.value || JSON.stringify(result.errors[0]));
                 }
               }
 
               function walkSuite(suite) {
-                if (suite.specs) {
-                  for (const spec of suite.specs) {
-                    for (const test of (spec.tests || [])) {
-                      total++;
-                      const results = test.results || [];
-                      const hasPassed = results.some(r => r.status === 'passed');
-                      const hasFailed = results.some(r =>
-                        ['failed', 'timedOut', 'interrupted'].includes(r.status)
-                      );
-
-                      if (hasPassed) passed++;
-                      else if (hasFailed) failed++;
-
-                      for (const result of results) {
-                        captureError(result);
-                      }
-                    }
+                for (const spec of (suite.specs || [])) {
+                  for (const test of (spec.tests || [])) {
+                    total++;
+                    const results = test.results || [];
+                    if (results.some(r => r.status === 'passed')) passed++;
+                    else if (results.some(r => ['failed','timedOut','interrupted'].includes(r.status))) failed++;
+                    results.forEach(captureError);
                   }
                 }
-
-                for (const child of (suite.suites || [])) {
-                  walkSuite(child);
-                }
+                for (const child of (suite.suites || [])) walkSuite(child);
               }
 
               if (fs.existsSync(path)) {
                 const data = JSON.parse(fs.readFileSync(path, 'utf8'));
-                for (const suite of (data.suites || [])) {
-                  walkSuite(suite);
-                }
+                (data.suites || []).forEach(walkSuite);
               }
 
-              if (!firstError && failed > 0) {
-                firstError = 'One or more tests failed. Open the test results link for details.';
-              }
+              if (!firstError && failed > 0) firstError = 'One or more tests failed. Check results link for details.';
 
               console.log('##vso[task.setvariable variable=TEST_TOTAL]' + total);
               console.log('##vso[task.setvariable variable=TEST_PASSED]' + passed);
               console.log('##vso[task.setvariable variable=TEST_FAILED]' + failed);
               console.log('##vso[task.setvariable variable=TEST_ERROR]' + firstError);
               "
-            displayName: Calculate Playwright totals and error
+            displayName: Calculate test totals
             condition: succeededOrFailed()
 
           - script: |
-              curl --fail-with-body -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
+              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
-                -d '{
-                  "text": "✅ K12Catering Automation passed.\n\nPassed: $(TEST_PASSED) |Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"
-                }'
+                -d '{"text": "✅ K12Catering Automation passed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"}' || true
             displayName: Notify RingCentral - Success
             condition: and(succeeded(), eq(variables['TEST_FAILED'], '0'))
             env:
@@ -206,10 +149,17 @@ stages:
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
-                -d '{
-                  "text": "❌ K12Catering Automation failed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\nError: $(TEST_ERROR)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"
-                }' || true
-            displayName: Notify RingCentral - Failed
-            condition: or(failed(), ne(variables['TEST_FAILED'], '0'))
+                -d '{"text": "❌ K12Catering Automation — Tests Failed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\nError: $(TEST_ERROR)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"}' || true
+            displayName: Notify RingCentral - Tests Failed
+            condition: ne(variables['TEST_FAILED'], '0')
+            env:
+              RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
+
+          - script: |
+              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
+                -H "Content-Type: application/json" \
+                -d '{"text": "⚠️ K12Catering Automation — Pipeline Failed (tests may have passed).\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Pipeline: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"}' || true
+            displayName: Notify RingCentral - Pipeline Failed
+            condition: and(failed(), eq(variables['TEST_FAILED'], '0'))
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
