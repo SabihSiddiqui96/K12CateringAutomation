@@ -271,6 +271,12 @@ async function returnToPaymentInformation(
   page: Page,
   accountingStringDescriptionValue: string,
 ) {
+  // Wait for any visible toast to disappear before clicking cart
+  const toast = page.getByRole('alert');
+  if (await toast.isVisible().catch(() => false)) {
+    await expect(toast).not.toBeVisible({ timeout: 30000 });
+  }
+
   const cartButton = page.getByLabel(viewShoppingCartBtn);
   await scrollUntilVisible(page, { target: cartButton });
   await expect(cartButton).toBeVisible();
