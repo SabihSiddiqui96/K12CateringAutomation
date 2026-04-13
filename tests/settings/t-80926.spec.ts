@@ -266,6 +266,7 @@ async function saveAccountingStringRequirementsRule(
   await expect(toast).toContainText(updateRequirementsSuccessTitle);
   await expect(toast).toContainText(updateRequirementsSuccessBody);
   await page.waitForTimeout(1000);
+  await expect(toast).not.toBeVisible({ timeout: 30000 });
 }
 
 async function returnToPaymentInformation(
@@ -419,6 +420,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await expect(descriptionToast).toContainText(updateDescriptionSuccessTitle);
   await expect(descriptionToast).toContainText(updateDescriptionSuccessBody);
   await catering.waitForTimeout(1000);
+  await expect(descriptionToast).not.toBeVisible({ timeout: 30000 });
 
   const descriptionSection = catering
     .getByLabel('Edit accounting string description')
@@ -520,6 +522,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await expect(requirementsToast).toContainText(updateRequirementsSuccessTitle);
   await expect(requirementsToast).toContainText(updateRequirementsSuccessBody);
   await catering.waitForTimeout(1000);
+  await expect(requirementsToast).not.toBeVisible({ timeout: 30000 });
 
   // ── Verify Payment Type in Orders ─────────────────────────────────────────
 
