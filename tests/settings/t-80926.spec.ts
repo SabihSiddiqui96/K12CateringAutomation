@@ -528,20 +528,6 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await catering.waitForTimeout(1000);
   await expect(requirementsToast).not.toBeVisible({ timeout: 30000 });
 
-  // ── Verify Payment Type in Orders ─────────────────────────────────────────
-
-  await navigateK12CateringMenu(catering, 'Orders');
-
-  const paymentTypeInOrders = await getTextFromLocator(
-    catering,
-    catering
-      .locator('article')
-      .first()
-      .getByText('Payment Type', { exact: true })
-      .locator('xpath=following-sibling::p[1]'),
-  );
-  expect(paymentTypeInOrders).toBe(newAccountingStringDescriptionValue);
-
   // ── Add to Cart ───────────────────────────────────────────────────────────
 
   await navigateK12CateringMenu(catering, 'Menu');
@@ -685,6 +671,18 @@ test('Catering - Settings - Add district customization settings for Payment disp
       .waitFor({ state: 'visible', timeout: 15000 }),
   ]);
 
+  // ── Verify Payment Type in Orders ─────────────────────────────────────────
+
+  const paymentTypeInOrders = await getTextFromLocator(
+    catering,
+    catering
+      .locator('article')
+      .first()
+      .getByText('Payment Type', { exact: true })
+      .locator('xpath=following-sibling::p[1]'),
+  );
+  expect(paymentTypeInOrders).toBe(newAccountingStringDescriptionValue);
+
   // ── Verify Order in Orders List ───────────────────────────────────────────
 
   await expect(
@@ -693,24 +691,18 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await catering.waitForLoadState('domcontentloaded');
   await catering.waitForTimeout(2000);
 
-  // Find the order card that matches our payment type
-  const matchingOrderCard = catering
-    .locator('article')
-    .filter({ hasText: newAccountingStringDescriptionValue })
-    .first();
-
-  await scrollUntilVisible(catering, { target: matchingOrderCard });
-  await expect(matchingOrderCard).toBeVisible();
+  const latestOrderCard = catering.locator('article').first();
+  await expect(latestOrderCard).toBeVisible();
 
   const latestOrderPaymentType = await getTextFromLocator(
     catering,
-    matchingOrderCard
+    latestOrderCard
       .getByText('Payment Type', { exact: true })
       .locator('xpath=following-sibling::p[1]'),
   );
   expect(latestOrderPaymentType).toBe(newAccountingStringDescriptionValue);
 
-  const viewDetailsButton = matchingOrderCard
+  const viewDetailsButton = latestOrderCard
     .getByRole('button', { name: viewDetailsForOrderBtn })
     .first();
   await expect(viewDetailsButton).toBeVisible();
