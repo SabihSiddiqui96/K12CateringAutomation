@@ -693,18 +693,24 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await catering.waitForLoadState('domcontentloaded');
   await catering.waitForTimeout(2000);
 
-  const latestOrderCard = catering.locator('article').first();
-  await expect(latestOrderCard).toBeVisible();
+  // Find the order card that matches our payment type
+  const matchingOrderCard = catering
+    .locator('article')
+    .filter({ hasText: newAccountingStringDescriptionValue })
+    .first();
+
+  await scrollUntilVisible(catering, { target: matchingOrderCard });
+  await expect(matchingOrderCard).toBeVisible();
 
   const latestOrderPaymentType = await getTextFromLocator(
     catering,
-    latestOrderCard
+    matchingOrderCard
       .getByText('Payment Type', { exact: true })
       .locator('xpath=following-sibling::p[1]'),
   );
   expect(latestOrderPaymentType).toBe(newAccountingStringDescriptionValue);
 
-  const viewDetailsButton = latestOrderCard
+  const viewDetailsButton = matchingOrderCard
     .getByRole('button', { name: viewDetailsForOrderBtn })
     .first();
   await expect(viewDetailsButton).toBeVisible();
