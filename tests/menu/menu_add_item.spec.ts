@@ -21,6 +21,19 @@ test.describe('Menu - Add Menu Item', () => {
     await catering.waitForLoadState('domcontentloaded');
   });
 
+  const dialog = () =>
+    catering.getByRole('dialog', { name: 'Add New Menu Item' });
+  const openModal = async () => {
+    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
+    await expect(dialog()).toBeVisible({ timeout: 10000 });
+  };
+  const closeModal = async () => {
+    await catering
+      .getByRole('button', { name: 'Cancel and close modal' })
+      .click();
+    await expect(dialog()).not.toBeVisible({ timeout: 5000 });
+  };
+
   test('Menu - Add Menu Item button is visible on the Menu page', async () => {
     await expect(
       catering.getByRole('button', { name: 'Add a new menu item' }),
@@ -28,206 +41,141 @@ test.describe('Menu - Add Menu Item', () => {
   });
 
   test('Menu - Clicking Add Menu Item opens the Add New Menu Item modal', async () => {
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await expect(
-      catering.getByRole('textbox', {
-        name: 'Add categories for this menu item',
-      }),
-    ).toBeVisible();
-    await expect(
-      catering.getByRole('textbox', { name: 'Enter menu item name' }),
-    ).toBeVisible();
-    await expect(
-      catering.getByRole('textbox', { name: 'Enter menu item description' }),
-    ).toBeVisible();
-    await expect(
-      catering.getByRole('spinbutton', { name: 'Price (USD)' }),
-    ).toBeVisible();
-    await expect(
-      catering.getByRole('spinbutton', { name: 'Serves #' }),
-    ).toBeVisible();
-    await catering
-      .getByRole('button', { name: 'Cancel and close modal' })
-      .click();
+    await openModal();
+    await expect(catering.locator('#categories-input')).toBeVisible();
+    await expect(catering.locator('#menu-item-name')).toBeVisible();
+    await expect(catering.locator('#menu-item-description')).toBeVisible();
+    await expect(catering.locator('#price-per-item')).toBeVisible();
+    await expect(catering.locator('#serves-count')).toBeVisible();
+    await closeModal();
   });
 
-  test('Menu - Submitting Add Menu Item with all required fields empty shows validation errors', async () => {
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
+  test('Menu - Submitting with all required fields empty shows validation errors', async () => {
+    await openModal();
     await catering.getByRole('button', { name: 'Add new menu item' }).click();
-    // At least one validation error should appear
-    await expect(
-      catering
-        .locator('[aria-invalid="true"], .error, [class*="error"]')
-        .first(),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('button', { name: 'Cancel and close modal' })
-      .click();
+    // Validation errors appear as p.text-red-500
+    await expect(catering.locator('p.text-red-500').first()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(dialog()).toBeVisible(); // modal stays open
+    await closeModal();
   });
 
   test('Menu - Category is required in Add Menu Item form', async () => {
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    // Fill all except category
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item name' })
-      .fill('Test Item');
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item description' })
-      .fill('Test Description');
-    await catering
-      .getByRole('spinbutton', { name: 'Price (USD)' })
-      .fill('5.00');
-    await catering.getByRole('spinbutton', { name: 'Serves #' }).fill('1');
+    await openModal();
+    await catering.locator('#menu-item-name').fill('Test Item');
+    await catering.locator('#menu-item-description').fill('Test Description');
+    await catering.locator('#price-per-item').fill('5.00');
+    await catering.locator('#serves-count').fill('1');
     await catering.getByRole('button', { name: 'Add new menu item' }).click();
-    // Validation error should appear near categories
     await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('button', { name: 'Cancel and close modal' })
-      .click();
+      catering.locator('p.text-red-500', { hasText: /category/i }),
+    ).toBeVisible({ timeout: 5000 });
+    await expect(dialog()).toBeVisible();
+    await closeModal();
   });
 
   test('Menu - Name is required in Add Menu Item form', async () => {
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item description' })
-      .fill('Test Description');
-    await catering
-      .getByRole('spinbutton', { name: 'Price (USD)' })
-      .fill('5.00');
-    await catering.getByRole('spinbutton', { name: 'Serves #' }).fill('1');
+    await openModal();
+    await catering.locator('#menu-item-description').fill('Test Description');
+    await catering.locator('#price-per-item').fill('5.00');
+    await catering.locator('#serves-count').fill('1');
     await catering.getByRole('button', { name: 'Add new menu item' }).click();
-    // Modal should remain open (validation failed)
     await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('button', { name: 'Cancel and close modal' })
-      .click();
+      catering.locator('p.text-red-500', { hasText: 'Name is required' }),
+    ).toBeVisible({ timeout: 5000 });
+    await expect(dialog()).toBeVisible();
+    await closeModal();
   });
 
   test('Menu - Description is required in Add Menu Item form', async () => {
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item name' })
-      .fill('Test Item');
-    await catering
-      .getByRole('spinbutton', { name: 'Price (USD)' })
-      .fill('5.00');
-    await catering.getByRole('spinbutton', { name: 'Serves #' }).fill('1');
+    await openModal();
+    await catering.locator('#menu-item-name').fill('Test Item');
+    await catering.locator('#price-per-item').fill('5.00');
+    await catering.locator('#serves-count').fill('1');
     await catering.getByRole('button', { name: 'Add new menu item' }).click();
     await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('button', { name: 'Cancel and close modal' })
-      .click();
+      catering.locator('p.text-red-500', {
+        hasText: 'Description is required',
+      }),
+    ).toBeVisible({ timeout: 5000 });
+    await expect(dialog()).toBeVisible();
+    await closeModal();
   });
 
   test('Menu - Price is required in Add Menu Item form', async () => {
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item name' })
-      .fill('Test Item');
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item description' })
-      .fill('Test Description');
-    await catering.getByRole('spinbutton', { name: 'Serves #' }).fill('1');
-    // Clear price to 0 or empty
-    const priceInput = catering.getByRole('spinbutton', {
-      name: 'Price (USD)',
-    });
-    await priceInput.clear();
+    await openModal();
+    // Fill category (required to isolate the price error)
+    await catering.locator('#categories-input').fill('Drink');
+    await catering.locator('#categories-input').press('Enter');
+    await catering.locator('#menu-item-name').fill('Test Item');
+    await catering.locator('#menu-item-description').fill('Test Description');
+    await catering.locator('#serves-count').fill('1');
+    // Set price to 0 — invalid (must be greater than 0)
+    await catering.locator('#price-per-item').fill('0');
     await catering.getByRole('button', { name: 'Add new menu item' }).click();
+    // Price error scoped to dialog
     await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('button', { name: 'Cancel and close modal' })
-      .click();
+      catering
+        .getByRole('dialog', { name: 'Add New Menu Item' })
+        .locator('p.text-red-500', { hasText: 'Price must be greater than 0' }),
+    ).toBeVisible({ timeout: 5000 });
+    await expect(dialog()).toBeVisible();
+    await closeModal();
   });
 
   test('Menu - Ingredients, Image, and Min Order Qty are optional', async () => {
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    // Select category
+    await openModal();
+    await catering.locator('#categories-input').click();
+    await catering.locator('#categories-input').type('Drink');
+    await catering.locator('#categories-input').press('Enter');
+    await catering.locator('#menu-item-name').fill('Automation Test Item');
     await catering
-      .getByRole('textbox', { name: 'Add categories for this menu item' })
-      .fill('Drink');
-    await catering.getByRole('option', { name: 'Drink' }).click();
-    // Fill required fields only
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item name' })
-      .fill('Automation Test Item');
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item description' })
+      .locator('#menu-item-description')
       .fill('Automation test description');
-    await catering
-      .getByRole('spinbutton', { name: 'Price (USD)' })
-      .fill('1.00');
-    await catering.getByRole('spinbutton', { name: 'Serves #' }).fill('1');
-    // Leave Ingredients, Image, Min Order Qty blank - submit
+    await catering.locator('#price-per-item').fill('1.00');
+    await catering.locator('#serves-count').fill('1');
     await catering.getByRole('button', { name: 'Add new menu item' }).click();
-    // Modal should close on success
+    await expect(dialog()).not.toBeVisible({ timeout: 15000 });
+    // Clean up
+    await catering
+      .getByRole('button', { name: /Delete Automation Test Item menu item/ })
+      .click();
     await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).not.toBeVisible({ timeout: 15000 });
+      catering.locator('h3', { hasText: 'Delete Menu Item' }),
+    ).toBeVisible({ timeout: 5000 });
+    await catering.getByText('Delete Item').click();
   });
 
   test('Menu - Successfully adding a menu item closes modal and adds item to the list', async () => {
-    // Count items before
-    const itemCountBefore = await catering
-      .locator('main')
-      .getByRole('article')
-      .count();
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
+    const cards = catering.locator('#main-content div.group.rounded-xl');
+    await expect(cards.first()).toBeVisible({ timeout: 15000 });
+    const countBefore = await cards.count();
+
+    await openModal();
+    await catering.locator('#categories-input').click();
+    await catering.locator('#categories-input').type('Drink');
+    await catering.locator('#categories-input').press('Enter');
+    await catering.locator('#menu-item-name').fill('Automation New Item');
     await catering
-      .getByRole('textbox', { name: 'Add categories for this menu item' })
-      .fill('Drink');
-    await catering.getByRole('option', { name: 'Drink' }).click();
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item name' })
-      .fill('Automation New Item');
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item description' })
+      .locator('#menu-item-description')
       .fill('Added by automation test');
-    await catering
-      .getByRole('spinbutton', { name: 'Price (USD)' })
-      .fill('2.00');
-    await catering.getByRole('spinbutton', { name: 'Serves #' }).fill('1');
+    await catering.locator('#price-per-item').fill('2.00');
+    await catering.locator('#serves-count').fill('1');
     await catering.getByRole('button', { name: 'Add new menu item' }).click();
+    await expect(dialog()).not.toBeVisible({ timeout: 15000 });
+
+    await expect(cards.nth(countBefore)).toBeVisible({ timeout: 10000 });
+    const countAfter = await cards.count();
+    expect(countAfter).toBeGreaterThan(countBefore);
+
+    // Clean up
+    await catering
+      .getByRole('button', { name: /Delete Automation New Item menu item/ })
+      .click();
     await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).not.toBeVisible({ timeout: 15000 });
-    // Item count should increase
-    const itemCountAfter = await catering
-      .locator('main')
-      .getByRole('article')
-      .count();
-    expect(itemCountAfter).toBeGreaterThan(itemCountBefore);
+      catering.locator('h3', { hasText: 'Delete Menu Item' }),
+    ).toBeVisible({ timeout: 5000 });
+    await catering.getByText('Delete Item').click();
   });
 });
