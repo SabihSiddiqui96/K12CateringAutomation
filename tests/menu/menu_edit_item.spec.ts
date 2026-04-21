@@ -21,237 +21,142 @@ test.describe('Menu - Edit Menu Item', () => {
     await catering.waitForLoadState('domcontentloaded');
   });
 
-  test('Menu - Clicking edit button on a menu item opens Edit Menu Item modal', async () => {
+  async function openEditModal() {
     await catering
       .getByRole('button', { name: /Edit .+ menu item/ })
       .first()
       .click();
+    const dialog = catering.getByRole('dialog', { name: 'Edit Menu Item' });
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    return dialog;
+  }
+
+  test('Clicking edit button opens Edit Menu Item modal pre-filled with existing data', async () => {
+    const dialog = await openEditModal();
     await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
+      dialog.getByRole('heading', { name: 'Edit Menu Item' }),
+    ).toBeVisible();
+    // Name and description are pre-filled (inputs have no aria-label, use id)
+    await expect(catering.locator('#menu-item-name')).not.toHaveValue('');
+    await expect(catering.locator('#menu-item-description')).not.toHaveValue(
+      '',
+    );
     await catering
       .getByRole('button', { name: 'Cancel and close modal' })
       .click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('Menu - Edit Menu Item modal pre-fills existing item data', async () => {
-    await catering
-      .getByRole('button', { name: /Edit .+ menu item/ })
-      .first()
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    const nameInput = catering.getByRole('textbox', {
-      name: 'Enter menu item name',
-    });
-    const descInput = catering.getByRole('textbox', {
-      name: 'Enter menu item description',
-    });
-    await expect(nameInput).not.toHaveValue('');
-    await expect(descInput).not.toHaveValue('');
-    await catering
-      .getByRole('button', { name: 'Cancel and close modal' })
-      .click();
-  });
-
-  test('Menu - Editing menu item name and saving updates the item on the page', async () => {
-    await catering
-      .getByRole('button', { name: /Edit .+ menu item/ })
-      .first()
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    const nameInput = catering.getByRole('textbox', {
-      name: 'Enter menu item name',
-    });
+  test('Editing name and description saves correctly, cancel discards changes', async () => {
+    const dialog = await openEditModal();
+    const nameInput = catering.locator('#menu-item-name');
+    const descInput = catering.locator('#menu-item-description');
     const originalName = await nameInput.inputValue();
-    const updatedName = originalName + ' Updated';
-
-    await nameInput.clear();
-    await nameInput.fill(updatedName);
-    await catering.getByRole('button', { name: 'Update menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).not.toBeVisible({ timeout: 15000 });
-    await expect(catering.getByText(updatedName)).toBeVisible({
-      timeout: 10000,
-    });
-
-    // Restore original name
-    await catering
-      .getByRole('button', {
-        name: new RegExp(`Edit ${updatedName} menu item`),
-      })
-      .first()
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item name' })
-      .clear();
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item name' })
-      .fill(originalName);
-    await catering.getByRole('button', { name: 'Update menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).not.toBeVisible({ timeout: 15000 });
-  });
-
-  test('Menu - Editing menu item description and saving updates the item', async () => {
-    await catering
-      .getByRole('button', { name: /Edit .+ menu item/ })
-      .first()
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    const descInput = catering.getByRole('textbox', {
-      name: 'Enter menu item description',
-    });
     const originalDesc = await descInput.inputValue();
-    const updatedDesc = 'Automation updated description';
 
-    await descInput.clear();
-    await descInput.fill(updatedDesc);
-    await catering.getByRole('button', { name: 'Update menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).not.toBeVisible({ timeout: 15000 });
-
-    // Restore original description
-    await catering
-      .getByRole('button', { name: /Edit .+ menu item/ })
-      .first()
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item description' })
-      .clear();
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item description' })
-      .fill(originalDesc);
-    await catering.getByRole('button', { name: 'Update menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).not.toBeVisible({ timeout: 15000 });
-  });
-
-  test('Menu - Editing menu item price and saving updates the displayed price', async () => {
-    await catering
-      .getByRole('button', { name: /Edit .+ menu item/ })
-      .first()
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    const priceInput = catering.getByRole('spinbutton', {
-      name: 'Price (USD)',
-    });
-    const originalPrice = await priceInput.inputValue();
-    const updatedPrice = '9.99';
-
-    await priceInput.clear();
-    await priceInput.fill(updatedPrice);
-    await catering.getByRole('button', { name: 'Update menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).not.toBeVisible({ timeout: 15000 });
-    await expect(
-      catering
-        .locator('main[aria-label="Main content"]')
-        .getByText('$9.99')
-        .first(),
-    ).toBeVisible({ timeout: 10000 });
-
-    // Restore original price
-    await catering
-      .getByRole('button', { name: /Edit .+ menu item/ })
-      .first()
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering.getByRole('spinbutton', { name: 'Price (USD)' }).clear();
-    await catering
-      .getByRole('spinbutton', { name: 'Price (USD)' })
-      .fill(originalPrice);
-    await catering.getByRole('button', { name: 'Update menu item' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).not.toBeVisible({ timeout: 15000 });
-  });
-
-  test('Menu - Cancelling Edit Menu Item modal discards changes', async () => {
-    await catering
-      .getByRole('button', { name: /Edit .+ menu item/ })
-      .first()
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    const nameInput = catering.getByRole('textbox', {
-      name: 'Enter menu item name',
-    });
-    const originalName = await nameInput.inputValue();
-
+    // --- Test CANCEL first ---
     await nameInput.clear();
     await nameInput.fill('Should Not Save');
     await catering
       .getByRole('button', { name: 'Cancel and close modal' })
       .click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
     await expect(
-      catering.getByRole('dialog', { name: 'Edit Menu Item' }),
-    ).not.toBeVisible({ timeout: 10000 });
+      catering.locator('#main-content').getByText(originalName).first(),
+    ).toBeVisible({ timeout: 5000 });
 
-    // Original name should still be on the page
-    await expect(catering.getByText(originalName)).toBeVisible({
-      timeout: 10000,
-    });
+    // --- Test SAVE name ---
+    await openEditModal();
+    const updatedName = originalName + ' Updated';
+    await catering.locator('#menu-item-name').clear();
+    await catering.locator('#menu-item-name').fill(updatedName);
+    await catering.getByRole('button', { name: 'Update menu item' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 15000 });
+    await expect(
+      catering.locator('#main-content').getByText(updatedName).first(),
+    ).toBeVisible({ timeout: 10000 });
+
+    // --- Test SAVE description ---
+    await catering
+      .getByRole('button', { name: /Edit .+ menu item/ })
+      .first()
+      .click();
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await catering.locator('#menu-item-description').clear();
+    await catering
+      .locator('#menu-item-description')
+      .fill('Automation updated description');
+    await catering.getByRole('button', { name: 'Update menu item' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 15000 });
+
+    // Restore original name and description
+    await catering
+      .getByRole('button', { name: /Edit .+ menu item/ })
+      .first()
+      .click();
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await catering.locator('#menu-item-name').clear();
+    await catering.locator('#menu-item-name').fill(originalName);
+    await catering.locator('#menu-item-description').clear();
+    await catering.locator('#menu-item-description').fill(originalDesc);
+    await catering.getByRole('button', { name: 'Update menu item' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 15000 });
   });
 
-  test('Menu - Deleting a menu item removes it from the list', async () => {
-    // First add a throwaway item to delete
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
+  test('Editing price saves the updated price on the card', async () => {
+    const dialog = await openEditModal();
+    const originalPrice = await catering
+      .locator('#price-per-item')
+      .inputValue();
+
+    await catering.locator('#price-per-item').clear();
+    await catering.locator('#price-per-item').fill('9.99');
+    await catering.getByRole('button', { name: 'Update menu item' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 15000 });
     await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
+      catering.locator('#main-content').getByText('$9.99').first(),
     ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('textbox', { name: 'Add categories for this menu item' })
-      .fill('Drink');
-    await catering.getByRole('option', { name: 'Drink' }).click();
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item name' })
-      .fill('Delete Me Item');
-    await catering
-      .getByRole('textbox', { name: 'Enter menu item description' })
-      .fill('To be deleted');
-    await catering
-      .getByRole('spinbutton', { name: 'Price (USD)' })
-      .fill('1.00');
-    await catering.getByRole('spinbutton', { name: 'Serves #' }).fill('1');
+
+    // Restore original price
+    await openEditModal();
+    await catering.locator('#price-per-item').clear();
+    await catering.locator('#price-per-item').fill(originalPrice);
+    await catering.getByRole('button', { name: 'Update menu item' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 15000 });
+  });
+
+  test('Deleting a menu item removes it from the list', async () => {
+    // Add a throwaway item first
+    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
+    const addDialog = catering.getByRole('dialog', {
+      name: 'Add New Menu Item',
+    });
+    await expect(addDialog).toBeVisible({ timeout: 10000 });
+
+    // Category: fill + Enter (native datalist — no role="option")
+    await catering.locator('#categories-input').fill('Drink');
+    await catering.locator('#categories-input').press('Enter');
+
+    await catering.locator('#menu-item-name').fill('Delete Me Item');
+    await catering.locator('#menu-item-description').fill('To be deleted');
+    await catering.locator('#price-per-item').fill('1.00');
     await catering.getByRole('button', { name: 'Add new menu item' }).click();
+    await expect(addDialog).not.toBeVisible({ timeout: 15000 });
     await expect(
-      catering.getByRole('dialog', { name: 'Add New Menu Item' }),
-    ).not.toBeVisible({ timeout: 15000 });
+      catering.locator('#main-content').getByText('Delete Me Item').first(),
+    ).toBeVisible({ timeout: 10000 });
 
     // Now delete it
     await catering
       .getByRole('button', { name: 'Delete Delete Me Item menu item' })
       .click();
-    // Confirm deletion dialog
-    await catering.getByRole('button', { name: /confirm|yes|delete/i }).click();
-    await expect(catering.getByText('Delete Me Item')).not.toBeVisible({
-      timeout: 10000,
-    });
+    // Wait for confirmation dialog heading then click confirm
+    await expect(
+      catering.locator('h3', { hasText: 'Delete Menu Item' }),
+    ).toBeVisible({ timeout: 5000 });
+    await catering.getByRole('button', { name: 'Delete Item' }).click();
+    await expect(
+      catering.locator('#main-content').getByText('Delete Me Item'),
+    ).not.toBeVisible({ timeout: 10000 });
   });
 });
