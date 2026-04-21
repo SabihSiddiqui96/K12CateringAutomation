@@ -21,126 +21,97 @@ test.describe('Menu - Configuration: Manage Allergens', () => {
     await catering.waitForLoadState('domcontentloaded');
   });
 
-  test('Menu - Manage Allergens modal opens from Configuration', async () => {
+  async function openManageAllergensModal() {
     await catering.getByRole('button', { name: 'Manage allergens' }).click();
+    const dialog = catering.getByRole('dialog', { name: 'Manage Allergens' });
+    await expect(dialog).toBeVisible({ timeout: 10000 });
     await expect(
-      catering.getByRole('dialog', { name: 'Manage Allergens' }),
+      catering.getByRole('button', { name: 'Edit allergen' }).first(),
     ).toBeVisible({ timeout: 10000 });
+    return dialog;
+  }
+
+  test('Modal opens and displays allergen list', async () => {
+    const dialog = await openManageAllergensModal();
+    await expect(
+      dialog.getByRole('heading', { name: 'Manage Allergens' }),
+    ).toBeVisible();
     await expect(
       catering.getByRole('button', { name: 'Edit allergen' }).first(),
     ).toBeVisible();
-    await catering.getByRole('button', { name: 'Close' }).click();
+    // Close with bottom Close button (no aria-label, has text "Close")
+    await dialog.getByText('Close').click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('Menu - Clicking pencil icon on an allergen opens inline edit', async () => {
-    await catering.getByRole('button', { name: 'Manage allergens' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Allergens' }),
-    ).toBeVisible({ timeout: 10000 });
-
+  test('Clicking pencil opens inline edit with save and cancel buttons', async () => {
+    const dialog = await openManageAllergensModal();
     await catering
       .getByRole('button', { name: 'Edit allergen' })
       .first()
       .click();
-    await expect(catering.getByRole('textbox').first()).toBeVisible({
+    await expect(dialog.getByRole('textbox').first()).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(catering.getByRole('button', { name: 'Save' })).toBeVisible();
+    await expect(
+      catering.getByRole('button', { name: 'Cancel' }),
+    ).toBeVisible();
+    // Cancel edit
+    await catering.getByRole('button', { name: 'Cancel' }).click();
+    await dialog.getByText('Close').click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
+  });
+
+  test('Saving inline edit updates the allergen name, cancel discards it', async () => {
+    const dialog = await openManageAllergensModal();
+    const editInput = dialog.getByRole('textbox').first();
+
+    // --- Test CANCEL first ---
+    await catering
+      .getByRole('button', { name: 'Edit allergen' })
+      .first()
+      .click();
+    await expect(editInput).toBeVisible({ timeout: 5000 });
+    const originalName = await editInput.inputValue();
+    await editInput.clear();
+    await editInput.fill('ShouldNotSave');
+    await catering.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog.getByText('ShouldNotSave')).not.toBeVisible();
+    await expect(dialog.getByText(originalName)).toBeVisible({ timeout: 5000 });
+
+    // --- Test SAVE ---
+    await catering
+      .getByRole('button', { name: 'Edit allergen' })
+      .first()
+      .click();
+    await expect(editInput).toBeVisible({ timeout: 5000 });
+    const updatedName = originalName + ' Updated';
+    await editInput.clear();
+    await editInput.fill(updatedName);
+    await catering.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog.getByText(updatedName)).toBeVisible({ timeout: 10000 });
+
+    // Restore original name
+    await catering
+      .getByRole('button', { name: 'Edit allergen' })
+      .first()
+      .click();
+    await expect(editInput).toBeVisible({ timeout: 5000 });
+    await editInput.clear();
+    await editInput.fill(originalName);
+    await catering.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog.getByText(originalName)).toBeVisible({
       timeout: 10000,
     });
 
-    // Cancel button (X) and save (checkmark) should appear
-    const dialog = catering.getByRole('dialog', { name: 'Manage Allergens' });
-    await expect(
-      dialog.locator('button').filter({ hasText: '' }).first(),
-    ).toBeVisible();
-
-    // Press Escape or click X to cancel
-    await catering.keyboard.press('Escape');
-    await catering.getByRole('button', { name: 'Close' }).click();
+    await dialog.getByText('Close').click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('Menu - Saving inline edit updates the allergen name', async () => {
-    await catering.getByRole('button', { name: 'Manage allergens' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Allergens' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    await catering
-      .getByRole('button', { name: 'Edit allergen' })
-      .first()
-      .click();
-    const editInput = catering
-      .getByRole('dialog', { name: 'Manage Allergens' })
-      .getByRole('textbox')
-      .first();
-    const originalName = await editInput.inputValue();
-    const updatedName = originalName + ' Updated';
-
-    await editInput.clear();
-    await editInput.fill(updatedName);
-
-    // Click the green checkmark (save) button
-    await catering
-      .getByRole('dialog', { name: 'Manage Allergens' })
-      .locator('button[type="button"]')
-      .filter({ hasText: '' })
-      .first()
-      .click();
-    await expect(
-      catering
-        .getByRole('dialog', { name: 'Manage Allergens' })
-        .getByText(updatedName),
-    ).toBeVisible({ timeout: 10000 });
-
-    // Restore original
-    await catering
-      .getByRole('button', { name: 'Edit allergen' })
-      .first()
-      .click();
-    await catering
-      .getByRole('dialog', { name: 'Manage Allergens' })
-      .getByRole('textbox')
-      .first()
-      .clear();
-    await catering
-      .getByRole('dialog', { name: 'Manage Allergens' })
-      .getByRole('textbox')
-      .first()
-      .fill(originalName);
-    await catering
-      .getByRole('dialog', { name: 'Manage Allergens' })
-      .locator('button[type="button"]')
-      .filter({ hasText: '' })
-      .first()
-      .click();
-    await catering.getByRole('button', { name: 'Close' }).click();
-  });
-
-  test('Menu - Cancelling inline edit discards allergen name change', async () => {
-    await catering.getByRole('button', { name: 'Manage allergens' }).click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Allergens' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    await catering
-      .getByRole('button', { name: 'Edit allergen' })
-      .first()
-      .click();
-    const editInput = catering
-      .getByRole('dialog', { name: 'Manage Allergens' })
-      .getByRole('textbox')
-      .first();
-    const originalName = await editInput.inputValue();
-
-    await editInput.clear();
-    await editInput.fill('Should Not Save');
-
-    // Click the red X (cancel) button
-    await catering.keyboard.press('Escape');
-    await catering.waitForTimeout(300);
-    await expect(
-      catering
-        .getByRole('dialog', { name: 'Manage Allergens' })
-        .getByText(originalName),
-    ).toBeVisible({ timeout: 10000 });
-    await catering.getByRole('button', { name: 'Close' }).click();
+  test('Modal closes with X button', async () => {
+    const dialog = await openManageAllergensModal();
+    await catering.getByRole('button', { name: 'Close modal' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
 });
