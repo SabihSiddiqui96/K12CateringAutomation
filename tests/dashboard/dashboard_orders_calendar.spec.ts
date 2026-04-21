@@ -50,22 +50,13 @@ test.describe('Dashboard - Orders Calendar', () => {
       name: 'Calendar view and date-wise orders',
     });
 
-  // ── Visibility ──────────────────────────────────────────────────────────────
-
-  test('Orders Calendar section is visible on page load', async () => {
+  test('Orders Calendar section is visible with heading and current month', async () => {
     await expect(calendarSection()).toBeVisible({ timeout: 15000 });
-  });
-
-  test('Orders Calendar shows heading "Orders Calendar"', async () => {
     await expect(
       calendarSection().getByRole('heading', { name: 'Orders Calendar' }),
     ).toBeVisible({ timeout: 15000 });
-  });
-
-  test('Orders Calendar displays the current month and year', async () => {
-    // The calendar header shows e.g. "April 2026"
-    const now = new Date();
-    const monthYear = now.toLocaleString('default', {
+    const todayNow = new Date();
+    const monthYear = todayNow.toLocaleString('default', {
       month: 'long',
       year: 'numeric',
     });
@@ -74,16 +65,16 @@ test.describe('Dashboard - Orders Calendar', () => {
     });
   });
 
-  // ── Navigation ──────────────────────────────────────────────────────────────
-
-  test('Previous month button is visible and clickable', async () => {
+  test('Month navigation buttons and Today button update calendar month', async () => {
     const prevBtn = calendarSection().getByRole('button', {
       name: 'Previous month',
     });
+    const nextBtn = calendarSection().getByRole('button', {
+      name: 'Next month',
+    });
     await expect(prevBtn).toBeVisible({ timeout: 15000 });
+    await expect(nextBtn).toBeVisible({ timeout: 15000 });
     await prevBtn.click();
-
-    // After clicking prev, the month should change
     const now = new Date();
     const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonthYear = prevMonth.toLocaleString('default', {
@@ -93,37 +84,21 @@ test.describe('Dashboard - Orders Calendar', () => {
     await expect(calendarSection()).toContainText(prevMonthYear, {
       timeout: 10000,
     });
-  });
-
-  test('Next month button is visible and clickable', async () => {
-    const nextBtn = calendarSection().getByRole('button', {
-      name: 'Next month',
-    });
-    await expect(nextBtn).toBeVisible({ timeout: 15000 });
     await nextBtn.click();
-
-    const now = new Date();
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const nextMonthYear = nextMonth.toLocaleString('default', {
+    const currentMonthYear = now.toLocaleString('default', {
       month: 'long',
       year: 'numeric',
     });
-    await expect(calendarSection()).toContainText(nextMonthYear, {
+    await expect(calendarSection()).toContainText(currentMonthYear, {
       timeout: 10000,
     });
-  });
-
-  test('"Today" button navigates back to the current month', async () => {
-    // First navigate away to a different month
     await calendarSection().getByRole('button', { name: 'Next month' }).click();
-
-    // Then click Today to return
     await calendarSection()
       .getByRole('button', { name: "Go to today's date" })
       .click();
 
-    const now = new Date();
-    const monthYear = now.toLocaleString('default', {
+    const todayNow = new Date();
+    const monthYear = todayNow.toLocaleString('default', {
       month: 'long',
       year: 'numeric',
     });
@@ -132,17 +107,11 @@ test.describe('Dashboard - Orders Calendar', () => {
     });
   });
 
-  // ── Day Grid ────────────────────────────────────────────────────────────────
-
-  test('Calendar renders day-of-week headers', async () => {
+  test('Calendar day grid renders and selecting date with orders updates panel', async () => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     for (const day of days) {
       await expect(calendarSection()).toContainText(day, { timeout: 15000 });
     }
-  });
-
-  test("Today's date cell is visually highlighted", async () => {
-    // Today's date button should be present
     const today = new Date();
     const todayLabel = `Select date ${today.toLocaleString('default', { month: 'long' })} ${today.getDate()}, ${today.getFullYear()}`;
     await expect(
@@ -150,58 +119,28 @@ test.describe('Dashboard - Orders Calendar', () => {
         name: new RegExp(todayLabel, 'i'),
       }),
     ).toBeVisible({ timeout: 15000 });
-  });
-
-  test('Clicking a date cell with orders shows orders in the side panel', async () => {
-    // Find a date button that has orders (aria-label includes "orders")
     const dateWithOrders = calendarSection()
       .getByRole('button', { name: /\d+ orders?/ })
       .first();
     await expect(dateWithOrders).toBeVisible({ timeout: 15000 });
     await dateWithOrders.click();
-
-    // The right-hand panel should show order items after clicking
-    // The panel heading updates to the selected date
     await expect(calendarSection()).toContainText(/Order #/i, {
       timeout: 10000,
     });
   });
 
-  test('Date cells with no orders have no order count badge', async () => {
-    // A date button without orders should NOT contain an order count div
-    const dateWithoutOrders = calendarSection()
-      .getByRole('button', { name: /^Select date .*, 2026$/ })
-      .first();
-    await expect(dateWithoutOrders).toBeVisible({ timeout: 15000 });
-  });
-
-  // ── Delivery / Created Date Filter ─────────────────────────────────────────
-
-  test('Delivery Date filter button is visible and active by default', async () => {
+  test('Calendar date type filter toggles between Delivery Date and Created Date', async () => {
     const deliveryBtn = calendarSection().getByRole('button', {
       name: 'View by delivery date',
     });
+    const createdBtn = calendarSection().getByRole('button', {
+      name: 'View by created date',
+    });
     await expect(deliveryBtn).toBeVisible({ timeout: 15000 });
-  });
-
-  test('Created Date filter button is visible', async () => {
-    const createdBtn = calendarSection().getByRole('button', {
-      name: 'View by created date',
-    });
     await expect(createdBtn).toBeVisible({ timeout: 15000 });
-  });
-
-  test('Switching to "Created Date" filter updates the calendar', async () => {
-    const createdBtn = calendarSection().getByRole('button', {
-      name: 'View by created date',
-    });
     await createdBtn.click();
-    // Calendar section should still be visible after switching filter
     await expect(calendarSection()).toBeVisible({ timeout: 10000 });
-    // Switching back
-    await calendarSection()
-      .getByRole('button', { name: 'View by delivery date' })
-      .click();
+    await deliveryBtn.click();
     await expect(calendarSection()).toBeVisible({ timeout: 10000 });
   });
 });

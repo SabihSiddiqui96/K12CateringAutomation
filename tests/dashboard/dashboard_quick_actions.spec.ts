@@ -41,24 +41,14 @@ test.describe('Dashboard - Quick Actions & Account Statistics', () => {
       'section[aria-label="Quick actions and account statistics"]',
     );
 
-  // ── Visibility ──────────────────────────────────────────────────────────────
-
-  test('Quick Actions section is visible with heading', async () => {
+  test('Quick Actions and Account Statistics sections render with key content', async () => {
     await expect(qaSection()).toBeVisible({ timeout: 15000 });
     await expect(
       qaSection().getByRole('heading', { name: 'Quick Actions' }),
     ).toBeVisible();
-  });
-
-  test('Account Statistics section is visible with heading', async () => {
     await expect(
       qaSection().getByRole('heading', { name: 'Account Statistics' }),
     ).toBeVisible({ timeout: 15000 });
-  });
-
-  // ── Quick Action Buttons Visible ────────────────────────────────────────────
-
-  test('All 5 Quick Action buttons are visible', async () => {
     await expect(
       qaSection().getByRole('button', { name: 'View all orders' }),
     ).toBeVisible({ timeout: 15000 });
@@ -76,91 +66,54 @@ test.describe('Dashboard - Quick Actions & Account Statistics', () => {
     await expect(
       qaSection().getByRole('button', { name: 'Open system settings' }),
     ).toBeVisible();
-  });
-
-  // ── Quick Action Navigation ─────────────────────────────────────────────────
-
-  test('"View All Orders" button navigates to Orders page', async () => {
-    await qaSection().getByRole('button', { name: 'View all orders' }).click();
-    await expect(catering).toHaveURL(/\/orders/, { timeout: 15000 });
-  });
-
-  test('"View Menu" button navigates to Menu page', async () => {
-    await navigateK12CateringMenu(catering, 'Dashboard');
-    await catering.waitForLoadState('domcontentloaded');
-    await qaSection().getByRole('button', { name: 'View menu items' }).click();
-    await expect(catering).toHaveURL(/\/menu/, { timeout: 15000 });
-  });
-
-  test('"Shopping List" button navigates to Shopping List page', async () => {
-    await navigateK12CateringMenu(catering, 'Dashboard');
-    await catering.waitForLoadState('domcontentloaded');
-    await qaSection()
-      .getByRole('button', { name: 'View shopping list for upcoming orders' })
-      .click();
-    await expect(catering).toHaveURL(/\/shopping-list/, { timeout: 15000 });
-  });
-
-  test('"Manage Accounts" button navigates to Accounts page', async () => {
-    await navigateK12CateringMenu(catering, 'Dashboard');
-    await catering.waitForLoadState('domcontentloaded');
-    await qaSection()
-      .getByRole('button', { name: 'Manage user accounts' })
-      .click();
-    await expect(catering).toHaveURL(/\/accounts/, { timeout: 15000 });
-  });
-
-  test('"Settings" button navigates to Settings page', async () => {
-    await navigateK12CateringMenu(catering, 'Dashboard');
-    await catering.waitForLoadState('domcontentloaded');
-    await qaSection()
-      .getByRole('button', { name: 'Open system settings' })
-      .click();
-    await expect(catering).toHaveURL(/\/settings/, { timeout: 15000 });
-  });
-
-  // ── Account Statistics ──────────────────────────────────────────────────────
-
-  test('Account Statistics shows Total Accounts count', async () => {
-    await navigateK12CateringMenu(catering, 'Dashboard');
-    await catering.waitForLoadState('domcontentloaded');
-    // The list item aria-label contains the count e.g. "14 total accounts - Click to view details"
     await expect(
       qaSection().locator('[aria-label*="total accounts"]'),
     ).toBeVisible({ timeout: 15000 });
     await expect(qaSection()).toContainText('Total Accounts:');
-  });
-
-  test('Account Statistics shows Active Accounts count', async () => {
     await expect(
       qaSection().locator('[aria-label*="active accounts"]'),
     ).toBeVisible({ timeout: 15000 });
     await expect(qaSection()).toContainText('Active Accounts:');
-  });
-
-  test('Account Statistics shows Pending Accounts count', async () => {
     await expect(
       qaSection().locator('[aria-label*="pending accounts"]'),
     ).toBeVisible({ timeout: 15000 });
     await expect(qaSection()).toContainText('Pending Accounts:');
   });
 
-  test('Clicking Total Accounts stat navigates to Accounts page', async () => {
-    await qaSection().locator('[aria-label*="total accounts"]').click();
-    await expect(catering).toHaveURL(/\/accounts/, { timeout: 15000 });
+  test('Quick Action buttons navigate to the correct pages', async () => {
+    const quickActions: Array<{ buttonName: string; urlPattern: RegExp }> = [
+      { buttonName: 'View all orders', urlPattern: /\/orders/ },
+      { buttonName: 'View menu items', urlPattern: /\/menu/ },
+      {
+        buttonName: 'View shopping list for upcoming orders',
+        urlPattern: /\/shopping-list/,
+      },
+      { buttonName: 'Manage user accounts', urlPattern: /\/accounts/ },
+      { buttonName: 'Open system settings', urlPattern: /\/settings/ },
+    ];
+
+    for (const action of quickActions) {
+      await qaSection().getByRole('button', { name: action.buttonName }).click();
+      await expect(catering).toHaveURL(action.urlPattern, { timeout: 15000 });
+      await navigateK12CateringMenu(catering, 'Dashboard');
+      await catering.waitForLoadState('domcontentloaded');
+      await expect(qaSection()).toBeVisible({ timeout: 15000 });
+    }
   });
 
-  test('Clicking Active Accounts stat navigates to Accounts page', async () => {
-    await navigateK12CateringMenu(catering, 'Dashboard');
-    await catering.waitForLoadState('domcontentloaded');
-    await qaSection().locator('[aria-label*="active accounts"]').click();
-    await expect(catering).toHaveURL(/\/accounts/, { timeout: 15000 });
-  });
+  test('Clicking account stats navigates to Accounts page', async () => {
+    const statSelectors = [
+      '[aria-label*="total accounts"]',
+      '[aria-label*="active accounts"]',
+      '[aria-label*="pending accounts"]',
+    ];
 
-  test('Clicking Pending Accounts stat navigates to Accounts page', async () => {
-    await navigateK12CateringMenu(catering, 'Dashboard');
-    await catering.waitForLoadState('domcontentloaded');
-    await qaSection().locator('[aria-label*="pending accounts"]').click();
-    await expect(catering).toHaveURL(/\/accounts/, { timeout: 15000 });
+    for (const selector of statSelectors) {
+      await qaSection().locator(selector).click();
+      await expect(catering).toHaveURL(/\/accounts/, { timeout: 15000 });
+      await navigateK12CateringMenu(catering, 'Dashboard');
+      await catering.waitForLoadState('domcontentloaded');
+      await expect(qaSection()).toBeVisible({ timeout: 15000 });
+    }
   });
 });

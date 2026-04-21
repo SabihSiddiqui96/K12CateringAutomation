@@ -26,20 +26,29 @@ test.describe('Dashboard - Filters', () => {
     await catering.waitForLoadState('domcontentloaded');
   });
 
-  test('Time Period dropdown is visible with a selected value', async () => {
+  test('Dashboard filter controls render with default values', async () => {
     const timePeriodButton = catering.getByRole('button', {
       name: 'Select time period filter',
     });
     await expect(timePeriodButton).toBeVisible({ timeout: 15000 });
+    const statusButton = catering.getByRole('button', {
+      name: 'Select status filter',
+    });
+    await expect(statusButton).toBeVisible({ timeout: 15000 });
+    await expect(statusButton).toContainText('All Status');
+    const statsByButton = catering.getByRole('button', {
+      name: 'Select statistics by date type',
+    });
+    await expect(statsByButton).toBeVisible({ timeout: 15000 });
+    await expect(statsByButton).toContainText('Delivery Date');
   });
 
-  test('Time Period dropdown shows all options when opened', async () => {
+  test('Time Period dropdown shows options and supports selection updates', async () => {
     const timePeriodButton = catering.getByRole('button', {
       name: 'Select time period filter',
     });
     await expect(timePeriodButton).toBeVisible({ timeout: 15000 });
     await timePeriodButton.click();
-
     await expect(catering.getByRole('option', { name: 'Today' })).toBeVisible();
     await expect(
       catering.getByRole('option', { name: 'Yesterday' }),
@@ -68,45 +77,19 @@ test.describe('Dashboard - Filters', () => {
     await expect(
       catering.getByRole('option', { name: 'All Time' }),
     ).toBeVisible();
-
-    await catering.keyboard.press('Escape');
-  });
-
-  test('Time Period dropdown - selecting "Today" updates the button label', async () => {
-    const timePeriodButton = catering.getByRole('button', {
-      name: 'Select time period filter',
-    });
-    await expect(timePeriodButton).toBeVisible({ timeout: 15000 });
-    await timePeriodButton.click();
     await catering.getByRole('option', { name: 'Today' }).click();
     await expect(timePeriodButton).toContainText('Today');
-  });
-
-  test('Time Period dropdown - selecting "All Time" updates the button label', async () => {
-    const timePeriodButton = catering.getByRole('button', {
-      name: 'Select time period filter',
-    });
-    await expect(timePeriodButton).toBeVisible({ timeout: 15000 });
     await timePeriodButton.click();
     await catering.getByRole('option', { name: 'All Time' }).click();
     await expect(timePeriodButton).toContainText('All Time');
   });
 
-  test('Status dropdown renders with default "All Status"', async () => {
-    const statusButton = catering.getByRole('button', {
-      name: 'Select status filter',
-    });
-    await expect(statusButton).toBeVisible({ timeout: 15000 });
-    await expect(statusButton).toContainText('All Status');
-  });
-
-  test('Status dropdown shows all options when opened', async () => {
+  test('Status dropdown shows options and supports selection updates', async () => {
     const statusButton = catering.getByRole('button', {
       name: 'Select status filter',
     });
     await expect(statusButton).toBeVisible({ timeout: 15000 });
     await statusButton.click();
-
     await expect(
       catering.getByRole('option', { name: 'All Status' }),
     ).toBeVisible();
@@ -125,29 +108,11 @@ test.describe('Dashboard - Filters', () => {
     await expect(
       catering.getByRole('option', { name: 'Rejected' }),
     ).toBeVisible();
-
-    await catering.keyboard.press('Escape');
-  });
-
-  test('Status dropdown - selecting "Accepted" updates the button label', async () => {
-    const statusButton = catering.getByRole('button', {
-      name: 'Select status filter',
-    });
-    await expect(statusButton).toBeVisible({ timeout: 15000 });
-    await statusButton.click();
     await catering.getByRole('option', { name: 'Accepted' }).click();
     await expect(statusButton).toContainText('Accepted');
   });
 
-  test('Statistics By dropdown renders with default "Delivery Date"', async () => {
-    const statsByButton = catering.getByRole('button', {
-      name: 'Select statistics by date type',
-    });
-    await expect(statsByButton).toBeVisible({ timeout: 15000 });
-    await expect(statsByButton).toContainText('Delivery Date');
-  });
-
-  test('Statistics By dropdown - selecting "Created Date" updates the button label', async () => {
+  test('Statistics By dropdown supports switching to Created Date', async () => {
     const statsByButton = catering.getByRole('button', {
       name: 'Select statistics by date type',
     });
@@ -157,7 +122,7 @@ test.describe('Dashboard - Filters', () => {
     await expect(statsByButton).toContainText('Created Date');
   });
 
-  test('Calendar shortcut button scrolls to Orders Calendar section', async () => {
+  test('Dashboard shortcut buttons scroll to their target sections', async () => {
     await catering
       .getByRole('button', { name: 'Scroll to calendar view' })
       .click();
@@ -165,9 +130,6 @@ test.describe('Dashboard - Filters', () => {
       name: 'Calendar view and date-wise orders',
     });
     await expect(calendarSection).toBeVisible({ timeout: 10000 });
-  });
-
-  test("Trending shortcut button scrolls to What's Trending section", async () => {
     await catering
       .getByRole('button', { name: 'Scroll to trending chart' })
       .click();
@@ -175,9 +137,6 @@ test.describe('Dashboard - Filters', () => {
       .getByRole('region', { name: 'Trending data visualization' })
       .first();
     await expect(trendingSection).toBeVisible({ timeout: 10000 });
-  });
-
-  test('Search shortcut button scrolls to Search Orders section', async () => {
     await catering
       .getByRole('button', { name: 'Scroll to search orders' })
       .click();

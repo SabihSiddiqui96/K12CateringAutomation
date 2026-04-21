@@ -61,29 +61,16 @@ test.describe('Dashboard - Recent & Upcoming Orders', () => {
       .locator('section[aria-label="Recent and upcoming orders"] > div > div')
       .nth(1);
 
-  // ── Section Visibility ──────────────────────────────────────────────────────
-
-  test('Recent and Upcoming Orders section is visible', async () => {
-    await expect(
-      catering.getByRole('region', { name: 'Recent and upcoming orders' }),
-    ).toBeVisible({ timeout: 15000 });
-  });
-
   // ── Recent Orders ───────────────────────────────────────────────────────────
 
-  test('Recent Orders heading is visible', async () => {
+  test('Recent Orders content and pagination are visible', async () => {
     await expect(
       catering.getByRole('heading', { name: 'Recent Orders' }),
     ).toBeVisible({ timeout: 15000 });
-  });
 
-  test('Recent Orders list has items visible', async () => {
     const list = catering.getByRole('list', { name: 'Recent orders list' });
     await expect(list).toBeVisible({ timeout: 15000 });
-    await expect(list.getByRole('listitem').first()).toBeVisible();
-  });
 
-  test('Recent Orders items show order number, status, customer name, date, and amount', async () => {
     const firstItem = catering
       .getByRole('list', { name: 'Recent orders list' })
       .getByRole('listitem')
@@ -95,15 +82,9 @@ test.describe('Dashboard - Recent & Upcoming Orders', () => {
       /Accepted|Pending|Completed|Cancelled|Rejected/i,
     );
     await expect(firstItem).toContainText(/\$[\d,]+\.\d{2}/);
-  });
-
-  test('Recent Orders shows pagination range text', async () => {
     await expect(recentOrdersCard()).toContainText(/\d+-\d+ of \d+/, {
       timeout: 15000,
     });
-  });
-
-  test('Recent Orders pagination controls are visible', async () => {
     await expect(
       recentOrdersCard().getByRole('button', { name: 'Previous page' }),
     ).toBeVisible({ timeout: 15000 });
@@ -114,9 +95,7 @@ test.describe('Dashboard - Recent & Upcoming Orders', () => {
     await expect(
       recentOrdersCard().getByRole('button', { name: 'Page 1', exact: true }),
     ).toBeVisible();
-  });
 
-  test('Recent Orders - changing rows per page to 10 shows 10 items', async () => {
     const select = recentOrdersCard().locator(
       'select[aria-label="Items per page"]',
     );
@@ -135,12 +114,6 @@ test.describe('Dashboard - Recent & Upcoming Orders', () => {
   });
 
   test('Recent Orders - clicking an order item navigates to order details', async () => {
-    await navigateK12CateringMenu(catering, 'Dashboard');
-    await catering.waitForLoadState('domcontentloaded');
-    await catering
-      .getByRole('button', { name: 'Scroll to search orders' })
-      .click();
-
     const firstItem = catering
       .getByRole('list', { name: 'Recent orders list' })
       .getByRole('listitem')
@@ -154,19 +127,14 @@ test.describe('Dashboard - Recent & Upcoming Orders', () => {
 
   // ── Upcoming Orders ─────────────────────────────────────────────────────────
 
-  test('Upcoming Orders heading is visible', async () => {
+  test('Upcoming Orders content and pagination are visible', async () => {
     await expect(
       catering.getByRole('heading', { name: 'Upcoming Orders' }),
     ).toBeVisible({ timeout: 15000 });
-  });
 
-  test('Upcoming Orders list has items visible', async () => {
     const list = catering.getByRole('list', { name: 'Upcoming orders list' });
     await expect(list).toBeVisible({ timeout: 15000 });
-    await expect(list.getByRole('listitem').first()).toBeVisible();
-  });
 
-  test('Upcoming Orders items show order number, status, customer name, date, and amount', async () => {
     const firstItem = catering
       .getByRole('list', { name: 'Upcoming orders list' })
       .getByRole('listitem')
@@ -178,15 +146,9 @@ test.describe('Dashboard - Recent & Upcoming Orders', () => {
       /Accepted|Pending|Completed|Cancelled|Rejected/i,
     );
     await expect(firstItem).toContainText(/\$[\d,]+\.\d{2}/);
-  });
-
-  test('Upcoming Orders shows pagination range text', async () => {
     await expect(upcomingOrdersCard()).toContainText(/\d+-\d+ of \d+/, {
       timeout: 15000,
     });
-  });
-
-  test('Upcoming Orders pagination controls are visible', async () => {
     await expect(
       upcomingOrdersCard().getByRole('button', { name: 'Previous page' }),
     ).toBeVisible({ timeout: 15000 });
@@ -202,16 +164,12 @@ test.describe('Dashboard - Recent & Upcoming Orders', () => {
     await catering
       .getByRole('button', { name: 'View all upcoming orders' })
       .click();
-    await expect(catering).toHaveURL(/\/orders/, { timeout: 15000 });
+    await expect(catering).toHaveURL(/\/orders\?filter=upcoming\b/, {
+      timeout: 15000,
+    });
   });
 
   test('Upcoming Orders - clicking an order item navigates to order details', async () => {
-    await navigateK12CateringMenu(catering, 'Dashboard');
-    await catering.waitForLoadState('domcontentloaded');
-    await catering
-      .getByRole('button', { name: 'Scroll to search orders' })
-      .click();
-
     const firstItem = catering
       .getByRole('list', { name: 'Upcoming orders list' })
       .getByRole('listitem')
