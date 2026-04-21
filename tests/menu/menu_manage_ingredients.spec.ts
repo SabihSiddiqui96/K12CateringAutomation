@@ -29,7 +29,7 @@ test.describe('Menu - Configuration: Manage Ingredients', () => {
     await expect(
       catering.getByRole('button', { name: 'Edit ingredient' }).first(),
     ).toBeVisible();
-    await catering.getByRole('button', { name: 'Close' }).click();
+    await catering.getByRole('button', { name: 'Close' }).last().click();
   });
 
   test('Menu - Clicking pencil icon on an ingredient opens inline edit', async () => {
@@ -50,7 +50,7 @@ test.describe('Menu - Configuration: Manage Ingredients', () => {
     ).toBeVisible({ timeout: 10000 });
 
     await catering.keyboard.press('Escape');
-    await catering.getByRole('button', { name: 'Close' }).click();
+    await catering.getByRole('button', { name: 'Close' }).last().click();
   });
 
   test('Menu - Saving inline edit updates the ingredient name', async () => {
@@ -72,12 +72,8 @@ test.describe('Menu - Configuration: Manage Ingredients', () => {
 
     await editInput.clear();
     await editInput.fill(updatedName);
-    await catering
-      .getByRole('dialog', { name: 'Manage Ingredients' })
-      .locator('button[type="button"]')
-      .filter({ hasText: '' })
-      .first()
-      .click();
+    await editInput.press('Enter');
+
     await expect(
       catering
         .getByRole('dialog', { name: 'Manage Ingredients' })
@@ -89,23 +85,14 @@ test.describe('Menu - Configuration: Manage Ingredients', () => {
       .getByRole('button', { name: 'Edit ingredient' })
       .first()
       .click();
-    await catering
+    const restoreInput = catering
       .getByRole('dialog', { name: 'Manage Ingredients' })
       .getByRole('textbox')
-      .first()
-      .clear();
-    await catering
-      .getByRole('dialog', { name: 'Manage Ingredients' })
-      .getByRole('textbox')
-      .first()
-      .fill(originalName);
-    await catering
-      .getByRole('dialog', { name: 'Manage Ingredients' })
-      .locator('button[type="button"]')
-      .filter({ hasText: '' })
-      .first()
-      .click();
-    await catering.getByRole('button', { name: 'Close' }).click();
+      .first();
+    await restoreInput.clear();
+    await restoreInput.fill(originalName);
+    await restoreInput.press('Enter');
+    await catering.getByRole('button', { name: 'Close' }).last().click();
   });
 
   test('Menu - Cancelling inline edit discards ingredient name change', async () => {
@@ -128,11 +115,12 @@ test.describe('Menu - Configuration: Manage Ingredients', () => {
     await editInput.fill('Should Not Save');
     await catering.keyboard.press('Escape');
     await catering.waitForTimeout(300);
+
     await expect(
       catering
         .getByRole('dialog', { name: 'Manage Ingredients' })
         .getByText(originalName),
     ).toBeVisible({ timeout: 10000 });
-    await catering.getByRole('button', { name: 'Close' }).click();
+    await catering.getByRole('button', { name: 'Close' }).last().click();
   });
 });
