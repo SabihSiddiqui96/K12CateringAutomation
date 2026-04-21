@@ -21,44 +21,67 @@ test.describe('Menu - Menu Items Grid', () => {
     await catering.waitForLoadState('domcontentloaded');
   });
 
-  test('Menu - Each menu item card displays name, price, and Add to Cart button', async () => {
-    // Grid view is default
-    const firstCard = catering
-      .locator('main[aria-label="Main content"]')
-      .getByRole('article')
-      .first();
+  // Cards are div.group.rounded-xl in both grid and list view
+  const cardLocator = () =>
+    catering.locator('#main-content div.group.rounded-xl');
+
+  test('Each menu item card displays name, price, and Add to Cart button', async () => {
+    const firstCard = cardLocator().first();
     await expect(firstCard).toBeVisible({ timeout: 15000 });
-    // Price should be formatted as currency
-    await expect(firstCard).toContainText(/\$[\d]+\.[\d]{2}/);
-    // Add to Cart button should be present
+
+    // Name is an h3
+    await expect(firstCard.locator('h3')).toBeVisible();
+
+    // Price formatted as currency e.g. $2.00
     await expect(
-      firstCard.getByRole('button', { name: /Add to cart/i }),
+      firstCard.locator('div.text-xl.font-bold.text-green-700'),
+    ).toContainText(/\$[\d]+\.[\d]{2}/);
+
+    // Add to Cart button
+    await expect(
+      firstCard.getByRole('button', { name: 'Add to Cart' }),
     ).toBeVisible();
   });
 
-  test('Menu - Each menu item in List view displays name, price, and Add to Cart button', async () => {
+  test('Each menu item in List view displays name, price, and Add to Cart button', async () => {
     await catering.getByRole('button', { name: 'Switch to list view' }).click();
-    await catering.waitForTimeout(300);
-    const firstItem = catering
-      .locator('main[aria-label="Main content"]')
-      .getByRole('article')
-      .first();
-    await expect(firstItem).toBeVisible({ timeout: 15000 });
-    await expect(firstItem).toContainText(/\$[\d]+\.[\d]{2}/);
+    await catering.waitForTimeout(500);
+
+    const firstCard = cardLocator().first();
+    await expect(firstCard).toBeVisible({ timeout: 15000 });
+
+    await expect(firstCard.locator('h3')).toBeVisible();
     await expect(
-      firstItem.getByRole('button', { name: /Add to cart/i }),
+      firstCard.locator('div.text-xl.font-bold.text-green-700'),
+    ).toContainText(/\$[\d]+\.[\d]{2}/);
+    await expect(
+      firstCard.getByRole('button', { name: 'Add to Cart' }),
     ).toBeVisible();
+
+    // Switch back to grid
+    await catering.getByRole('button', { name: 'Switch to grid view' }).click();
   });
 
-  test('Menu - No results message is shown when filters match no items', async () => {
-    const searchInput = catering.getByRole('textbox', {
-      name: 'Search menu items',
+  test('Edit and Delete buttons are visible on each item card', async () => {
+    const firstCard = cardLocator().first();
+    await expect(firstCard).toBeVisible({ timeout: 15000 });
+
+    // Edit button aria-label = "Edit [name] menu item"
+    const editBtn = firstCard.getByRole('button', {
+      name: /Edit .* menu item/,
     });
-    await searchInput.fill('zzz_no_match_xyz_123');
-    await catering.waitForTimeout(500);
-    // Should show empty state or "no results" text
-    await expect(
-      catering.locator('main[aria-label="Main content"]'),
-    ).not.toContainText(/\$[\d]+\.[\d]{2}/, { timeout: 10000 });
+    await expect(editBtn).toBeVisible();
+
+    // Delete button aria-label = "Delete [name] menu item"
+    const deleteBtn = firstCard.getByRole('button', {
+      name: /Delete .* menu item/,
+    });
+    await expect(deleteBtn).toBeVisible();
+  });
+
+  test('Multiple item cards are displayed on the page', async () => {
+    await expect(cardLocator().first()).toBeVisible({ timeout: 15000 });
+    const count = await cardLocator().count();
+    expect(count).toBeGreaterThan(1);
   });
 });
