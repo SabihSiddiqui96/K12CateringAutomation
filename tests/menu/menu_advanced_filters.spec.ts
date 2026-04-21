@@ -28,103 +28,98 @@ test.describe('Menu - Advanced Filters', () => {
     }
   });
 
-  test('Menu - Clicking More Filters reveals the Advanced Filters panel', async () => {
+  async function openAdvancedFilters() {
     await catering
       .getByRole('button', { name: 'Show advanced filters' })
       .click();
     await expect(
-      catering.getByRole('heading', { name: 'Advanced Filters' }),
+      catering.locator('h2', { hasText: 'Advanced Filters' }),
     ).toBeVisible({ timeout: 10000 });
+  }
+
+  test('Clicking More Filters reveals the Advanced Filters panel', async () => {
+    await openAdvancedFilters();
+    await expect(
+      catering.locator('h2', { hasText: 'Advanced Filters' }),
+    ).toBeVisible();
+    await expect(catering.locator('#serves-select')).toBeVisible();
+    await expect(catering.locator('#sort-select')).toBeVisible();
+    await expect(catering.locator('#sort-order-select')).toBeVisible();
+    await expect(catering.locator('#price-range-min')).toBeVisible();
+    await expect(catering.locator('#price-range-max')).toBeVisible();
+    await expect(
+      catering.locator('label[for="price-range-min"]'),
+    ).toContainText('Price Range:');
   });
 
-  test('Menu - Advanced Filters panel contains Serves, Sort by, Order, and Price Range fields', async () => {
-    await catering
-      .getByRole('button', { name: 'Show advanced filters' })
-      .click();
+  test('Filtering by Serves filters the menu items', async () => {
+    await openAdvancedFilters();
+    await catering.locator('#serves-select').selectOption({ value: '1' });
+    await catering.waitForTimeout(500);
+    // Page still renders (Menu heading visible, items shown)
     await expect(
-      catering.getByRole('combobox', { name: /All Serves/i }),
+      catering.getByRole('heading', { name: 'Menu', exact: true }),
     ).toBeVisible({ timeout: 10000 });
-    await expect(
-      catering.getByRole('combobox', { name: /Display Order/i }),
-    ).toBeVisible();
-    await expect(
-      catering.getByRole('combobox', { name: /Ascending/i }),
-    ).toBeVisible();
-    await expect(
-      catering.getByRole('textbox', { name: /Minimum price/i }),
-    ).toBeVisible();
-    await expect(
-      catering.getByRole('textbox', { name: /Maximum price/i }),
-    ).toBeVisible();
+    const cards = catering.locator('#main-content div.group.rounded-xl');
+    await expect(cards.first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('Menu - Filtering by Serves returns matching items', async () => {
-    await catering
-      .getByRole('button', { name: 'Show advanced filters' })
-      .click();
-    await catering
-      .getByRole('combobox', { name: /All Serves/i })
-      .selectOption({ value: '1' });
+  test('Sort by field changes the display order of items', async () => {
+    await openAdvancedFilters();
+    await catering.locator('#sort-select').selectOption({ value: 'name' });
+    await catering.waitForTimeout(500);
+    await expect(
+      catering.getByRole('heading', { name: 'Menu', exact: true }),
+    ).toBeVisible({ timeout: 10000 });
+    await catering.locator('#sort-select').selectOption({ value: 'price' });
     await catering.waitForTimeout(500);
     await expect(
       catering.getByRole('heading', { name: 'Menu', exact: true }),
     ).toBeVisible({ timeout: 10000 });
   });
 
-  test('Menu - Sort by field changes the display order of items', async () => {
+  test('Order field toggles ascending and descending sort', async () => {
+    await openAdvancedFilters();
+    // Switch to descending
     await catering
-      .getByRole('button', { name: 'Show advanced filters' })
-      .click();
-    await catering
-      .getByRole('combobox', { name: /Display Order/i })
-      .selectOption({ value: 'name' });
-    await catering.waitForTimeout(500);
-    await expect(
-      catering.getByRole('heading', { name: 'Menu', exact: true }),
-    ).toBeVisible({ timeout: 10000 });
-  });
-
-  test('Menu - Order field toggles ascending and descending sort', async () => {
-    await catering
-      .getByRole('button', { name: 'Show advanced filters' })
-      .click();
-    await catering
-      .getByRole('combobox', { name: /Ascending/i })
+      .locator('#sort-order-select')
       .selectOption({ value: 'desc' });
     await catering.waitForTimeout(500);
-    await expect(
-      catering.getByRole('combobox', { name: /Descending/i }),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(catering.locator('#sort-order-select')).toHaveValue('desc');
+    // Switch back to ascending
+    await catering.locator('#sort-order-select').selectOption({ value: 'asc' });
+    await catering.waitForTimeout(500);
+    await expect(catering.locator('#sort-order-select')).toHaveValue('asc');
   });
 
-  test('Menu - Price Range slider is interactive and shows updated range label', async () => {
-    await catering
-      .getByRole('button', { name: 'Show advanced filters' })
-      .click();
-    const minSlider = catering.getByRole('textbox', { name: /Minimum price/i });
-    await expect(minSlider).toBeVisible({ timeout: 10000 });
-    // Verify the price range label is present
-    await expect(catering.locator('text=/Price Range:/i')).toBeVisible({
+  test('Price Range sliders are interactive', async () => {
+    await openAdvancedFilters();
+    await expect(catering.locator('#price-range-min')).toBeVisible({
       timeout: 10000,
     });
+    await expect(catering.locator('#price-range-max')).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(
+      catering.locator('label[for="price-range-min"]'),
+    ).toContainText('Price Range:');
+    // Sliders have min/max attributes
+    const minType = await catering
+      .locator('#price-range-min')
+      .getAttribute('type');
+    expect(minType).toBe('range');
   });
 
-  test('Menu - Combining multiple advanced filters narrows results', async () => {
-    await catering
-      .getByRole('button', { name: 'Show advanced filters' })
-      .click();
-    await catering
-      .getByRole('combobox', { name: /All Serves/i })
-      .selectOption({ value: '1' });
-    await catering
-      .getByRole('combobox', { name: /Display Order/i })
-      .selectOption({ value: 'price' });
-    await catering
-      .getByRole('combobox', { name: /Ascending/i })
-      .selectOption({ value: 'asc' });
+  test('Combining multiple advanced filters narrows results', async () => {
+    await openAdvancedFilters();
+    await catering.locator('#serves-select').selectOption({ value: '1' });
+    await catering.locator('#sort-select').selectOption({ value: 'price' });
+    await catering.locator('#sort-order-select').selectOption({ value: 'asc' });
     await catering.waitForTimeout(500);
     await expect(
       catering.getByRole('heading', { name: 'Menu', exact: true }),
     ).toBeVisible({ timeout: 10000 });
+    const cards = catering.locator('#main-content div.group.rounded-xl');
+    await expect(cards.first()).toBeVisible({ timeout: 10000 });
   });
 });
