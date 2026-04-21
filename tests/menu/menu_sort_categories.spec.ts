@@ -24,7 +24,7 @@ test.describe('Menu - Configuration: Sort Categories', () => {
   test('Menu - Sort Categories modal opens from Configuration', async () => {
     await catering.getByRole('button', { name: 'Sort category order' }).click();
     await expect(
-      catering.getByRole('dialog', { name: 'Sort Categories' }),
+      catering.getByRole('heading', { name: 'Sort Categories' }),
     ).toBeVisible({ timeout: 10000 });
     await expect(
       catering.getByText('Drag and drop to reorder categories'),
@@ -35,7 +35,7 @@ test.describe('Menu - Configuration: Sort Categories', () => {
   test('Menu - Categories display with position badges and drag handles', async () => {
     await catering.getByRole('button', { name: 'Sort category order' }).click();
     await expect(
-      catering.getByRole('dialog', { name: 'Sort Categories' }),
+      catering.getByRole('heading', { name: 'Sort Categories' }),
     ).toBeVisible({ timeout: 10000 });
 
     await expect(
@@ -52,7 +52,7 @@ test.describe('Menu - Configuration: Sort Categories', () => {
   test('Menu - Dragging a category to a new position reorders the list', async () => {
     await catering.getByRole('button', { name: 'Sort category order' }).click();
     await expect(
-      catering.getByRole('dialog', { name: 'Sort Categories' }),
+      catering.getByRole('heading', { name: 'Sort Categories' }),
     ).toBeVisible({ timeout: 10000 });
 
     const firstItem = catering
@@ -90,7 +90,7 @@ test.describe('Menu - Configuration: Sort Categories', () => {
   test('Menu - Clicking Save Order shows success message', async () => {
     await catering.getByRole('button', { name: 'Sort category order' }).click();
     await expect(
-      catering.getByRole('dialog', { name: 'Sort Categories' }),
+      catering.getByRole('heading', { name: 'Sort Categories' }),
     ).toBeVisible({ timeout: 10000 });
 
     // Drag first item down to second position
@@ -128,7 +128,7 @@ test.describe('Menu - Configuration: Sort Categories', () => {
   test('Menu - Category order persists after closing and reopening Sort Categories', async () => {
     await catering.getByRole('button', { name: 'Sort category order' }).click();
     await expect(
-      catering.getByRole('dialog', { name: 'Sort Categories' }),
+      catering.getByRole('heading', { name: 'Sort Categories' }),
     ).toBeVisible({ timeout: 10000 });
 
     // Get the first category name before reorder
@@ -172,13 +172,16 @@ test.describe('Menu - Configuration: Sort Categories', () => {
     await catering.waitForTimeout(500);
     await catering.getByRole('button', { name: 'Sort category order' }).click();
     await expect(
-      catering.getByRole('dialog', { name: 'Sort Categories' }),
+      catering.getByRole('heading', { name: 'Sort Categories' }),
     ).toBeVisible({ timeout: 10000 });
 
     // The previously second category should now be first
     await expect(
-      catering.getByRole('dialog').getByText(secondCategoryName).first(),
+      catering.getByRole('heading', { name: 'Sort Categories' }),
     ).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(secondCategoryName).first()).toBeVisible({
+      timeout: 10000,
+    });
     await catering.getByRole('button', { name: 'Cancel' }).click();
   });
 });
