@@ -21,219 +21,199 @@ test.describe('Menu - Configuration: Manage Categories', () => {
     await catering.waitForLoadState('domcontentloaded');
   });
 
-  test('Menu - Manage Categories modal opens from Configuration', async () => {
+  async function openManageCategoriesModal() {
     await catering
       .getByRole('button', { name: 'Manage menu categories' })
       .click();
+    const dialog = catering.getByRole('dialog', { name: 'Manage Categories' });
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    const footerCount = catering.locator(
+      'div.text-sm.font-medium.text-gray-700',
+    );
+    await expect(footerCount).toBeVisible({ timeout: 10000 });
+    await expect(footerCount).toContainText('categories total', {
+      timeout: 10000,
+    });
+    return dialog;
+  }
+
+  async function getFooterCount(): Promise<number> {
+    const text =
+      (await catering
+        .locator('div.text-sm.font-medium.text-gray-700')
+        .textContent({ timeout: 10000 })) ?? '';
+    const match = text.match(/^(\d+)\s+categories total/);
+    return match ? parseInt(match[1]) : 0;
+  }
+
+  test('Modal opens and displays layout correctly', async () => {
+    const dialog = await openManageCategoriesModal();
     await expect(
-      catering.getByRole('dialog', { name: 'Manage Categories' }),
-    ).toBeVisible({ timeout: 10000 });
-    await expect(
-      catering.getByRole('textbox', { name: /Enter category name/i }),
+      dialog.getByRole('heading', { name: 'Manage Categories' }),
     ).toBeVisible();
-    await expect(
-      catering.getByRole('button', { name: 'Add new category' }),
-    ).toBeVisible();
-    await catering.getByRole('button', { name: 'Close modal' }).click();
+    await expect(dialog.getByText('Add New Category')).toBeVisible();
+    await expect(catering.locator('#new-category-input')).toBeVisible();
+    await expect(dialog.getByText('Existing Categories')).toBeVisible();
+    const handles = catering.locator('[aria-label="Drag to reorder category"]');
+    expect(await handles.count()).toBeGreaterThan(0);
+    const footerCount = catering.locator(
+      'div.text-sm.font-medium.text-gray-700',
+    );
+    await expect(footerCount).toContainText('categories total');
+    await catering.getByRole('button', { name: 'Close modal' }).first().click();
   });
 
-  test('Menu - Adding a new category with a name adds it to the list', async () => {
-    await catering
-      .getByRole('button', { name: 'Manage menu categories' })
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Categories' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    const newCategoryName = 'Automation Category';
-    await catering
-      .getByRole('textbox', { name: /Enter category name/i })
-      .fill(newCategoryName);
+  test('Adding a category with a name adds it to the list', async () => {
+    await openManageCategoriesModal();
+    const countBefore = await getFooterCount();
+    const newName = `TestCat_${Date.now()}`;
+    await catering.locator('#new-category-input').fill(newName);
     await catering.getByRole('button', { name: 'Add new category' }).click();
     await expect(
-      catering.getByRole('dialog').getByText(newCategoryName),
-    ).toBeVisible({ timeout: 10000 });
-
-    // Clean up - delete it
+      catering.locator('div.text-sm.font-medium.text-gray-700'),
+    ).toContainText(`${countBefore + 1} categories total`, { timeout: 10000 });
+    // Clean up
     await catering
-      .getByRole('button', { name: `Delete category` })
+      .getByRole('button', { name: 'Delete category' })
       .last()
       .click();
-    await catering.getByRole('button', { name: 'Close modal' }).click();
+    await catering.getByRole('button', { name: 'Close modal' }).first().click();
   });
 
-  test('Menu - Adding a category without a name does not add it', async () => {
-    await catering
-      .getByRole('button', { name: 'Manage menu categories' })
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Categories' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    const countBefore = await catering
-      .getByRole('button', { name: /Drag to reorder category/ })
-      .count();
-    // Leave name empty and click Add
+  test('Adding a category without a name shows validation and does not add it', async () => {
+    const dialog = await openManageCategoriesModal();
+    const countBefore = await getFooterCount();
     await catering.getByRole('button', { name: 'Add new category' }).click();
-    await catering.waitForTimeout(300);
-    const countAfter = await catering
-      .getByRole('button', { name: /Drag to reorder category/ })
-      .count();
-    expect(countAfter).toBe(countBefore);
-
-    await catering.getByRole('button', { name: 'Close modal' }).click();
+    await expect(dialog.getByText('Category name is required')).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(
+      catering.locator('div.text-sm.font-medium.text-gray-700'),
+    ).toContainText(`${countBefore} categories total`, { timeout: 5000 });
+    await catering.getByRole('button', { name: 'Close modal' }).first().click();
   });
 
-  test('Menu - Clicking the pencil icon on a category opens an inline text box', async () => {
-    await catering
-      .getByRole('button', { name: 'Manage menu categories' })
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Categories' }),
-    ).toBeVisible({ timeout: 10000 });
+  test('Editing a category name — save updates it, cancel discards it', async () => {
+    const dialog = await openManageCategoriesModal();
 
+    // Open inline edit and cancel — name should be unchanged
     await catering
       .getByRole('button', { name: 'Edit category name' })
       .first()
       .click();
-    await expect(
-      catering.getByRole('textbox', { name: 'Edit category name' }),
-    ).toBeVisible({ timeout: 10000 });
-    await expect(
-      catering.getByRole('button', { name: 'Save category changes' }),
-    ).toBeVisible();
-    await expect(
-      catering.getByRole('button', { name: 'Cancel editing category' }),
-    ).toBeVisible();
-
+    const editInput = dialog.getByRole('textbox', {
+      name: 'Edit category name',
+    });
+    await expect(editInput).toBeVisible({ timeout: 5000 });
+    const originalName = await editInput.inputValue();
+    await editInput.clear();
+    await editInput.fill('ShouldNotSave');
     await catering
       .getByRole('button', { name: 'Cancel editing category' })
       .click();
-    await catering.getByRole('button', { name: 'Close modal' }).click();
-  });
+    await expect(dialog.getByText('ShouldNotSave')).not.toBeVisible();
+    await expect(dialog.getByText(originalName)).toBeVisible({ timeout: 5000 });
 
-  test('Menu - Saving the inline edit updates the category name', async () => {
-    await catering
-      .getByRole('button', { name: 'Manage menu categories' })
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Categories' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    // Use a category with 0 items so we can edit it freely (water has 0 items)
+    // Open inline edit and save — name should update
     await catering
       .getByRole('button', { name: 'Edit category name' })
       .first()
       .click();
-    const editInput = catering.getByRole('textbox', {
-      name: 'Edit category name',
-    });
-    const originalName = await editInput.inputValue();
-    const updatedName = originalName + ' Edited';
-
+    await expect(editInput).toBeVisible({ timeout: 5000 });
+    const updatedName = `Renamed_${Date.now()}`;
     await editInput.clear();
     await editInput.fill(updatedName);
     await catering
       .getByRole('button', { name: 'Save category changes' })
       .click();
-    await expect(
-      catering.getByRole('dialog').getByText(updatedName),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(dialog.getByText(updatedName)).toBeVisible({ timeout: 10000 });
 
     // Restore original name
     await catering
       .getByRole('button', { name: 'Edit category name' })
       .first()
       .click();
-    await catering.getByRole('textbox', { name: 'Edit category name' }).clear();
-    await catering
-      .getByRole('textbox', { name: 'Edit category name' })
-      .fill(originalName);
+    await expect(editInput).toBeVisible({ timeout: 5000 });
+    await editInput.clear();
+    await editInput.fill(originalName);
     await catering
       .getByRole('button', { name: 'Save category changes' })
       .click();
-    await catering.getByRole('button', { name: 'Close modal' }).click();
-  });
-
-  test('Menu - Cancelling the inline edit discards changes', async () => {
-    await catering
-      .getByRole('button', { name: 'Manage menu categories' })
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Categories' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    await catering
-      .getByRole('button', { name: 'Edit category name' })
-      .first()
-      .click();
-    const editInput = catering.getByRole('textbox', {
-      name: 'Edit category name',
+    await expect(dialog.getByText(originalName)).toBeVisible({
+      timeout: 10000,
     });
-    const originalName = await editInput.inputValue();
 
-    await editInput.clear();
-    await editInput.fill('Should Not Save');
-    await catering
-      .getByRole('button', { name: 'Cancel editing category' })
-      .click();
-
-    await expect(
-      catering.getByRole('dialog').getByText(originalName),
-    ).toBeVisible({ timeout: 10000 });
-    await catering.getByRole('button', { name: 'Close modal' }).click();
+    await catering.getByRole('button', { name: 'Close modal' }).first().click();
   });
 
-  test('Menu - Clicking the eye icon deactivates an active category', async () => {
-    await catering
-      .getByRole('button', { name: 'Manage menu categories' })
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Categories' }),
-    ).toBeVisible({ timeout: 10000 });
-
+  test('Eye icon toggles category active/inactive state', async () => {
+    const dialog = await openManageCategoriesModal();
+    // Deactivate an active category
     await catering
       .getByRole('button', { name: 'Deactivate category' })
       .first()
       .click();
     await expect(
-      catering.getByText(/Category deactivated successfully/i),
-    ).toBeVisible({ timeout: 10000 });
-
-    // Re-activate to restore state
+      catering.getByRole('button', { name: 'Activate category' }).first(),
+    ).toBeVisible({ timeout: 5000 });
+    // Re-activate it
     await catering
       .getByRole('button', { name: 'Activate category' })
       .first()
       .click();
-    await catering.getByRole('button', { name: 'Close modal' }).click();
+    await expect(
+      catering.getByRole('button', { name: 'Deactivate category' }).first(),
+    ).toBeVisible({ timeout: 5000 });
+    await catering.getByRole('button', { name: 'Close modal' }).first().click();
   });
 
-  test('Menu - Clicking the delete icon removes the category', async () => {
-    // Add a throwaway category first
-    await catering
-      .getByRole('button', { name: 'Manage menu categories' })
-      .click();
-    await expect(
-      catering.getByRole('dialog', { name: 'Manage Categories' }),
-    ).toBeVisible({ timeout: 10000 });
-
-    await catering
-      .getByRole('textbox', { name: /Enter category name/i })
-      .fill('Delete Me Category');
+  test('Deleting a category reduces the count by one', async () => {
+    await openManageCategoriesModal();
+    // Add a fresh category to safely delete
+    const tempName = `DeleteMe_${Date.now()}`;
+    await catering.locator('#new-category-input').fill(tempName);
     await catering.getByRole('button', { name: 'Add new category' }).click();
     await expect(
-      catering.getByRole('dialog').getByText('Delete Me Category'),
-    ).toBeVisible({ timeout: 10000 });
+      catering.locator('div.text-sm.font-medium.text-gray-700'),
+    ).toContainText('categories total', { timeout: 10000 });
+    const countAfterAdd = await getFooterCount();
 
-    // Delete it
     await catering
       .getByRole('button', { name: 'Delete category' })
       .last()
       .click();
     await expect(
-      catering.getByRole('dialog').getByText('Delete Me Category'),
-    ).not.toBeVisible({ timeout: 10000 });
+      catering.locator('div.text-sm.font-medium.text-gray-700'),
+    ).toContainText(`${countAfterAdd - 1} categories total`, {
+      timeout: 10000,
+    });
+    await catering.getByRole('button', { name: 'Close modal' }).first().click();
+  });
 
-    await catering.getByRole('button', { name: 'Close modal' }).click();
+  test('Categories in use have the delete button disabled', async () => {
+    const dialog = await openManageCategoriesModal();
+    const disabledDelete = catering
+      .getByRole('button', { name: 'Cannot delete - category is in use' })
+      .first();
+    await expect(disabledDelete).toBeVisible({ timeout: 5000 });
+    await expect(disabledDelete).toBeDisabled();
+    await catering.getByRole('button', { name: 'Close modal' }).first().click();
+  });
+
+  test('Modal can be closed with X, Cancel, or Done', async () => {
+    // Close with X
+    let dialog = await openManageCategoriesModal();
+    await catering.getByRole('button', { name: 'Close modal' }).first().click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
+
+    // Close with Cancel
+    dialog = await openManageCategoriesModal();
+    await catering.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
+
+    // Close with Done
+    dialog = await openManageCategoriesModal();
+    await catering.getByRole('button', { name: 'Done' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
 });
