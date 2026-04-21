@@ -23,7 +23,10 @@ test.describe('Menu - Menu Items Grid', () => {
 
   test('Menu - Each menu item card displays name, price, and Add to Cart button', async () => {
     // Grid view is default
-    const firstCard = catering.locator('main').getByRole('article').first();
+    const firstCard = catering
+      .locator('main[aria-label="Main content"]')
+      .getByRole('article')
+      .first();
     await expect(firstCard).toBeVisible({ timeout: 15000 });
     // Price should be formatted as currency
     await expect(firstCard).toContainText(/\$[\d]+\.[\d]{2}/);
@@ -36,7 +39,10 @@ test.describe('Menu - Menu Items Grid', () => {
   test('Menu - Each menu item in List view displays name, price, and Add to Cart button', async () => {
     await catering.getByRole('button', { name: 'Switch to list view' }).click();
     await catering.waitForTimeout(300);
-    const firstItem = catering.locator('main').getByRole('article').first();
+    const firstItem = catering
+      .locator('main[aria-label="Main content"]')
+      .getByRole('article')
+      .first();
     await expect(firstItem).toBeVisible({ timeout: 15000 });
     await expect(firstItem).toContainText(/\$[\d]+\.[\d]{2}/);
     await expect(
@@ -51,9 +57,8 @@ test.describe('Menu - Menu Items Grid', () => {
     await searchInput.fill('zzz_no_match_xyz_123');
     await catering.waitForTimeout(500);
     // Should show empty state or "no results" text
-    await expect(catering.locator('main')).not.toContainText(
-      /\$[\d]+\.[\d]{2}/,
-      { timeout: 10000 },
-    );
+    await expect(
+      catering.locator('main[aria-label="Main content"]'),
+    ).not.toContainText(/\$[\d]+\.[\d]{2}/, { timeout: 10000 });
   });
 });

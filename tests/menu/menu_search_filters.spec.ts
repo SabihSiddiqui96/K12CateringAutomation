@@ -28,7 +28,9 @@ test.describe('Menu - Search & Basic Filters', () => {
     await searchInput.fill('coffee');
     await catering.waitForTimeout(500);
     // At least one result should be visible and it should contain the search term
-    const allText = await catering.locator('main').textContent();
+    const allText = await catering
+      .locator('main[aria-label="Main content"]')
+      .textContent();
     expect(allText?.toLowerCase()).toContain('coffee');
   });
 
