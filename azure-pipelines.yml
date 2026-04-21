@@ -139,26 +139,26 @@ stages:
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
-                -d "{\"text\": \"✅ K12Catering Automation passed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\"}" || true
+                -d "{\"text\": \"✅ K12Catering Automation — All Tests Passed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\"}" || true
             displayName: Notify RingCentral - Success
-            condition: and(succeeded(), eq(variables['TEST_FAILED'], '0'))
+            condition: and(succeededOrFailed(), eq(variables['TEST_FAILED'], '0'), ne(variables['TEST_TOTAL'], '0'))
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
-                -d '{"text": "❌ K12Catering Automation — Tests Failed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\nError: $(TEST_ERROR)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab"}' || true
+                -d "{\"text\": \"❌ K12Catering Automation — Tests Failed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\nError: $(TEST_ERROR)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\"}" || true
             displayName: Notify RingCentral - Tests Failed
-            condition: ne(variables['TEST_FAILED'], '0')
+            condition: and(succeededOrFailed(), ne(variables['TEST_FAILED'], '0'))
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
-                -d '{"text": "⚠️ K12Catering Automation — Pipeline Failed (tests may have passed).\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Pipeline: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"}' || true
+                -d "{\"text\": \"⚠️ K12Catering Automation — Pipeline Error (no test results).\n\n🔗 Pipeline: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)\"}" || true
             displayName: Notify RingCentral - Pipeline Failed
-            condition: and(failed(), eq(variables['TEST_FAILED'], '0'))
+            condition: and(succeededOrFailed(), eq(variables['TEST_TOTAL'], '0'))
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)

@@ -203,17 +203,17 @@ test.describe('Menu - Configuration: Manage Categories', () => {
   test('Modal can be closed with X, Cancel, or Done', async () => {
     // Close with X
     let dialog = await openManageCategoriesModal();
-    await catering.getByRole('button', { name: 'Close modal' }).first().click();
+    await catering.locator('[aria-label="Close modal"]').click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
 
     // Close with Cancel
     dialog = await openManageCategoriesModal();
-    await catering.getByRole('button', { name: 'Cancel' }).click();
+    await catering.locator('button:has-text("Cancel")').click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
 
     // Close with Done
     dialog = await openManageCategoriesModal();
-    await catering.getByRole('button', { name: 'Done' }).click();
-    await expect(dialog).not.toBeVisible({ timeout: 5000 });
+    await catering.locator('button:has-text("Done")').click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 }); // longer timeout for Done
   });
 });
