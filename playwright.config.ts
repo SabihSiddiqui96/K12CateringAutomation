@@ -5,8 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  timeout: 3000000,
-  workers: 1,
+  timeout: 60000,
+  workers: process.env.CI ? 4 : 2,
   fullyParallel: true,
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
@@ -18,7 +18,7 @@ export default defineConfig({
     headless: true,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'on',
+    video: 'off',
   },
   projects: [
     {

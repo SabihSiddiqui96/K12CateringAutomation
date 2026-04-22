@@ -28,7 +28,7 @@ stages:
     jobs:
       - job: PlaywrightTests
         displayName: Playwright smoke tests
-        timeoutInMinutes: 60
+        timeoutInMinutes: 30
         steps:
           - checkout: self
 
@@ -40,7 +40,7 @@ stages:
           - script: npm ci
             displayName: Install npm packages
 
-          - script: npx playwright install --with-deps
+          - script: npx playwright install --with-deps chromium
             displayName: Install Playwright browsers
 
           - script: |
@@ -54,6 +54,7 @@ stages:
           - script: npm run test:e2e:qa
             displayName: Run Playwright tests
             env:
+              CI: true
               BASE_URL: $(BASE_URL)
               PE_USERNAME: $(PE_USERNAME)
               ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
