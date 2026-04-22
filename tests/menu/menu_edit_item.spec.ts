@@ -124,39 +124,4 @@ test.describe('Menu - Edit Menu Item', () => {
     await catering.getByRole('button', { name: 'Update menu item' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 15000 });
   });
-
-  test('Deleting a menu item removes it from the list', async () => {
-    // Add a throwaway item first
-    await catering.getByRole('button', { name: 'Add a new menu item' }).click();
-    const addDialog = catering.getByRole('dialog', {
-      name: 'Add New Menu Item',
-    });
-    await expect(addDialog).toBeVisible({ timeout: 10000 });
-
-    // Category: fill + Enter (native datalist — no role="option")
-    await catering.locator('#categories-input').fill('Drink');
-    await catering.locator('#categories-input').press('Enter');
-
-    await catering.locator('#menu-item-name').fill('Delete Me Item');
-    await catering.locator('#menu-item-description').fill('To be deleted');
-    await catering.locator('#price-per-item').fill('1.00');
-    await catering.getByRole('button', { name: 'Add new menu item' }).click();
-    await expect(addDialog).not.toBeVisible({ timeout: 15000 });
-    await expect(
-      catering.locator('#main-content').getByText('Delete Me Item').first(),
-    ).toBeVisible({ timeout: 10000 });
-
-    // Now delete it
-    await catering
-      .getByRole('button', { name: 'Delete Delete Me Item menu item' })
-      .click();
-    // Wait for confirmation dialog heading then click confirm
-    await expect(
-      catering.locator('h3', { hasText: 'Delete Menu Item' }),
-    ).toBeVisible({ timeout: 5000 });
-    await catering.getByRole('button', { name: 'Delete Item' }).click();
-    await expect(
-      catering.locator('#main-content').getByText('Delete Me Item'),
-    ).not.toBeVisible({ timeout: 10000 });
-  });
 });

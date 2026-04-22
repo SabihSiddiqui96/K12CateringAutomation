@@ -8,6 +8,7 @@ test.setTimeout(180000);
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Menu - Configuration: Manage Categories', () => {
+  test.describe.configure({ mode: 'serial' });
   let catering: Page;
 
   test.beforeAll(async ({ browser }) => {
@@ -38,6 +39,7 @@ test.describe('Menu - Configuration: Manage Categories', () => {
   }
 
   async function getFooterCount(): Promise<number> {
+    await catering.waitForTimeout(500);
     const text =
       (await catering
         .locator('div.text-sm.font-medium.text-gray-700')
