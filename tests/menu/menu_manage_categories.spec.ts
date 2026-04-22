@@ -8,7 +8,6 @@ test.setTimeout(180000);
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Menu - Configuration: Manage Categories', () => {
-  test.describe.configure({ mode: 'serial' });
   let catering: Page;
 
   test.beforeAll(async ({ browser }) => {
