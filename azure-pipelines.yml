@@ -90,24 +90,11 @@ stages:
           - script: |
               node -e "
               const fs = require('fs');
-              const path = 'test-results/results.json';
-              let total = 0, passed = 0, failed = 0, firstError = '';
+              const https = require('https');
+              const url = require('url');
 
-              function clean(text) {
-                return String(text || '')
-                  .replace(/\r?\n/g, ' | ')
-                  .replace(/\"/g, '').replace(/'/g, '')
-                  .replace(/[{}[\]]/g, '').replace(/\s+/g, ' ')
-                  .trim().slice(0, 500);
-              }
-
-              function captureError(result) {
-                if (!result || firstError) return;
-                if (result.error?.message) { firstError = clean(result.error.message); return; }
-                if (Array.isArray(result.errors) && result.errors.length) {
-                  firstError = clean(result.errors[0]?.message || result.errors[0]?.value || JSON.stringify(result.errors[0]));
-                }
-              }
+              const resultsPath = 'test-results/results.json';
+              let total = 0, passed = 0, failed = 0;
 
               function walkSuite(suite) {
                 for (const spec of (suite.specs || [])) {
@@ -116,50 +103,54 @@ stages:
                     const results = test.results || [];
                     if (results.some(r => r.status === 'passed')) passed++;
                     else if (results.some(r => ['failed','timedOut','interrupted'].includes(r.status))) failed++;
-                    results.forEach(captureError);
                   }
                 }
                 for (const child of (suite.suites || [])) walkSuite(child);
               }
 
-              if (fs.existsSync(path)) {
-                const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+              if (fs.existsSync(resultsPath)) {
+                const data = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
                 (data.suites || []).forEach(walkSuite);
               }
 
-              if (!firstError && failed > 0) firstError = 'One or more tests failed. Check results link for details.';
+              const buildUrl = process.env.COLLECTION_URI + process.env.TEAM_PROJECT + '/_build/results?buildId=' + process.env.BUILD_ID + '&view=ms.vss-test-web.build-test-results-tab';
+              const pipelineUrl = process.env.COLLECTION_URI + process.env.TEAM_PROJECT + '/_build/results?buildId=' + process.env.BUILD_ID;
 
-              console.log('##vso[task.setvariable variable=TEST_TOTAL]' + total);
-              console.log('##vso[task.setvariable variable=TEST_PASSED]' + passed);
-              console.log('##vso[task.setvariable variable=TEST_FAILED]' + failed);
-              console.log('##vso[task.setvariable variable=TEST_ERROR]' + firstError);
+              let text;
+              if (total === 0) {
+                text = '⚠️ K12Catering Automation — Pipeline Error (no test results).\n\n🔗 Pipeline: ' + pipelineUrl;
+              } else if (failed === 0) {
+                text = '✅ K12Catering Automation — All Tests Passed.\n\nPassed: ' + passed + ' | Failed: ' + failed + ' | Total: ' + total + '\n\n🔗 Results: ' + buildUrl;
+              } else {
+                text = '❌ K12Catering Automation — Tests Failed.\n\nPassed: ' + passed + ' | Failed: ' + failed + ' | Total: ' + total + '\n\n🔗 Results: ' + buildUrl;
+              }
+
+              const webhookUrl = process.env.RINGCENTRAL_WEBHOOK_URL;
+              if (!webhookUrl) { console.log('No webhook URL set, skipping.'); process.exit(0); }
+
+              const parsed = url.parse(webhookUrl);
+              const body = JSON.stringify({ text });
+              const options = {
+                hostname: parsed.hostname,
+                path: parsed.path,
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Content-Length': Buffer.byteLength(body)
+                }
+              };
+
+              const req = https.request(options, (res) => {
+                console.log('Webhook sent, status:', res.statusCode);
+              });
+              req.on('error', (e) => { console.error('Webhook error:', e); process.exit(0); });
+              req.write(body);
+              req.end();
               "
-            displayName: Calculate test totals
-            condition: succeededOrFailed()
-
-          - script: |
-              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
-                -H "Content-Type: application/json" \
-                -d "{\"text\": \"✅ K12Catering Automation — All Tests Passed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\"}" || true
-            displayName: Notify RingCentral - Success
-            condition: and(succeededOrFailed(), eq(variables['TEST_FAILED'], '0'), ne(variables['TEST_TOTAL'], '0'))
+            displayName: Notify RingCentral
+            condition: always()
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
-
-          - script: |
-              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
-                -H "Content-Type: application/json" \
-                -d "{\"text\": \"❌ K12Catering Automation — Tests Failed.\n\nPassed: $(TEST_PASSED) | Failed: $(TEST_FAILED) | Total: $(TEST_TOTAL)\n\n🔗 Results: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab\"}" || true
-            displayName: Notify RingCentral - Tests Failed
-            condition: and(succeededOrFailed(), ne(variables['TEST_FAILED'], '0'))
-            env:
-              RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
-
-          - script: |
-              curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
-                -H "Content-Type: application/json" \
-                -d "{\"text\": \"⚠️ K12Catering Automation — Pipeline Error (no test results).\n\n🔗 Pipeline: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)\"}" || true
-            displayName: Notify RingCentral - Pipeline Failed
-            condition: and(succeededOrFailed(), eq(variables['TEST_TOTAL'], '0'))
-            env:
-              RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
+              COLLECTION_URI: $(System.CollectionUri)
+              TEAM_PROJECT: $(System.TeamProject)
+              BUILD_ID: $(Build.BuildId)
