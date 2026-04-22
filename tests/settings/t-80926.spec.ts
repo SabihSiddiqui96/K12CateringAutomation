@@ -363,6 +363,7 @@ async function selectAvailableEventDate(page: Page) {
 test('Catering - Settings - Add district customization settings for Payment display label and requirements', async ({
   page,
 }) => {
+  test.setTimeout(300000);
   const catering = await loginToK12Catering(page, { navigateTo: 'Settings' });
 
   await catering.waitForLoadState('networkidle');

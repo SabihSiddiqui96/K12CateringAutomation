@@ -58,18 +58,20 @@ test('Orders - Status filter dropdown shows all options', async () => {
 test('Orders - Sort dropdown shows all sort options', async () => {
   await catering.getByRole('button', { name: 'Sort orders' }).click();
   await expect(
-    catering.getByRole('option', { name: 'Newest First' }),
+    catering.getByRole('option', { name: 'Newest First' }).first(),
   ).toBeVisible({ timeout: 5000 });
   await expect(
-    catering.getByRole('option', { name: 'Oldest First' }),
+    catering.getByRole('option', { name: 'Oldest First' }).first(),
   ).toBeVisible();
   await expect(
-    catering.getByRole('option', { name: 'Amount: High to Low' }),
+    catering.getByRole('option', { name: 'Amount: High to Low' }).first(),
   ).toBeVisible();
   await expect(
-    catering.getByRole('option', { name: 'Amount: Low to High' }),
+    catering.getByRole('option', { name: 'Amount: Low to High' }).first(),
   ).toBeVisible();
-  await expect(catering.getByRole('option', { name: 'Status' })).toBeVisible();
+  await expect(
+    catering.getByRole('option', { name: 'Status' }).first(),
+  ).toBeVisible();
   await catering.keyboard.press('Escape');
 });
 
