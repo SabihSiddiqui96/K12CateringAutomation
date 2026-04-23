@@ -24,7 +24,6 @@ test.describe('Name Display Standardization', () => {
   });
 
   test('First Last format shown consistently across all pages', async () => {
-    // Dashboard header + welcome message
     await catering.getByRole('button', { name: 'Go to home page' }).click();
     await catering.waitForLoadState('domcontentloaded');
     await expect(catering.getByText('Sabih Siddiqui').first()).toBeVisible({
@@ -34,7 +33,6 @@ test.describe('Name Display Standardization', () => {
       catering.getByText(/Welcome back, Sabih Siddiqui/i),
     ).toBeVisible();
 
-    // Accounts page
     await navigateK12CateringMenu(catering, 'Accounts');
     await catering.waitForLoadState('domcontentloaded');
     const firstAccount = catering
@@ -45,14 +43,12 @@ test.describe('Name Display Standardization', () => {
     const name = label?.replace('View details for ', '').trim() ?? '';
     expect(name).toMatch(/^\S+ \S+/);
 
-    // My Profile page
     await navigateK12CateringMenu(catering, 'My Profile');
     await catering.waitForLoadState('domcontentloaded');
     await expect(
       catering.getByRole('heading', { name: /Sabih Siddiqui/i }).first(),
     ).toBeVisible({ timeout: 10000 });
 
-    // Orders page
     await navigateK12CateringMenu(catering, 'Orders');
     await catering.waitForLoadState('domcontentloaded');
     await expect(catering.getByText('Sabih Siddiqui').first()).toBeVisible({
@@ -124,156 +120,92 @@ test.describe('Reports Status Filter', () => {
     await catering.waitForLoadState('domcontentloaded');
   });
 
-  test.describe('Reports Status Filter', () => {
-    let catering: Page;
+  test('All three reports default to Delivered and filter updates data accordingly', async () => {
+    // ── Sales & Revenue Dashboard ──
+    await catering.getByRole('button', { name: /Sales & Revenue Dashboard/i }).click();
+    await catering.waitForLoadState('networkidle');
 
-    test.beforeAll(async ({ browser }) => {
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      catering = await loginToK12Catering(page);
-    });
+    const salesFilter = catering.getByRole('button', { name: /Select.*status/i });
+    await expect(salesFilter).toBeVisible({ timeout: 10000 });
+    await expect(salesFilter).toContainText(/Delivered/i);
 
-    test.beforeEach(async () => {
-      await catering.getByRole('button', { name: 'Go to home page' }).click();
-      await catering.waitForLoadState('domcontentloaded');
-      await navigateK12CateringMenu(catering, 'Reports');
-      await catering.waitForLoadState('domcontentloaded');
-    });
+    await salesFilter.click();
+    await catering.getByRole('option', { name: /All/i }).first().click();
+    await catering.waitForLoadState('networkidle');
+    await catering.getByRole('button', { name: 'Go to home page' }).click();
+    await catering.waitForLoadState('domcontentloaded');
 
-    test('All three reports default to Delivered and filter updates data accordingly', async () => {
+    // ── Financial Summary ──
+    await navigateK12CateringMenu(catering, 'Reports');
+    await catering.waitForLoadState('domcontentloaded');
 
-      // ── Sales & Revenue Dashboard ──
-      await navigateK12CateringMenu(catering, 'Reports');
-      await catering.waitForLoadState('domcontentloaded');
-      await catering.getByRole('button', { name: /Sales & Revenue Dashboard/i }).click();
-      await catering.waitForLoadState('networkidle');
+    const financialSummaryBtn = catering
+      .getByRole('button', { name: /Financial Summary/i })
+      .or(catering.getByRole('link', { name: /Financial Summary/i }))
+      .first();
+    await expect(financialSummaryBtn).toBeVisible({ timeout: 15000 });
+    await financialSummaryBtn.click();
+    await catering.waitForLoadState('networkidle');
 
-      const salesFilter = catering.getByRole('button', { name: /Select.*status/i });
-      await expect(salesFilter).toBeVisible({ timeout: 10000 });
-      await expect(salesFilter).toContainText(/Delivered/i);
+    const financialFilter = catering.getByRole('button', { name: /Select.*status/i });
+    await expect(financialFilter).toBeVisible({ timeout: 10000 });
+    await expect(financialFilter).toContainText(/Delivered/i);
 
-      // Change status then leave to dashboard
-      await salesFilter.click();
-      await catering.getByRole('option', { name: /All/i }).first().click();
-      await catering.waitForLoadState('networkidle');
-      await catering.getByRole('button', { name: 'Go to home page' }).click();
-      await catering.waitForLoadState('domcontentloaded');
+    await financialFilter.click();
+    await catering.getByRole('option', { name: /All/i }).first().click();
+    await catering.waitForLoadState('networkidle');
+    await catering.getByRole('button', { name: 'Go to home page' }).click();
+    await catering.waitForLoadState('domcontentloaded');
 
-      // ── Financial Summary ──
-      await navigateK12CateringMenu(catering, 'Reports');
-      await catering.waitForLoadState('domcontentloaded');
+    // ── Revenue by Customer ──
+    await navigateK12CateringMenu(catering, 'Reports');
+    await catering.waitForLoadState('domcontentloaded');
 
-      const financialSummaryBtn = catering
-        .getByRole('button', { name: /Financial Summary/i })
-        .or(catering.getByRole('link', { name: /Financial Summary/i }))
-        .first();
-      await expect(financialSummaryBtn).toBeVisible({ timeout: 15000 });
-      await financialSummaryBtn.click();
-      await catering.waitForLoadState('networkidle');
+    const revenueByCustomerBtn = catering
+      .getByRole('button', { name: /Revenue by Customer/i })
+      .or(catering.getByRole('link', { name: /Revenue by Customer/i }))
+      .first();
+    await expect(revenueByCustomerBtn).toBeVisible({ timeout: 15000 });
+    await revenueByCustomerBtn.scrollIntoViewIfNeeded();
+    await revenueByCustomerBtn.click();
+    await catering.waitForLoadState('networkidle');
 
-      const financialFilter = catering.getByRole('button', { name: /Select.*status/i });
-      await expect(financialFilter).toBeVisible({ timeout: 10000 });
-      await expect(financialFilter).toContainText(/Delivered/i);
-
-      // Change status then leave to dashboard
-      await financialFilter.click();
-      await catering.getByRole('option', { name: /All/i }).first().click();
-      await catering.waitForLoadState('networkidle');
-      await catering.getByRole('button', { name: 'Go to home page' }).click();
-      await catering.waitForLoadState('domcontentloaded');
-
-      // ── Revenue by Customer ──
-      await navigateK12CateringMenu(catering, 'Reports');
-      await catering.waitForLoadState('domcontentloaded');
-
-      const revenueByCustomerBtn = catering
-        .getByRole('button', { name: /Revenue by Customer/i })
-        .or(catering.getByRole('link', { name: /Revenue by Customer/i }))
-        .first();
-      await expect(revenueByCustomerBtn).toBeVisible({ timeout: 15000 });
-      await revenueByCustomerBtn.scrollIntoViewIfNeeded();
-      await revenueByCustomerBtn.click();
-      await catering.waitForLoadState('networkidle');
-
-      const customerFilter = catering.getByRole('button', { name: /Select.*status/i });
-      await expect(customerFilter).toBeVisible({ timeout: 10000 });
-      await expect(customerFilter).toContainText(/Delivered/i);
-    });
-
-    test('Filter changes on one report do not affect the default on other reports', async () => {
-      await catering.getByRole('button', { name: /Sales & Revenue Dashboard/i }).click();
-      await catering.waitForLoadState('networkidle');
-      const salesFilter = catering.getByRole('button', { name: /Select.*status/i });
-      await expect(salesFilter).toBeVisible({ timeout: 10000 });
-      await salesFilter.click();
-      await catering.getByRole('option', { name: /All/i }).first().click();
-      await catering.waitForLoadState('networkidle');
-      await expect(salesFilter).not.toContainText(/Delivered/i);
-
-      await catering.getByRole('button', { name: /Back to reports list/i }).click();
-      await catering.waitForLoadState('domcontentloaded');
-      await catering.getByRole('button', { name: /Financial Summary/i }).click();
-      await catering.waitForLoadState('networkidle');
-      const financialFilter = catering.getByRole('button', { name: /Select.*status/i });
-      await expect(financialFilter).toBeVisible({ timeout: 10000 });
-      await financialFilter.click();
-      await catering.getByRole('option', { name: /All/i }).first().click();
-      await catering.waitForLoadState('networkidle');
-      await expect(financialFilter).not.toContainText(/Delivered/i);
-
-      await catering.getByRole('button', { name: /Back to reports list/i }).click();
-      await catering.waitForLoadState('domcontentloaded');
-      const revenueBtn = catering.getByRole('button', { name: /Revenue by Customer/i });
-      await revenueBtn.scrollIntoViewIfNeeded();
-      await revenueBtn.click();
-      await catering.waitForLoadState('networkidle');
-      const customerFilter = catering.getByRole('button', { name: /Select.*status/i });
-      await expect(customerFilter).toBeVisible({ timeout: 10000 });
-    });
+    const customerFilter = catering.getByRole('button', { name: /Select.*status/i });
+    await expect(customerFilter).toBeVisible({ timeout: 10000 });
+    await expect(customerFilter).toContainText(/Delivered/i);
   });
 
   test('Filter changes on one report do not affect the default on other reports', async () => {
-    // Verify each report has a status filter that can be independently changed
     await catering
       .getByRole('button', { name: /Sales & Revenue Dashboard/i })
       .click();
     await catering.waitForLoadState('networkidle');
-    const salesFilter = catering.getByRole('button', {
-      name: /Select.*status/i,
-    });
+    const salesFilter = catering.getByRole('button', { name: /Select.*status/i });
     await expect(salesFilter).toBeVisible({ timeout: 10000 });
     await salesFilter.click();
     await catering.getByRole('option', { name: /All/i }).first().click();
     await catering.waitForLoadState('networkidle');
     await expect(salesFilter).not.toContainText(/Delivered/i);
 
-    // Navigate to Financial Summary and verify its filter is visible and functional
     await catering.getByRole('button', { name: /Back to reports list/i }).click();
     await catering.waitForLoadState('domcontentloaded');
     await catering.getByRole('button', { name: /Financial Summary/i }).click();
     await catering.waitForLoadState('networkidle');
-    const financialFilter = catering.getByRole('button', {
-      name: /Select.*status/i,
-    });
+    const financialFilter = catering.getByRole('button', { name: /Select.*status/i });
     await expect(financialFilter).toBeVisible({ timeout: 10000 });
-    // Filter state may persist across reports; verify filter is accessible
     await financialFilter.click();
     await catering.getByRole('option', { name: /All/i }).first().click();
     await catering.waitForLoadState('networkidle');
     await expect(financialFilter).not.toContainText(/Delivered/i);
 
-    // Navigate to Revenue by Customer and verify its filter is visible
     await catering.getByRole('button', { name: /Back to reports list/i }).click();
     await catering.waitForLoadState('domcontentloaded');
     const revenueBtn = catering.getByRole('button', { name: /Revenue by Customer/i });
     await revenueBtn.scrollIntoViewIfNeeded();
     await revenueBtn.click();
     await catering.waitForLoadState('networkidle');
-    const customerFilter = catering.getByRole('button', {
-      name: /Select.*status/i,
-    });
+    const customerFilter = catering.getByRole('button', { name: /Select.*status/i });
     await expect(customerFilter).toBeVisible({ timeout: 10000 });
-    // All three reports have accessible, functional status filters
   });
 });
 
@@ -293,24 +225,20 @@ function getChangePasswordDialog(catering: Page) {
 
 async function closeChangePasswordModal(catering: Page) {
   const dialog = getChangePasswordDialog(catering);
-
   if (!(await dialog.isVisible({ timeout: 1000 }).catch(() => false))) {
     return;
   }
-
   const cancelButton = dialog.getByRole('button', { name: /Cancel/i });
   if (await cancelButton.isVisible({ timeout: 1000 }).catch(() => false)) {
     await cancelButton.click();
   } else {
     await catering.keyboard.press('Escape');
   }
-
   await expect(dialog).toBeHidden({ timeout: 10000 });
 }
 
 async function openChangePasswordModal(catering: Page) {
   await closeChangePasswordModal(catering);
-
   await navigateK12CateringMenu(catering, 'Accounts');
   await catering.waitForLoadState('domcontentloaded');
 
@@ -353,26 +281,20 @@ test.describe('Accounts Change Password', () => {
   });
 
   test('Validate password requirements, change password, logout, login with new password, and reset', async () => {
-    // ── Open modal once for all validations ──
     let dialog = await openChangePasswordModal(catering);
 
-    // ── Step 1: Empty submit ──
     await dialog.getByRole('button', { name: /Save|Submit|Change Password/i }).click();
     await expect(
       dialog.getByText(/required|must not be empty|enter.*password/i).first(),
     ).toBeVisible({ timeout: 5000 });
 
-    // ── Step 2: Too short ──
     await dialog.getByLabel(/New Password/i).fill('Ab1!');
     await dialog.getByLabel(/Confirm Password/i).fill('Ab1!');
     await dialog.getByRole('button', { name: /Save|Submit|Change Password/i }).click();
     await expect(
-      dialog
-        .getByText(/at least \d+ characters|minimum.*character|too short/i)
-        .first(),
+      dialog.getByText(/at least \d+ characters|minimum.*character|too short/i).first(),
     ).toBeVisible({ timeout: 5000 });
 
-    // ── Step 3: No uppercase ──
     await dialog.getByLabel(/New Password/i).fill('sabih1234!');
     await dialog.getByLabel(/Confirm Password/i).fill('sabih1234!');
     await dialog.getByRole('button', { name: /Save|Submit|Change Password/i }).click();
@@ -380,7 +302,6 @@ test.describe('Accounts Change Password', () => {
       timeout: 5000,
     });
 
-    // ── Step 4: No number ──
     await dialog.getByLabel(/New Password/i).fill('SabihTest!');
     await dialog.getByLabel(/Confirm Password/i).fill('SabihTest!');
     await dialog.getByRole('button', { name: /Save|Submit|Change Password/i }).click();
@@ -388,7 +309,6 @@ test.describe('Accounts Change Password', () => {
       timeout: 5000,
     });
 
-    // ── Step 5: No special character ──
     await dialog.getByLabel(/New Password/i).fill('Sabih12345');
     await dialog.getByLabel(/Confirm Password/i).fill('Sabih12345');
     await dialog.getByRole('button', { name: /Save|Submit|Change Password/i }).click();
@@ -396,32 +316,24 @@ test.describe('Accounts Change Password', () => {
       timeout: 5000,
     });
 
-    // ── Step 6: Passwords don't match ──
     await dialog.getByLabel(/New Password/i).fill('Sabih1234!');
     await dialog.getByLabel(/Confirm Password/i).fill('Sabih9999!');
     await dialog.getByRole('button', { name: /Save|Submit|Change Password/i }).click();
     await expect(
-      dialog
-        .getByText(/do not match|passwords must match|confirmation/i)
-        .first(),
+      dialog.getByText(/do not match|passwords must match|confirmation/i).first(),
     ).toBeVisible({ timeout: 5000 });
 
-    // ── Close modal after all validations ──
     await closeChangePasswordModal(catering);
 
-    // ── Step 7: Successfully change password ──
     const successDialog = await openChangePasswordModal(catering);
     await successDialog.getByLabel(/New Password/i).fill(NEW_PASSWORD);
     await successDialog.getByLabel(/Confirm Password/i).fill(NEW_PASSWORD);
     await successDialog.getByRole('button', { name: /Save|Submit|Change Password/i }).click();
     await expect(
-      catering
-        .getByText(/password.*changed|updated successfully|success/i)
-        .first(),
+      catering.getByText(/password.*changed|updated successfully|success/i).first(),
     ).toBeVisible({ timeout: 8000 });
     await expect(getChangePasswordDialog(catering)).toBeHidden({ timeout: 10000 });
 
-    // ── Step 8: Logout ──
     await catering.getByRole('button', { name: /User account menu/i }).click();
     await catering.waitForTimeout(400);
     await catering.getByRole('menuitem', { name: /Log out|Sign out/i }).click();
@@ -431,15 +343,12 @@ test.describe('Accounts Change Password', () => {
       { timeout: 10000 },
     );
 
-    // ── Step 9: Login with new password ──
     const emailInput = catering.getByRole('textbox', { name: /Email/i });
     const passwordInput = catering.getByRole('textbox', { name: /Password/i });
     await expect(emailInput).toBeVisible({ timeout: 10000 });
     await expect(passwordInput).toBeVisible({ timeout: 10000 });
     await emailInput.fill(CUSTOMER_EMAIL);
-    await catering
-      .getByRole('textbox', { name: /Password/i })
-      .fill(NEW_PASSWORD);
+    await catering.getByRole('textbox', { name: /Password/i }).fill(NEW_PASSWORD);
     await catering.getByRole('button', { name: /Sign in/i }).click();
     await catering.waitForLoadState('networkidle');
     await expect(catering).not.toHaveURL(/login/, { timeout: 10000 });
@@ -447,7 +356,6 @@ test.describe('Accounts Change Password', () => {
       catering.getByRole('button', { name: 'Go to home page' }),
     ).toBeVisible({ timeout: 10000 });
 
-    // ── Step 10: Logout, then switch back to district admin for cleanup/reset ──
     await catering.getByRole('button', { name: /User account menu/i }).click();
     await catering.waitForTimeout(400);
     await catering.getByRole('menuitem', { name: /Log out|Sign out/i }).click();
@@ -464,15 +372,12 @@ test.describe('Accounts Change Password', () => {
     const k12Page = await openK12CateringApp(catering);
     await k12Page.waitForLoadState('domcontentloaded');
 
-    // ── Step 11: Reset password back to original ──
     dialog = await openChangePasswordModal(k12Page);
     await dialog.getByLabel(/New Password/i).fill(ORIGINAL_PASSWORD);
     await dialog.getByLabel(/Confirm Password/i).fill(ORIGINAL_PASSWORD);
     await dialog.getByRole('button', { name: /Save|Submit|Change Password/i }).click();
     await expect(
-      k12Page
-        .getByText(/password.*changed|updated successfully|success/i)
-        .first(),
+      k12Page.getByText(/password.*changed|updated successfully|success/i).first(),
     ).toBeVisible({ timeout: 8000 });
   });
 });
@@ -502,10 +407,7 @@ function escapeRegExp(value: string) {
 }
 
 function formatMonthYear(date: Date) {
-  return date.toLocaleString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
+  return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 }
 
 function formatCalendarDate(date: Date) {
@@ -550,9 +452,7 @@ async function addFirstMenuItemToCart(page: Page, navigateToMenu = true) {
     await modalAddToCart.click();
     await expect(addToCartModal).toBeHidden({ timeout: 10000 });
   } else {
-    const modalAddToCart = page.getByRole('button', {
-      name: /^Add to Cart$/i,
-    }).last();
+    const modalAddToCart = page.getByRole('button', { name: /^Add to Cart$/i }).last();
     if (await modalAddToCart.isVisible({ timeout: 3000 }).catch(() => false)) {
       await expect(modalAddToCart).toBeEnabled({ timeout: 10000 });
       await modalAddToCart.click();
@@ -607,7 +507,6 @@ async function navigateDatePickerToDate(page: Page, targetDate: Date) {
     if (await targetMonthHeading.isVisible().catch(() => false)) {
       return;
     }
-
     await nextMonthButton.click();
     await page.waitForTimeout(200);
   }
@@ -633,11 +532,10 @@ async function expectCalendarDateRestricted(page: Page, targetDate: Date) {
     await expect(dateButton).toBeDisabled();
     return;
   }
-
   await expect(
-    getSelectDateDialog(page).getByText(String(targetDate.getDate()), {
-      exact: true,
-    }).first(),
+    getSelectDateDialog(page)
+      .getByText(String(targetDate.getDate()), { exact: true })
+      .first(),
   ).toBeVisible({ timeout: 10000 });
 }
 
@@ -682,10 +580,7 @@ test.describe('Settings Order Lead Time', () => {
 
     await navigateDatePickerToDate(catering, adminBypassDate);
 
-    const adminBypassDateButton = getCalendarDateButton(
-      catering,
-      adminBypassDate,
-    );
+    const adminBypassDateButton = getCalendarDateButton(catering, adminBypassDate);
     await expect(adminBypassDateButton).toBeVisible({ timeout: 10000 });
     await expect(adminBypassDateButton).toBeEnabled({ timeout: 10000 });
     await adminBypassDateButton.click();
@@ -709,7 +604,9 @@ test.describe('Minimum Order Amount', () => {
     catering = await loginToK12Catering(page);
   });
 
-  test('Setting visible, modal shows helper text, and admin bypasses restriction at checkout', async () => {
+  test('Setting visible, admin bypasses restriction, non-admin blocked, set to $0 removes restriction', async ({ browser }) => {
+
+    // ── Step 1-3: Navigate to Settings, verify Minimum Order Amount ──
     await catering.getByRole('button', { name: 'Go to home page' }).click();
     await catering.waitForLoadState('domcontentloaded');
     await navigateK12CateringMenu(catering, 'Settings');
@@ -725,6 +622,7 @@ test.describe('Minimum Order Amount', () => {
       catering.getByRole('button', { name: /Edit minimum order amount/i }),
     ).toBeVisible();
 
+    // ── Step 4: Open edit modal and verify helper text ──
     await catering
       .getByRole('button', { name: /Edit minimum order amount/i })
       .click();
@@ -733,22 +631,143 @@ test.describe('Minimum Order Amount', () => {
       timeout: 10000,
     });
 
+    // Read current value to restore later
+    const amountInput = catering
+      .getByRole('spinbutton')
+      .or(catering.getByRole('textbox', { name: /minimum order amount/i }))
+      .first();
+    const originalAmount = await amountInput.inputValue();
+
     const cancelBtn = catering.getByRole('button', { name: /Cancel/i });
     if (await cancelBtn.isVisible()) {
       await cancelBtn.click();
     } else {
       await catering.keyboard.press('Escape');
     }
+    await catering.waitForTimeout(300);
 
-    // Add an item to cart then proceed to checkout via UI (goto('/checkout') uses wrong baseURL)
-    await addFirstMenuItemAndProceedToCheckout(catering);
+    // ── Step 6: Admin adds item to cart — no minimum order warning shown ──
+    await navigateK12CateringMenu(catering, 'Menu');
+    await catering.waitForLoadState('domcontentloaded');
+    await addFirstMenuItemToCart(catering, false);
 
     await expect(
-      catering.getByRole('heading', { name: /Checkout/i }).first(),
-    ).toBeVisible({ timeout: 10000 });
+      catering.getByText(/Min\. order.*required|minimum.*order.*required/i),
+    ).not.toBeVisible({ timeout: 5000 });
+
+    // ── Step 5: Non-admin in separate context — warning should appear ──
+    const nonAdminContext1 = await browser.newContext();
+    const nonAdminPage1 = await nonAdminContext1.newPage();
+
+    try {
+      await nonAdminPage1.goto('https://qak12cateringui.perseusedge.com/login');
+      await nonAdminPage1.waitForLoadState('domcontentloaded');
+      await nonAdminPage1
+        .getByRole('textbox', { name: /Email/i })
+        .fill(CUSTOMER_EMAIL);
+      await nonAdminPage1
+        .getByRole('textbox', { name: /Password/i })
+        .fill(ORIGINAL_PASSWORD);
+      await nonAdminPage1.getByRole('button', { name: /Sign in/i }).click();
+      await nonAdminPage1.waitForLoadState('networkidle');
+      await expect(nonAdminPage1).not.toHaveURL(/login/, { timeout: 15000 });
+
+      await nonAdminPage1
+        .getByRole('listitem', { name: /Navigate to Menu/i })
+        .click();
+      await nonAdminPage1.waitForLoadState('domcontentloaded');
+      await addFirstMenuItemToCart(nonAdminPage1, false);
+
+      // Verify minimum order warning appears in cart for non-admin
+      await expect(
+        nonAdminPage1
+          .getByText(/Min\. order.*required|minimum.*order.*required/i)
+          .first(),
+      ).toBeVisible({ timeout: 10000 });
+    } finally {
+      await nonAdminContext1.close();
+    }
+
+    // ── Step 7: Admin (still logged in) sets Minimum Order Amount to $0 ──
+    await catering.getByRole('button', { name: 'Go to home page' }).click();
+    await catering.waitForLoadState('domcontentloaded');
+    await navigateK12CateringMenu(catering, 'Settings');
+    await catering.waitForLoadState('domcontentloaded');
+
+    await catering
+      .getByRole('button', { name: /Edit minimum order amount/i })
+      .click();
+    await catering.waitForTimeout(500);
+
+    const editInput = catering
+      .getByRole('spinbutton')
+      .or(catering.getByRole('textbox', { name: /minimum order amount/i }))
+      .first();
+    await editInput.clear();
+    await editInput.fill('0');
+
+    const saveBtn = catering.getByRole('button', { name: /Save/i });
+    await expect(saveBtn).toBeVisible({ timeout: 5000 });
+    await saveBtn.click();
+    await catering.waitForTimeout(1000);
     await expect(
-      catering.getByText(/minimum.*order.*required/i),
-    ).not.toBeVisible();
+      catering.getByText(/saved|updated|success/i).first(),
+    ).toBeVisible({ timeout: 8000 });
+
+    // ── Non-admin in new context — restriction should now be gone ──
+    const nonAdminContext2 = await browser.newContext();
+    const nonAdminPage2 = await nonAdminContext2.newPage();
+
+    try {
+      await nonAdminPage2.goto('https://qak12cateringui.perseusedge.com/login');
+      await nonAdminPage2.waitForLoadState('domcontentloaded');
+      await nonAdminPage2
+        .getByRole('textbox', { name: /Email/i })
+        .fill(CUSTOMER_EMAIL);
+      await nonAdminPage2
+        .getByRole('textbox', { name: /Password/i })
+        .fill(ORIGINAL_PASSWORD);
+      await nonAdminPage2.getByRole('button', { name: /Sign in/i }).click();
+      await nonAdminPage2.waitForLoadState('networkidle');
+      await expect(nonAdminPage2).not.toHaveURL(/login/, { timeout: 15000 });
+
+      await nonAdminPage2
+        .getByRole('listitem', { name: /Navigate to Menu/i })
+        .click();
+      await nonAdminPage2.waitForLoadState('domcontentloaded');
+      await addFirstMenuItemToCart(nonAdminPage2, false);
+
+      // Verify minimum order warning is gone after setting to $0
+      await expect(
+        nonAdminPage2.getByText(
+          /Min\. order.*required|minimum.*order.*required/i,
+        ),
+      ).not.toBeVisible({ timeout: 5000 });
+    } finally {
+      await nonAdminContext2.close();
+
+      // ── Restore original minimum order amount ──
+      await catering.getByRole('button', { name: 'Go to home page' }).click();
+      await catering.waitForLoadState('domcontentloaded');
+      await navigateK12CateringMenu(catering, 'Settings');
+      await catering.waitForLoadState('domcontentloaded');
+
+      await catering
+        .getByRole('button', { name: /Edit minimum order amount/i })
+        .click();
+      await catering.waitForTimeout(500);
+
+      const restoreInput = catering
+        .getByRole('spinbutton')
+        .or(catering.getByRole('textbox', { name: /minimum order amount/i }))
+        .first();
+      await restoreInput.clear();
+      await restoreInput.fill(originalAmount);
+
+      const restoreSave = catering.getByRole('button', { name: /Save/i });
+      await restoreSave.click();
+      await catering.waitForTimeout(1000);
+    }
   });
 });
 
@@ -767,7 +786,6 @@ test.describe('Checkout Backdate Order', () => {
   test.beforeEach(async () => {
     if (!catering) return;
 
-    // Dismiss any open modal/overlay before navigating
     const overlay = catering.locator('div.fixed.inset-0').first();
     if (await overlay.isVisible({ timeout: 1000 }).catch(() => false)) {
       await catering.keyboard.press('Escape');
@@ -844,7 +862,6 @@ test.describe('Checkout Backdate Order', () => {
       }),
     ).toBeVisible({ timeout: 5000 });
 
-    // All dates in this month should be disabled (beyond 6-month window)
     const allDates = catering.getByRole('button', {
       name: new RegExp(`${prevMonthName} \\d+, ${prevYear}`, 'i'),
     });
@@ -861,7 +878,9 @@ test.describe('Checkout Backdate Order', () => {
     } else {
       await catering.keyboard.press('Escape');
     }
-    await catering.locator('div.fixed.inset-0').first()
+    await catering
+      .locator('div.fixed.inset-0')
+      .first()
       .waitFor({ state: 'hidden', timeout: 5000 })
       .catch(() => { });
   });
@@ -896,11 +915,9 @@ test.describe('Checkout Backdate Order', () => {
 
       const prevMonthBtn = nonAdminPage.getByRole('button', { name: /Previous month/i });
       await expect(prevMonthBtn).toBeVisible({ timeout: 5000 });
-
       await prevMonthBtn.click();
       await nonAdminPage.waitForTimeout(300);
 
-      // Use this — matches only buttons with a full date label like "March 1, 2026":
       const prevMonthDate = new Date();
       prevMonthDate.setMonth(prevMonthDate.getMonth() - 1);
       const prevMonthName = prevMonthDate.toLocaleString('default', { month: 'long' });
