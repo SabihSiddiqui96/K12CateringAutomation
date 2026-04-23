@@ -936,3 +936,165 @@ test.describe('Checkout Backdate Order', () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────
+// Districts — New District Visibility
+// ─────────────────────────────────────────────
+
+test.describe('Districts - New District Visibility', () => {
+  let catering: Page;
+
+  const districtNumber = Math.floor(Math.random() * 3) + 1;
+  const districtName = `Sabih Automation District ${districtNumber} ${Date.now()}`;
+
+  test.beforeAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    catering = await loginToK12Catering(page);
+  });
+
+  test('Create new district, verify in switch list, switch to it, then delete it', async () => {
+
+    // ── Navigate to Districts ──
+    await catering.getByRole('button', { name: 'Go to home page' }).click();
+    await catering.waitForLoadState('domcontentloaded');
+    await navigateK12CateringMenu(catering, 'Districts');
+    await catering.waitForLoadState('domcontentloaded');
+
+    // ── Click Add New District ──
+    const addDistrictBtn = catering.getByRole('button', { name: /Add new district/i });
+    await expect(addDistrictBtn).toBeVisible({ timeout: 10000 });
+    await addDistrictBtn.click();
+    await catering.waitForTimeout(500);
+
+    // ── Fill District Name ──
+    const districtNameInput = catering.getByRole('textbox', { name: /District Name/i });
+    await expect(districtNameInput).toBeVisible({ timeout: 10000 });
+    await districtNameInput.fill(districtName);
+
+    // ── Select Environment — QA (PrimeroEdge) ──
+    const enciDropdown = catering.locator('#add-environment-select');
+    await expect(enciDropdown).toBeVisible({ timeout: 10000 });
+    await enciDropdown.selectOption({ label: 'QA (PrimeroEdge)' });
+
+    // ── Fill Region ID ──
+    const regionIdInput = catering.locator('#add-region-id');
+    await expect(regionIdInput).toBeVisible({ timeout: 10000 });
+    await regionIdInput.fill('123');
+
+    // ── Select Timezone — Eastern Time ──
+    const timezoneDropdown = catering
+      .getByRole('combobox', { name: /Select timezone|Eastern Time|Timezone/i })
+      .first();
+    await expect(timezoneDropdown).toBeVisible({ timeout: 10000 });
+    await timezoneDropdown.selectOption({ value: '1' });
+
+    // ── Scroll down and verify District Logo section is visible ──
+    const districtLogoSection = catering.getByText(/District Logo/i).first();
+    await districtLogoSection.scrollIntoViewIfNeeded();
+    await expect(districtLogoSection).toBeVisible({ timeout: 10000 });
+
+    // ── Click Add District button ──
+    const submitBtn = catering.getByRole('button', { name: /Add District/i }).last();
+    await expect(submitBtn).toBeVisible({ timeout: 10000 });
+    await submitBtn.click();
+
+    // ── Verify district created success toast ──
+    await expect(
+      catering.getByText(/district.*created|created.*successfully|success/i).first(),
+    ).toBeVisible({ timeout: 10000 });
+
+    // ── Click Switch District button (top left) ──
+    const switchDistrictBtn = catering.getByRole('button', { name: /Switch district/i });
+    await expect(switchDistrictBtn).toBeVisible({ timeout: 10000 });
+    await switchDistrictBtn.click();
+    await catering.waitForLoadState('domcontentloaded');
+
+    // ── Verify new district name appears in the list ──
+    const newDistrictOption = catering.getByText(districtName).first();
+    await expect(newDistrictOption).toBeVisible({ timeout: 10000 });
+
+    // ── Click on the new district ──
+    await newDistrictOption.click();
+    await catering.waitForTimeout(500);
+
+    // ── Click Switch District confirm button ──
+    const switchConfirmBtn = catering
+      .getByRole('button', { name: /Switch District|Switch|Confirm/i })
+      .last();
+    await expect(switchConfirmBtn).toBeVisible({ timeout: 10000 });
+    await switchConfirmBtn.click();
+
+    // ── Verify district switched successfully via toast ──
+    await expect(
+      catering.getByText('District Switched')
+    ).toBeVisible({ timeout: 10000 });
+
+    // ── Refresh the page ──
+    await catering.reload();
+    await catering.waitForLoadState('domcontentloaded');
+
+    // ── Switch back to Mercer County School District ──
+    await switchDistrictBtn.click();
+    await catering.waitForLoadState('domcontentloaded');
+
+    const mercerOption = catering.getByText(/Mercer County School District/i).first();
+    await expect(mercerOption).toBeVisible({ timeout: 10000 });
+    await mercerOption.click();
+    await catering.waitForTimeout(500);
+
+    const switchBackConfirmBtn = catering
+      .getByRole('button', { name: /Switch District|Switch|Confirm/i })
+      .last();
+    await expect(switchBackConfirmBtn).toBeVisible({ timeout: 10000 });
+    await switchBackConfirmBtn.click();
+
+    await expect(
+      catering.getByText(/switched|district.*switched|switched.*successfully/i).first(),
+    ).toBeVisible({ timeout: 10000 });
+    await catering.waitForLoadState('domcontentloaded');
+
+    // ── Navigate to Districts ──
+    await catering.getByRole('button', { name: 'Go to home page' }).click();
+    await catering.waitForLoadState('domcontentloaded');
+    await navigateK12CateringMenu(catering, 'Districts');
+    await catering.waitForLoadState('domcontentloaded');
+
+    // ── Search for the newly created district ──
+    const searchInput = catering.getByRole('textbox', { name: /Search districts/i });
+    await expect(searchInput).toBeVisible({ timeout: 10000 });
+    await searchInput.fill(districtName);
+    await catering.waitForTimeout(600);
+
+    // ── Verify district appears in search results ──
+    await expect(
+      catering.getByText(districtName).first(),
+    ).toBeVisible({ timeout: 10000 });
+
+    // ── Click Delete button for the district ──
+    const deleteBtn = catering.getByRole('button', {
+      name: new RegExp(`Delete district ${districtName}`, 'i'),
+    });
+    await expect(deleteBtn).toBeVisible({ timeout: 10000 });
+    await deleteBtn.click();
+    await catering.waitForTimeout(500);
+
+    // ── Confirm deletion if dialog appears ──
+    const confirmDeleteBtn = catering
+      .getByRole('button', { name: /Confirm|Yes|Delete/i })
+      .last();
+    if (await confirmDeleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await confirmDeleteBtn.click();
+    }
+
+    // ── Verify deletion success toast ──
+    await expect(
+      catering.getByText(/deleted|district.*deleted|removed.*successfully|success/i).first(),
+    ).toBeVisible({ timeout: 10000 });
+
+    // ── Verify district no longer appears in list ──
+    await expect(
+      catering.getByText(districtName),
+    ).not.toBeVisible({ timeout: 5000 });
+  });
+});
