@@ -7,7 +7,7 @@ export default defineConfig({
   testDir: './tests',
   timeout: 90000,
   expect: { timeout: 5000 },
-  workers: process.env.CI ? 4 : 2,
+  workers: 1,
   fullyParallel: true,
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
