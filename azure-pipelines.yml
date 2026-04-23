@@ -27,8 +27,11 @@ stages:
     condition: succeeded()
     jobs:
       - job: PlaywrightTests
-        displayName: Playwright smoke tests
+        displayName: Playwright smoke tests (Shard $(System.JobPositionInPhase)/4)
         timeoutInMinutes: 30
+        strategy:
+          parallel: 4
+
         steps:
           - checkout: self
 
@@ -48,11 +51,12 @@ stages:
                 -H "Content-Type: application/json" \
                 -d '{"text": "🚀 K12Catering Automation started.\n\n🔗 Monitor: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"}' || true
             displayName: Notify RingCentral - Started
+            condition: eq(variables['System.JobPositionInPhase'], '1')
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
-          - script: npm run test:e2e:qa
-            displayName: Run Playwright tests
+          - script: npx playwright test --shard=$(System.JobPositionInPhase)/4
+            displayName: Run Playwright tests (Shard $(System.JobPositionInPhase)/4)
             env:
               CI: true
               BASE_URL: $(BASE_URL)
@@ -71,14 +75,14 @@ stages:
               testResultsFormat: 'JUnit'
               testResultsFiles: 'test-results/results.xml'
               failTaskOnFailedTests: true
-              testRunTitle: 'Playwright QA Smoke'
+              testRunTitle: 'Playwright QA Smoke - Shard $(System.JobPositionInPhase)'
 
           - task: PublishPipelineArtifact@1
             displayName: Publish Playwright HTML report
             condition: succeededOrFailed()
             inputs:
               targetPath: 'playwright-report'
-              artifact: 'playwright-report'
+              artifact: 'playwright-report-shard-$(System.JobPositionInPhase)'
               publishLocation: 'pipeline'
 
           - task: PublishPipelineArtifact@1
@@ -86,7 +90,7 @@ stages:
             condition: succeededOrFailed()
             inputs:
               targetPath: 'test-results'
-              artifact: 'playwright-test-results'
+              artifact: 'playwright-test-results-shard-$(System.JobPositionInPhase)'
               publishLocation: 'pipeline'
 
           - script: |

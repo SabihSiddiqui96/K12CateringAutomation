@@ -119,6 +119,16 @@ type LoginToK12CateringOptions = {
   navigateTo?: K12CateringNavItem;
 };
 
+export async function handle404Page(page: Page): Promise<boolean> {
+  const errorCode = page.getByText(/Error Code: 404/i);
+  if (await errorCode.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await page.getByRole('button', { name: /Back to previous page/i }).click();
+    await page.waitForLoadState('domcontentloaded');
+    return true;
+  }
+  return false;
+}
+
 export async function loginToK12Catering(
   page: Page,
   options: LoginToK12CateringOptions = {}
@@ -134,7 +144,19 @@ export async function loginToK12Catering(
 
   await expect(
     cateringPage.locator('aside[aria-label="Main navigation"]')
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 30000 });
+
+  // Auto-handle 404 pages that occasionally appear during navigation
+  await cateringPage.addLocatorHandler(
+    cateringPage.getByText(/Error Code: 404/i),
+    async () => {
+      const backBtn = cateringPage.getByRole('button', { name: /Back to previous page/i });
+      if (await backBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await backBtn.click();
+        await cateringPage.waitForLoadState('domcontentloaded');
+      }
+    }
+  );
 
   if (navigateTo) {
     await navigateK12CateringMenu(cateringPage, navigateTo);

@@ -1,4 +1,4 @@
-//Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/109618
+﻿//Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/109618
 
 import { test, expect } from "@playwright/test";
 import {
@@ -9,7 +9,6 @@ import {
   clickAndCaptureNewTab,
 } from "../../utils/helpers";
 
-test.setTimeout(180000);
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
