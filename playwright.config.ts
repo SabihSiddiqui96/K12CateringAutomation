@@ -16,7 +16,7 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.BASE_URL?.trim() || 'https://qa.primeroedge.co',
-    headless: false,
+    headless: true,
     actionTimeout: 8000,
     navigationTimeout: 20000,
     trace: 'on-first-retry',
