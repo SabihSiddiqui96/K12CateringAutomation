@@ -1,4 +1,4 @@
-// Dashboard - Filters regression tests
+﻿// Dashboard - Filters regression tests
 // Tests the Time Period, Status, Statistics By dropdowns
 // and the Calendar, Trending, Search shortcut buttons
 
@@ -8,7 +8,6 @@ import {
   navigateK12CateringMenu,
 } from '../../utils/helpers';
 
-test.setTimeout(180000);
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

@@ -1,4 +1,4 @@
-// Dashboard - Recent Orders & Upcoming Orders regression tests
+﻿// Dashboard - Recent Orders & Upcoming Orders regression tests
 
 import { test, expect, Page } from '@playwright/test';
 import {
@@ -6,7 +6,6 @@ import {
   navigateK12CateringMenu,
 } from '../../utils/helpers';
 
-test.setTimeout(180000);
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

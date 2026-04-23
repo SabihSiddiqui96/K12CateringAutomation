@@ -1,4 +1,4 @@
-// Dashboard - Orders Calendar regression tests
+﻿// Dashboard - Orders Calendar regression tests
 // Tests the calendar section: month navigation, date selection,
 // Delivery Date / Created Date filter toggle, and the date-wise orders panel
 
@@ -8,7 +8,6 @@ import {
   navigateK12CateringMenu,
 } from '../../utils/helpers';
 
-test.setTimeout(180000);
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

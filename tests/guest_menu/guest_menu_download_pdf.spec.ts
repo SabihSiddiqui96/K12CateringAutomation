@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+﻿import { test, expect, Page } from '@playwright/test';
 import fs from 'fs';
 import { PDFParse } from 'pdf-parse';
 
@@ -7,7 +7,6 @@ import {
   navigateK12CateringMenu,
 } from '../../utils/helpers';
 
-test.setTimeout(180000);
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Guest Menu - Download PDF', () => {

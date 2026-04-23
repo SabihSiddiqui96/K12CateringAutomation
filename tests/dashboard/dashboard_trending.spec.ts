@@ -1,4 +1,4 @@
-// Dashboard - Trending Chart regression tests
+﻿// Dashboard - Trending Chart regression tests
 // Tests the What's Trending section: day filters, chart view toggles,
 // search functionality, and empty state
 
@@ -8,7 +8,6 @@ import {
   navigateK12CateringMenu,
 } from '../../utils/helpers';
 
-test.setTimeout(180000);
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

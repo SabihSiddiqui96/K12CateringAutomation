@@ -1,4 +1,4 @@
-// Dashboard - Statistics / KPI Cards regression tests
+﻿// Dashboard - Statistics / KPI Cards regression tests
 // Tests all 10 stat cards and the Basic/Advanced view toggle
 
 import { test, expect, Page } from '@playwright/test';
@@ -7,7 +7,6 @@ import {
   navigateK12CateringMenu,
 } from '../../utils/helpers';
 
-test.setTimeout(180000);
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

@@ -1,10 +1,9 @@
-import { test, expect, Page } from '@playwright/test';
+﻿import { test, expect, Page } from '@playwright/test';
 import {
   loginToK12Catering,
   navigateK12CateringMenu,
 } from '../../utils/helpers';
 
-test.setTimeout(180000);
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Menu - Search & Basic Filters', () => {

@@ -1,4 +1,4 @@
-// Dashboard - Quick Actions & Account Statistics regression tests
+﻿// Dashboard - Quick Actions & Account Statistics regression tests
 // Tests the Quick Actions button group navigation and
 // the Account Statistics sidebar counts and navigation
 
@@ -8,7 +8,6 @@ import {
   navigateK12CateringMenu,
 } from '../../utils/helpers';
 
-test.setTimeout(180000);
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

@@ -5,7 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  timeout: 60000,
+  timeout: 90000,
+  expect: { timeout: 5000 },
   workers: process.env.CI ? 4 : 2,
   fullyParallel: true,
   reporter: [
@@ -15,7 +16,9 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.BASE_URL?.trim() || 'https://qa.primeroedge.co',
-    headless: true,
+    headless: false,
+    actionTimeout: 8000,
+    navigationTimeout: 20000,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',
