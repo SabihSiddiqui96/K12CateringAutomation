@@ -42,8 +42,7 @@ const addToCardBtn = 'Add to Cart';
 const proceedToCheckoutBtn = 'Proceed to Checkout';
 const selectEventDate = 'Select Event Date *';
 const placeOrderBtn = 'Place Order';
-const standardProgramName = 'Sabih Testing';
-const selectPaymentContactCard = 'Sabih Testing';
+const checkoutProgramNameValue = 'Automation Program';
 const orderAgreementCheckbox =
   'I acknowledge and agree to the terms stated in the order disclaimer above. ';
 const viewShoppingCartBtn = /View shopping cart/i;
@@ -160,7 +159,7 @@ const ruleValidationCases: RuleValidationCase[] = [
 
 function generateRandomAccountingStringDescription(): string {
   const randomNumber = Math.floor(100000 + Math.random() * 900000);
-  return `Sabih Testing ${randomNumber}`;
+  return `Automation Payment ${randomNumber}`;
 }
 
 function getSettingsRow(page: Page, settingLabel: string) {
@@ -295,7 +294,7 @@ async function returnToPaymentInformation(
   const programNameInput = page.locator(checkoutProgramNameInput);
   await programNameInput.scrollIntoViewIfNeeded();
   await expect(programNameInput).toBeVisible();
-  await programNameInput.fill(standardProgramName);
+  await programNameInput.fill(checkoutProgramNameValue);
 }
 
 async function verifyAccountingStringInput(
@@ -325,6 +324,23 @@ async function verifyAccountingStringInput(
   await accountingStringInput.fill(validValue);
   await programNameInput.click();
   await expect(accountingStringInput).toHaveValue(validValue);
+}
+
+async function selectFirstContactCardInSection(
+  page: Page,
+  sectionHeading: RegExp | string,
+) {
+  const heading = page.getByRole('heading', { name: sectionHeading }).first();
+  await expect(heading).toBeVisible({ timeout: 10000 });
+
+  const section = heading.locator(
+    'xpath=ancestor::div[contains(@class,"space-y-3")][1]',
+  );
+  const contactCard = section.locator('article').first();
+
+  await contactCard.scrollIntoViewIfNeeded();
+  await expect(contactCard).toBeVisible({ timeout: 10000 });
+  await contactCard.click();
 }
 
 async function selectAvailableEventDate(page: Page) {
@@ -576,13 +592,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await catering
     .getByRole('button', { name: /Select from Address Book/i })
     .click();
-
-  const savedAddressBookCard = catering
-    .locator('article', { hasText: 'Sabih Testing' })
-    .first();
-  await scrollUntilVisible(catering, { target: savedAddressBookCard });
-  await expect(savedAddressBookCard).toBeVisible();
-  await savedAddressBookCard.click();
+  await selectFirstContactCardInSection(catering, /Select Contact/i);
 
   await clickNext(catering);
 
@@ -610,7 +620,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
   const programNameInput = catering.locator(checkoutProgramNameInput);
   await programNameInput.scrollIntoViewIfNeeded();
   await expect(programNameInput).toBeVisible();
-  await programNameInput.fill(standardProgramName);
+  await programNameInput.fill(checkoutProgramNameValue);
 
   // Verify Allow any text accepts any value
   await verifyAccountingStringInput(catering, 'ABC-123@#');
@@ -637,12 +647,10 @@ test('Catering - Settings - Add district customization settings for Payment disp
 
   // ── Payment Contact ───────────────────────────────────────────────────────
 
-  const paymentContactCard = catering
-    .locator('article', { hasText: selectPaymentContactCard })
-    .first();
-  await scrollUntilVisible(catering, { target: paymentContactCard });
-  await expect(paymentContactCard).toBeVisible();
-  await paymentContactCard.click();
+  await selectFirstContactCardInSection(
+    catering,
+    /Select Payment Contact/i,
+  );
   await clickNext(catering);
 
   // ── Review & Place Order ──────────────────────────────────────────────────
