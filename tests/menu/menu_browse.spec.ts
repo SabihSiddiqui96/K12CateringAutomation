@@ -18,13 +18,36 @@ test.describe('Menu - Browse, Search & Cart', () => {
   test.beforeEach(async () => {
     await navigateK12CateringMenu(catering, 'Menu');
     await catering.waitForLoadState('domcontentloaded');
+
+    const clearFiltersButton = catering.getByRole('button', {
+      name: /Clear All/i,
+    });
+    if (await clearFiltersButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await clearFiltersButton.click();
+      await catering.waitForTimeout(300);
+    }
+
+    const searchInput = catering.getByRole('textbox', {
+      name: 'Search menu items',
+    });
+    if (await searchInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await searchInput.clear();
+    }
   });
 
   const card = () => catering.locator('#main-content div.group.rounded-xl');
-  const cardAddToCart = () => catering.locator('#main-content').getByRole('button', { name: 'Add to Cart' }).first();
+  const cardAddToCart = () =>
+    catering.locator('#main-content').getByRole('button', { name: 'Add to Cart' }).first();
   const modal = () => catering.locator('div.fixed.inset-0');
   const modalAddToCart = () => modal().getByRole('button', { name: 'Add to Cart' });
   const modalClose = () => modal().getByRole('button', { name: 'Close modal' });
+
+  async function openFirstAddToCartModal() {
+    const addToCartButton = cardAddToCart();
+    await addToCartButton.scrollIntoViewIfNeeded();
+    await expect(addToCartButton).toBeVisible({ timeout: 10000 });
+    await addToCartButton.click();
+  }
 
   test('Menu - Page header, all controls and grid/list view toggle are visible', async () => {
     await expect(catering.getByRole('heading', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15000 });
@@ -73,7 +96,7 @@ test.describe('Menu - Browse, Search & Cart', () => {
   });
 
   test('Menu - Add to Cart modal opens with quantity stepper and confirms add to cart', async () => {
-    await cardAddToCart().click();
+    await openFirstAddToCartModal();
     await expect(catering.getByRole('heading', { name: 'Add to Cart' })).toBeVisible({ timeout: 10000 });
     await expect(catering.locator('#quantity-input')).toHaveValue('1');
     await expect(catering.getByRole('button', { name: 'Decrease quantity' })).toBeDisabled();
@@ -90,13 +113,13 @@ test.describe('Menu - Browse, Search & Cart', () => {
     const cartRegion = catering.getByRole('region', { name: 'Cart items' });
     const cartTextBefore = await cartRegion.textContent();
 
-    await cardAddToCart().click();
+    await openFirstAddToCartModal();
     await expect(catering.getByRole('heading', { name: 'Add to Cart' })).toBeVisible({ timeout: 10000 });
     await modal().getByRole('button', { name: 'Cancel' }).click();
     await expect(modal()).not.toBeVisible({ timeout: 10000 });
     expect(await cartRegion.textContent()).toBe(cartTextBefore);
 
-    await cardAddToCart().click();
+    await openFirstAddToCartModal();
     await expect(catering.getByRole('heading', { name: 'Add to Cart' })).toBeVisible({ timeout: 10000 });
     await modalAddToCart().click();
     await expect(modal()).not.toBeVisible({ timeout: 10000 });
@@ -105,7 +128,7 @@ test.describe('Menu - Browse, Search & Cart', () => {
   });
 
   test('Menu - Proceed to Checkout navigates to /checkout', async () => {
-    await cardAddToCart().click();
+    await openFirstAddToCartModal();
     await expect(catering.getByRole('heading', { name: 'Add to Cart' })).toBeVisible({ timeout: 10000 });
     await modalAddToCart().click();
     await expect(modal()).not.toBeVisible({ timeout: 10000 });

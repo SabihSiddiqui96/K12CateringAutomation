@@ -98,6 +98,40 @@ export async function openK12CateringApp(page: Page): Promise<Page> {
   return openedPage ?? page;
 }
 
+async function finishK12CateringLaunch(page: Page): Promise<void> {
+  const sidebar = page.locator('aside[aria-label="Main navigation"]');
+  if (await sidebar.isVisible({ timeout: 5000 }).catch(() => false)) {
+    return;
+  }
+
+  const launcherLink = page
+    .locator('a[href*="qak12cateringui.perseusedge.com/login?token="]')
+    .first();
+
+  if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await launcherLink.click();
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle').catch(() => { });
+  }
+
+  if (await sidebar.isVisible({ timeout: 5000 }).catch(() => false)) {
+    return;
+  }
+
+  const validationError = page.getByText(
+    /Failed to validate user with catering system/i,
+  );
+  if (await validationError.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => { });
+
+    if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await launcherLink.click();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState('networkidle').catch(() => { });
+    }
+  }
+}
+
 type K12CateringNavItem =
   | 'Dashboard'
   | 'Menu'
@@ -141,6 +175,7 @@ export async function loginToK12Catering(
 
   const cateringPage = await openK12CateringApp(page);
   await cateringPage.waitForLoadState('domcontentloaded');
+  await finishK12CateringLaunch(cateringPage);
 
   await expect(
     cateringPage.locator('aside[aria-label="Main navigation"]')

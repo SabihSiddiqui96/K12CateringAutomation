@@ -6,6 +6,10 @@ import {
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 test.describe('Guest Menu', () => {
   let catering: Page;
 
@@ -24,6 +28,11 @@ test.describe('Guest Menu', () => {
 
   const banner = (page: Page) => page.locator('div.bg-linear-to-r.from-blue-500.to-purple-600');
   const categoryNav = (page: Page) => page.locator('nav[aria-label="Menu categories"]');
+  const categoryButtons = (page: Page) => categoryNav(page).getByRole('button');
+  const itemCards = (page: Page) =>
+    page
+      .locator('article')
+      .filter({ has: page.locator('h2, h3, h4') });
 
   test('Guest Menu - Header shows district name, item count, and navigation buttons', async () => {
     await expect(catering.getByRole('heading', { name: /Mercer County School District/i })).toBeVisible({ timeout: 10000 });
@@ -41,22 +50,41 @@ test.describe('Guest Menu', () => {
 
   test('Guest Menu - Category sidebar shows categories and filtering works', async () => {
     await expect(catering.getByRole('complementary').getByRole('heading', { name: /categories/i })).toBeVisible({ timeout: 10000 });
-    await expect(catering.getByRole('complementary').getByText('Drink')).toBeVisible();
-    await expect(catering.getByRole('complementary').getByText('Appetizer')).toBeVisible();
+    await expect(categoryButtons(catering).first()).toBeVisible({ timeout: 10000 });
 
-    await categoryNav(catering).getByText('Appetizer').click();
-    await expect(catering.locator('div.bg-linear-to-r').getByText(/2 appetizer items/i)).toBeVisible({ timeout: 5000 });
+    const labels = (await categoryButtons(catering).allTextContents())
+      .map((text) => text.replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+    expect(labels.length).toBeGreaterThanOrEqual(2);
+    expect(labels.some((label) => /all categories/i.test(label))).toBeTruthy();
 
-    await categoryNav(catering).getByText('All Categories').click();
-    await expect(catering.locator('div.bg-linear-to-r').getByText(/10 items/)).toBeVisible({ timeout: 5000 });
+    const selectedCategoryButton = categoryButtons(catering).nth(1);
+    const selectedCategory = ((await selectedCategoryButton.textContent()) ?? '')
+      .replace(/\d+\s*$/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    expect(selectedCategory).toBeTruthy();
+
+    await selectedCategoryButton.click();
+    await expect(
+      banner(catering).getByText(
+        new RegExp(`\\d+\\s+${escapeRegExp(selectedCategory)}\\s+items?`, 'i'),
+      ),
+    ).toBeVisible({ timeout: 5000 });
+
+    await categoryNav(catering).getByRole('button', { name: /All Categories/i }).click();
+    await expect(banner(catering).getByText(/\d+\s+items?/i)).toBeVisible({ timeout: 5000 });
   });
 
   test('Guest Menu - Item cards show name, allergens, serves, price and Guest viewing badge', async () => {
-    await expect(catering.getByRole('article', { name: 'Menu item: apple juice' })).toBeVisible({ timeout: 10000 });
-    await expect(catering.getByText('Allergens:').first()).toBeVisible();
-    await expect(catering.getByText('Serves:').first()).toBeVisible();
-    await expect(catering.getByText('Min Order:').first()).toBeVisible();
-    await expect(catering.getByText('Guest viewing').first()).toBeVisible();
+    const firstItemCard = itemCards(catering).first();
+    await expect(firstItemCard).toBeVisible({ timeout: 10000 });
+    await expect(firstItemCard.locator('h2, h3, h4').first()).toBeVisible();
+    await expect(firstItemCard.getByText(/Allergens:/i)).toBeVisible();
+    await expect(firstItemCard.getByText(/Serves:/i)).toBeVisible();
+    await expect(firstItemCard.getByText(/Min Order:/i)).toBeVisible();
+    await expect(firstItemCard.getByText(/\$[\d,.]+\.\d{2}/)).toBeVisible();
+    await expect(firstItemCard.getByText(/Guest viewing/i)).toBeVisible();
   });
 
   test('Guest Menu - District dropdown opens with searchable list and selecting updates menu', async () => {

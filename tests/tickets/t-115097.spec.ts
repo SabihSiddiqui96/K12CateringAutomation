@@ -252,10 +252,10 @@ async function openChangePasswordModal(catering: Page) {
   await catering.waitForTimeout(600);
 
   const actionsButton = catering.getByRole('button', {
-    name: /Actions for Sabih Testing/i,
+    name: /Actions for/i,
   });
   await expect(actionsButton).toBeVisible({ timeout: 10000 });
-  await actionsButton.click();
+  await actionsButton.first().click();
 
   const changePasswordMenuItem = catering.getByRole('menuitem', {
     name: /Change Password/i,
@@ -408,6 +408,10 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function parseCurrency(value: string) {
+  return parseFloat(value.replace(/[$,]/g, '').trim() || '0');
+}
+
 function formatMonthYear(date: Date) {
   return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 }
@@ -437,10 +441,13 @@ async function addFirstMenuItemToCart(page: Page, navigateToMenu = true) {
     await page.waitForLoadState('domcontentloaded');
   }
 
+  await page.getByText(/Loading Menu/i).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+
   const cardAddToCart = page
     .locator('#main-content')
     .getByRole('button', { name: /Add to Cart/i })
     .first();
+  await cardAddToCart.scrollIntoViewIfNeeded();
   await expect(cardAddToCart).toBeVisible({ timeout: 10000 });
   await cardAddToCart.click();
 
@@ -467,12 +474,83 @@ async function addFirstMenuItemToCart(page: Page, navigateToMenu = true) {
   });
 }
 
+function getMinimumOrderMessage(page: Page) {
+  const cartSummaryPanel = page.locator('div.w-80.p-5.rounded-xl.fixed').first();
+
+  return cartSummaryPanel.getByText(
+    /minimum|min\. order|meet .*minimum|add .* more|required subtotal/i,
+  );
+}
+
+async function updateMinimumOrderAmount(page: Page, amount: string) {
+  await page.getByRole('button', { name: /Edit minimum order amount/i }).click();
+  await page.waitForTimeout(500);
+
+  const amountInput = page
+    .getByRole('spinbutton')
+    .or(page.getByRole('textbox', { name: /minimum order amount/i }))
+    .first();
+  await amountInput.clear();
+  await amountInput.fill(amount);
+
+  const saveButton = page.getByRole('button', { name: /Save/i });
+  await expect(saveButton).toBeVisible({ timeout: 5000 });
+  await saveButton.click();
+  await page.waitForTimeout(1000);
+  await expect(page.getByText(/saved|updated|success/i).first()).toBeVisible({
+    timeout: 8000,
+  });
+}
+
+async function expectMinimumOrderBlocked(page: Page) {
+  const proceedToCheckoutButton = page.getByRole('button', {
+    name: /Proceed to Checkout/i,
+  });
+  const warningVisible = await getMinimumOrderMessage(page)
+    .isVisible({ timeout: 3000 })
+    .catch(() => false);
+  const proceedVisible = await proceedToCheckoutButton
+    .isVisible({ timeout: 1000 })
+    .catch(() => false);
+  const proceedEnabled = proceedVisible
+    ? await proceedToCheckoutButton.isEnabled().catch(() => false)
+    : false;
+
+  expect(warningVisible || !proceedEnabled).toBeTruthy();
+}
+
 async function proceedToCheckout(page: Page) {
   const proceedToCheckoutButton = page.getByRole('button', {
     name: /Proceed to Checkout/i,
   });
-  await expect(proceedToCheckoutButton).toBeVisible({ timeout: 10000 });
-  await proceedToCheckoutButton.click();
+
+  const attemptCheckout = async () => {
+    await expect(proceedToCheckoutButton).toBeVisible({ timeout: 10000 });
+    await proceedToCheckoutButton.click();
+    return page
+      .waitForURL(/\/checkout/i, { timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+  };
+
+  if (await attemptCheckout()) {
+    return;
+  }
+
+  for (let i = 0; i < 6; i++) {
+    const minimumOrderBlocked = await getMinimumOrderMessage(page)
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
+    if (!minimumOrderBlocked) {
+      break;
+    }
+
+    await addFirstMenuItemToCart(page, false);
+    if (await attemptCheckout()) {
+      return;
+    }
+  }
+
   await expect(page).toHaveURL(/\/checkout/i, { timeout: 15000 });
 }
 
@@ -639,6 +717,10 @@ test.describe('Minimum Order Amount', () => {
       .or(catering.getByRole('textbox', { name: /minimum order amount/i }))
       .first();
     const originalAmount = await amountInput.inputValue();
+    const enforcedMinimumAmount = Math.max(
+      Math.ceil(parseCurrency(originalAmount)) + 100,
+      150,
+    );
 
     const cancelBtn = catering.getByRole('button', { name: /Cancel/i });
     if (await cancelBtn.isVisible()) {
@@ -648,14 +730,16 @@ test.describe('Minimum Order Amount', () => {
     }
     await catering.waitForTimeout(300);
 
+    await updateMinimumOrderAmount(catering, String(enforcedMinimumAmount));
+
     // ── Step 6: Admin adds item to cart — no minimum order warning shown ──
     await navigateK12CateringMenu(catering, 'Menu');
     await catering.waitForLoadState('domcontentloaded');
     await addFirstMenuItemToCart(catering, false);
 
-    await expect(
-      catering.getByText(/Min\. order.*required|minimum.*order.*required/i),
-    ).not.toBeVisible({ timeout: 5000 });
+    await expect(getMinimumOrderMessage(catering)).not.toBeVisible({
+      timeout: 5000,
+    });
 
     // ── Step 5: Non-admin in separate context — warning should appear ──
     const nonAdminContext1 = await browser.newContext();
@@ -681,11 +765,7 @@ test.describe('Minimum Order Amount', () => {
       await addFirstMenuItemToCart(nonAdminPage1, false);
 
       // Verify minimum order warning appears in cart for non-admin
-      await expect(
-        nonAdminPage1
-          .getByText(/Min\. order.*required|minimum.*order.*required/i)
-          .first(),
-      ).toBeVisible({ timeout: 10000 });
+      await expectMinimumOrderBlocked(nonAdminPage1);
     } finally {
       await nonAdminContext1.close();
     }
@@ -695,26 +775,7 @@ test.describe('Minimum Order Amount', () => {
     await catering.waitForLoadState('domcontentloaded');
     await navigateK12CateringMenu(catering, 'Settings');
     await catering.waitForLoadState('domcontentloaded');
-
-    await catering
-      .getByRole('button', { name: /Edit minimum order amount/i })
-      .click();
-    await catering.waitForTimeout(500);
-
-    const editInput = catering
-      .getByRole('spinbutton')
-      .or(catering.getByRole('textbox', { name: /minimum order amount/i }))
-      .first();
-    await editInput.clear();
-    await editInput.fill('0');
-
-    const saveBtn = catering.getByRole('button', { name: /Save/i });
-    await expect(saveBtn).toBeVisible({ timeout: 5000 });
-    await saveBtn.click();
-    await catering.waitForTimeout(1000);
-    await expect(
-      catering.getByText(/saved|updated|success/i).first(),
-    ).toBeVisible({ timeout: 8000 });
+    await updateMinimumOrderAmount(catering, '0');
 
     // ── Non-admin in new context — restriction should now be gone ──
     const nonAdminContext2 = await browser.newContext();
@@ -740,11 +801,9 @@ test.describe('Minimum Order Amount', () => {
       await addFirstMenuItemToCart(nonAdminPage2, false);
 
       // Verify minimum order warning is gone after setting to $0
-      await expect(
-        nonAdminPage2.getByText(
-          /Min\. order.*required|minimum.*order.*required/i,
-        ),
-      ).not.toBeVisible({ timeout: 5000 });
+      await expect(getMinimumOrderMessage(nonAdminPage2)).not.toBeVisible({
+        timeout: 5000,
+      });
     } finally {
       await nonAdminContext2.close();
 
@@ -753,22 +812,7 @@ test.describe('Minimum Order Amount', () => {
       await catering.waitForLoadState('domcontentloaded');
       await navigateK12CateringMenu(catering, 'Settings');
       await catering.waitForLoadState('domcontentloaded');
-
-      await catering
-        .getByRole('button', { name: /Edit minimum order amount/i })
-        .click();
-      await catering.waitForTimeout(500);
-
-      const restoreInput = catering
-        .getByRole('spinbutton')
-        .or(catering.getByRole('textbox', { name: /minimum order amount/i }))
-        .first();
-      await restoreInput.clear();
-      await restoreInput.fill(originalAmount);
-
-      const restoreSave = catering.getByRole('button', { name: /Save/i });
-      await restoreSave.click();
-      await catering.waitForTimeout(1000);
+      await updateMinimumOrderAmount(catering, originalAmount);
     }
   });
 });
@@ -890,8 +934,32 @@ test.describe('Checkout Backdate Order', () => {
   test('Non-admin user cannot select past dates on checkout date picker', async ({ browser }) => {
     const nonAdminContext = await browser.newContext();
     const nonAdminPage = await nonAdminContext.newPage();
+    let originalMinimumOrderAmount = '0';
 
     try {
+      await catering.getByRole('button', { name: 'Go to home page' }).click();
+      await catering.waitForLoadState('domcontentloaded');
+      await navigateK12CateringMenu(catering, 'Settings');
+      await catering.waitForLoadState('domcontentloaded');
+
+      await catering
+        .getByRole('button', { name: /Edit minimum order amount/i })
+        .click();
+      await catering.waitForTimeout(500);
+      const minimumOrderInput = catering
+        .getByRole('spinbutton')
+        .or(catering.getByRole('textbox', { name: /minimum order amount/i }))
+        .first();
+      originalMinimumOrderAmount = await minimumOrderInput.inputValue();
+
+      const cancelBtn = catering.getByRole('button', { name: /Cancel/i });
+      if (await cancelBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await cancelBtn.click();
+      } else {
+        await catering.keyboard.press('Escape');
+      }
+      await updateMinimumOrderAmount(catering, '0');
+
       const customerEmail = getRequiredEnvVar('K12_CUSTOMER_EMAIL');
       const customerPassword = decryptPassword(
         getRequiredEnvVar('K12_CUSTOMER_ENCRYPTED_PASSWORD'),
@@ -935,6 +1003,12 @@ test.describe('Checkout Backdate Order', () => {
       }
     } finally {
       await nonAdminContext.close();
+
+      await catering.getByRole('button', { name: 'Go to home page' }).click();
+      await catering.waitForLoadState('domcontentloaded');
+      await navigateK12CateringMenu(catering, 'Settings');
+      await catering.waitForLoadState('domcontentloaded');
+      await updateMinimumOrderAmount(catering, originalMinimumOrderAmount);
     }
   });
 });

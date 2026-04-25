@@ -6,6 +6,10 @@ import {
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 test.describe('Orders', () => {
   let catering: Page;
 
@@ -19,6 +23,11 @@ test.describe('Orders', () => {
     await navigateK12CateringMenu(catering, 'Orders');
     await catering.waitForLoadState('domcontentloaded');
   });
+
+  const orderCards = () =>
+    catering.locator('article').filter({
+      has: catering.getByRole('button', { name: /View details for order/i }),
+    });
 
   test('Orders - Page heading, stat cards (Total, Status, Revenue) are displayed', async () => {
     await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible({ timeout: 10000 });
@@ -34,10 +43,18 @@ test.describe('Orders', () => {
   });
 
   test('Orders - Order list shows cards with required fields, status badge, and pagination', async () => {
-    await expect(catering.getByText('260B857A02')).toBeVisible({ timeout: 10000 });
-    await expect(catering.getByText('Event Date').first()).toBeVisible();
-    await expect(catering.getByText('Total Amount').first()).toBeVisible();
-    await expect(catering.getByText('accepted').first()).toBeVisible();
+    const firstOrderCard = orderCards().first();
+    await expect(firstOrderCard).toBeVisible({ timeout: 10000 });
+    await expect(
+      firstOrderCard.getByRole('button', { name: /View details for order/i }),
+    ).toBeVisible();
+    await expect(firstOrderCard.getByText('Event Date')).toBeVisible();
+    await expect(firstOrderCard.getByText('Total Amount')).toBeVisible();
+    await expect(
+      firstOrderCard.getByText(
+        /accepted|completed|delivered|cancelled|pending|processing/i,
+      ).first(),
+    ).toBeVisible();
     await expect(catering.getByText(/1-20 of \d+/).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Page 1' }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Next page' }).first()).toBeVisible();
@@ -63,9 +80,25 @@ test.describe('Orders', () => {
     await expect(catering.locator('button', { hasText: 'View Activity' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });
     await catering.keyboard.press('Escape');
 
-    await catering.getByRole('button', { name: 'View details for order 260B857A02' }).click();
+    const detailsButton = catering
+      .getByRole('button', { name: /View details for order/i })
+      .first();
+    const detailsLabel = (await detailsButton.getAttribute('aria-label')) ?? '';
+    const orderId = detailsLabel.replace(/^View details for order\s*/i, '').trim();
+
+    await detailsButton.click();
     await catering.waitForLoadState('domcontentloaded');
-    await expect(catering.getByRole('heading', { name: /Order #260B857A02/i })).toBeVisible({ timeout: 10000 });
+    if (orderId) {
+      await expect(
+        catering.getByRole('heading', {
+          name: new RegExp(`Order\\s*#?\\s*${escapeRegExp(orderId)}`, 'i'),
+        }),
+      ).toBeVisible({ timeout: 10000 });
+    } else {
+      await expect(
+        catering.getByRole('heading', { name: /Order #/i }),
+      ).toBeVisible({ timeout: 10000 });
+    }
   });
 
   test('Orders - Detail page shows all sections and Back button returns to list', async () => {

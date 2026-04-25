@@ -158,7 +158,7 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
     await expect(catering.getByRole('heading', { name: 'Sort Categories' })).toBeVisible({ timeout: 10000 });
     await expect(catering.getByText('Drag and drop to reorder categories')).toBeVisible();
     await expect(catering.getByRole('button', { name: /Drag to reorder .+ category/ }).first()).toBeVisible();
-    await expect(catering.getByText('#1')).toBeVisible();
+    await expect(catering.getByText(/^#1$/)).toBeVisible();
 
     const firstItem = catering.getByRole('button', { name: /Drag to reorder .+ category/ }).nth(0);
     const secondItem = catering.getByRole('button', { name: /Drag to reorder .+ category/ }).nth(1);

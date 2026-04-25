@@ -27,6 +27,11 @@ test.describe('Accounts', () => {
     }
   });
 
+  const accountCards = () =>
+    catering.getByRole('listitem').filter({
+      has: catering.getByRole('button', { name: /View details for/i }),
+    });
+
   test('Accounts - Page heading, stat cards and list are visible', async () => {
     await expect(catering.locator('h1')).toContainText('Account Management', { timeout: 10000 });
     await expect(catering.getByText('Manage user accounts and permissions')).toBeVisible();
@@ -40,11 +45,12 @@ test.describe('Accounts', () => {
   });
 
   test('Accounts - Account cards display details, actions and pagination', async () => {
-    const firstCard = catering.getByRole('listitem').filter({ hasText: 'asd sdv' }).first();
+    const firstCard = accountCards().first();
+    await expect(firstCard).toBeVisible({ timeout: 10000 });
     await expect(firstCard.getByText('Role')).toBeVisible({ timeout: 10000 });
     await expect(firstCard.getByText('Email')).toBeVisible();
-    await expect(firstCard.getByRole('button', { name: /View details for asd sdv/i })).toBeVisible();
-    await expect(firstCard.getByRole('button', { name: /Actions for asd sdv/i })).toBeVisible();
+    await expect(firstCard.getByRole('button', { name: /View details for/i })).toBeVisible();
+    await expect(firstCard.getByRole('button', { name: /Actions for/i })).toBeVisible();
 
     await expect(catering.getByRole('button', { name: 'Page 1' }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Next page' }).first()).toBeVisible();
@@ -67,7 +73,10 @@ test.describe('Accounts', () => {
   });
 
   test('Accounts - Actions kebab menu opens and can be dismissed', async () => {
-    await catering.getByRole('button', { name: /Actions for asd sdv/i }).click();
+    await accountCards()
+      .first()
+      .getByRole('button', { name: /Actions for/i })
+      .click();
     await expect(catering.getByRole('menuitem', { name: 'Deactivate Account' })).toBeVisible({ timeout: 5000 });
     await expect(catering.getByRole('menuitem', { name: 'Change Password' })).toBeVisible();
     await catering.keyboard.press('Escape');
@@ -75,7 +84,10 @@ test.describe('Accounts', () => {
   });
 
   test('Accounts - Account Details modal opens with all sections and closes correctly', async () => {
-    await catering.getByRole('button', { name: /View details for asd sdv/i }).click();
+    await accountCards()
+      .first()
+      .getByRole('button', { name: /View details for/i })
+      .click();
     await expect(catering.getByRole('heading', { name: 'Account Details' })).toBeVisible({ timeout: 10000 });
     await expect(catering.getByText('Manage user information and permissions')).toBeVisible();
     await expect(catering.getByRole('heading', { name: 'Basic Information' })).toBeVisible();
