@@ -7,8 +7,9 @@ export default defineConfig({
   testDir: './tests',
   timeout: 120000,
   expect: { timeout: 10000 },
-  workers: process.env.CI ? 4 : undefined,
+  workers: process.env.CI ? 2 : undefined,
   fullyParallel: false,
+  retries: process.env.CI ? 1 : 0,
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['junit', { outputFile: 'test-results/results.xml' }],
@@ -16,7 +17,7 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.BASE_URL?.trim() || 'https://qa.primeroedge.co',
-    headless: true,
+    headless: !!process.env.CI,
     storageState: 'playwright/.auth/admin.json',
     actionTimeout: 15000,
     navigationTimeout: 45000,
