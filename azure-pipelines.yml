@@ -65,7 +65,11 @@ stages:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
           # ── Run this shard's slice of tests ──────────────────────────────
-          - script: npx playwright test --shard=$(System.JobPositionInPhase)/4
+          - script: |
+              SHARD_IDX=$(System.JobPositionInPhase)
+              SLEEP_SEC=$(( (SHARD_IDX - 1) * 20 ))
+              if [ "$SLEEP_SEC" -gt 0 ]; then sleep "$SLEEP_SEC"; fi
+              npx playwright test --shard=$(System.JobPositionInPhase)/4
             displayName: Run Playwright tests (Shard $(System.JobPositionInPhase)/4)
             env:
               CI: true

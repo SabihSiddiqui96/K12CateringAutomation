@@ -20,10 +20,19 @@ export class LoginPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto('/login.aspx', {
-      waitUntil: 'domcontentloaded',
-      timeout: 180000,
-    });
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.page.goto('/login.aspx', {
+          waitUntil: 'domcontentloaded',
+          timeout: 60000,
+        });
+        break;
+      } catch (err) {
+        if (attempt === maxAttempts) throw err;
+        await this.page.waitForTimeout(attempt * 5000);
+      }
+    }
 
     await this.usernameInput.waitFor({
       state: 'visible',
