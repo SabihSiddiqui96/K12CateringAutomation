@@ -10,7 +10,7 @@ browsers:
 testFramework:
   name: playwright
 
-parallelsPerPlatform: 1
+parallelsPerPlatform: 5
 browserstackLocal: false
 
 buildName: K12Catering-QA-TestAutomation
@@ -23,3 +23,5 @@ env:
   ENCRYPTION_KEY: ${ENCRYPTION_KEY}
   PE_DISTRICT_EMAIL: ${PE_DISTRICT_EMAIL}
   PE_DISTRICT_ENCRYPTED_PASSWORD: ${PE_DISTRICT_ENCRYPTED_PASSWORD}
+  K12_CUSTOMER_EMAIL: ${K12_CUSTOMER_EMAIL}
+  K12_CUSTOMER_ENCRYPTED_PASSWORD: ${K12_CUSTOMER_ENCRYPTED_PASSWORD}
