@@ -2,6 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 import {
   loginToK12Catering,
   navigateK12CateringMenu,
+  getDistrictName,
 } from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -27,8 +28,8 @@ test.describe('Districts', () => {
     await expect(catering.getByRole('textbox', { name: /Search districts/i })).toBeVisible();
   });
 
-  test('Districts - Mercer County School District is listed with edit/delete actions', async () => {
-    await expect(catering.getByText(/Mercer County School District/i).first()).toBeVisible({ timeout: 10000 });
+  test('Districts - District is listed with edit/delete actions', async () => {
+    await expect(catering.getByText(new RegExp(getDistrictName(), 'i')).first()).toBeVisible({ timeout: 10000 });
 
     const editBtn = catering.getByRole('button', { name: /Edit district/i }).or(catering.getByRole('button', { name: /Edit/i }).first()).first();
     const deleteBtn = catering.getByRole('button', { name: /Delete district/i }).or(catering.getByRole('button', { name: /Delete/i }).first()).first();
@@ -39,25 +40,25 @@ test.describe('Districts', () => {
 
   test('Districts - Search filters and clearing search restores list', async () => {
     const searchInput = catering.getByRole('textbox', { name: /Search districts/i });
-    await searchInput.fill('Mercer');
+    await searchInput.fill(getDistrictName().split(' ')[0]);
     await catering.waitForTimeout(600);
-    await expect(catering.getByText(/Mercer County School District/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(new RegExp(getDistrictName(), 'i')).first()).toBeVisible({ timeout: 10000 });
 
     await searchInput.fill('ZZZNoMatchXXX12345');
     await catering.waitForTimeout(600);
     const hasEmptyState = await catering.getByText(/no.*districts|no results|not found/i).first().isVisible({ timeout: 5000 }).catch(() => false);
-    const hasMercer = await catering.getByText(/Mercer County School District/i).first().isVisible({ timeout: 2000 }).catch(() => false);
-    expect(hasEmptyState || !hasMercer).toBe(true);
+    const hasDistrict = await catering.getByText(new RegExp(getDistrictName(), 'i')).first().isVisible({ timeout: 2000 }).catch(() => false);
+    expect(hasEmptyState || !hasDistrict).toBe(true);
 
     await searchInput.clear();
     await catering.waitForTimeout(600);
-    await expect(catering.getByText(/Mercer County School District/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(new RegExp(getDistrictName(), 'i')).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Districts - Switch District opens list showing current district', async () => {
     await catering.getByRole('button', { name: /Switch district/i }).click();
     await catering.waitForLoadState('domcontentloaded');
-    await expect(catering.getByText(/Mercer County School District/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(new RegExp(getDistrictName(), 'i')).first()).toBeVisible({ timeout: 10000 });
 
     const cancelBtn = catering.getByRole('button', { name: /Cancel|Back/i }).first();
     if (await cancelBtn.isVisible({ timeout: 2000 }).catch(() => false)) {

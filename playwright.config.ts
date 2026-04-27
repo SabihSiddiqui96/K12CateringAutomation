@@ -1,5 +1,18 @@
 import * as dotenv from 'dotenv';
-dotenv.config();
+import * as fs from 'fs';
+import * as path from 'path';
+
+function resolveEnvFile(): string {
+  if (process.env.ENV_FILE) return process.env.ENV_FILE.trim();
+  try {
+    const settings = JSON.parse(fs.readFileSync(path.resolve(__dirname, '.vscode/settings.json'), 'utf8'));
+    return settings?.['playwright.env']?.ENV_FILE?.trim() || '.env';
+  } catch {
+    return '.env';
+  }
+}
+
+dotenv.config({ path: resolveEnvFile() });
 
 import { defineConfig, devices } from '@playwright/test';
 

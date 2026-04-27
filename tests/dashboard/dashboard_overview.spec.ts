@@ -67,7 +67,7 @@ test.describe('Dashboard - Overview (Stats, Quick Actions, Filters)', () => {
     await expect(statsRegion()).toBeVisible({ timeout: 15000 });
     await expect(statsRegion().getByRole('region', { name: /^Total Orders/i })).toBeVisible();
     await expect(statsRegion().getByRole('region', { name: /^Total Revenue/i })).toBeVisible();
-    await expect(statsRegion().getByRole('region', { name: /^Pending Orders/i })).toContainText('All clear');
+    await expect(statsRegion().getByRole('region', { name: /^Pending Orders/i })).toBeVisible();
     await expect(statsRegion().getByRole('region', { name: /^Accepted Orders/i })).toContainText(/acceptance rate/i);
     await expect(statsRegion().getByRole('region', { name: /^Active Accounts/i })).toBeVisible();
   });

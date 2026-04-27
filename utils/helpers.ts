@@ -2,6 +2,11 @@ import { expect, Locator, Page } from '@playwright/test';
 import { LoginPage } from '../pages/Login';
 import { decryptPassword } from './crypto';
 import { getRequiredEnvVar } from './env';
+import { getK12CateringUrl } from './baseUrl';
+
+export function getDistrictName(): string {
+  return process.env.DISTRICT_NAME || 'Mercer County School District';
+}
 
 export const mercerCountySelector = '[value="MERCER COUNTY SCHOOLS"], [value="Mercer County School District"]';
 
@@ -71,13 +76,15 @@ export async function loginToPrimeroEdge(page: Page): Promise<void> {
   await loginPage.enterUsername(username);
   await loginPage.enterPassword(password);
   await loginPage.clickLogin();
-  await page.waitForURL(/(?!.*login\.aspx).*/);
+  const loginPath = process.env.LOGIN_PATH || '/login.aspx';
+  await page.waitForURL(url => !url.href.includes(loginPath));
 }
 
 // Login with new user
 export async function loginToK12CateringAsDistrictUser(page: Page): Promise<void> {
-  const username = getRequiredEnvVar('PE_DISTRICT_EMAIL');
-  const encryptedPassword = getRequiredEnvVar('PE_DISTRICT_ENCRYPTED_PASSWORD');
+  const isUAT = process.env.DIRECT_K12_LOGIN === 'true';
+  const username = getRequiredEnvVar(isUAT ? 'PE_UAT_DISTRICT_EMAIL' : 'PE_DISTRICT_EMAIL');
+  const encryptedPassword = getRequiredEnvVar(isUAT ? 'PE_UAT_DISTRICT_ENCRYPTED_PASSWORD' : 'PE_DISTRICT_ENCRYPTED_PASSWORD');
   const password = decryptPassword(encryptedPassword);
 
   const loginPage = new LoginPage(page);
@@ -105,7 +112,7 @@ async function finishK12CateringLaunch(page: Page): Promise<void> {
   }
 
   const launcherLink = page
-    .locator('a[href*="qak12cateringui.perseusedge.com/login?token="]')
+    .locator(`a[href*="${getK12CateringUrl()}/login?token="]`)
     .first();
 
   if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -171,11 +178,16 @@ export async function loginToK12Catering(
 
   await loginToPrimeroEdge(page);
 
-  await expect(page.locator(mercerCountySelector)).toBeVisible();
+  let cateringPage: Page;
 
-  const cateringPage = await openK12CateringApp(page);
-  await cateringPage.waitForLoadState('domcontentloaded');
-  await finishK12CateringLaunch(cateringPage);
+  if (process.env.DIRECT_K12_LOGIN === 'true') {
+    cateringPage = page;
+  } else {
+    await expect(page.locator(mercerCountySelector)).toBeVisible();
+    cateringPage = await openK12CateringApp(page);
+    await cateringPage.waitForLoadState('domcontentloaded');
+    await finishK12CateringLaunch(cateringPage);
+  }
 
   await expect(
     cateringPage.locator('aside[aria-label="Main navigation"]')

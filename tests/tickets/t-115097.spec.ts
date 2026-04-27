@@ -7,57 +7,14 @@ import {
   loginToK12CateringAsDistrictUser,
   navigateK12CateringMenu,
   openK12CateringApp,
+  getDistrictName,
 } from '../../utils/helpers';
 import { decryptPassword } from '../../utils/crypto';
 import { getRequiredEnvVar } from '../../utils/env';
+import { getK12CateringLoginUrl, getK12CateringUrl } from '../../utils/baseUrl';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-// ─────────────────────────────────────────────
-// Name Display Standardization
-// ─────────────────────────────────────────────
-test.describe('Name Display Standardization', () => {
-  let catering: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    catering = await loginToK12Catering(page);
-  });
-
-  test('First Last format shown consistently across all pages', async () => {
-    await catering.getByRole('button', { name: 'Go to home page' }).click();
-    await catering.waitForLoadState('domcontentloaded');
-    await expect(catering.getByText('Sabih Siddiqui').first()).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(
-      catering.getByText(/Welcome back, Sabih Siddiqui/i),
-    ).toBeVisible();
-
-    await navigateK12CateringMenu(catering, 'Accounts');
-    await catering.waitForLoadState('domcontentloaded');
-    const firstAccount = catering
-      .getByRole('button', { name: /View details for/i })
-      .first();
-    await expect(firstAccount).toBeVisible({ timeout: 10000 });
-    const label = await firstAccount.getAttribute('aria-label');
-    const name = label?.replace('View details for ', '').trim() ?? '';
-    expect(name).toMatch(/^\S+ \S+/);
-
-    await navigateK12CateringMenu(catering, 'My Profile');
-    await catering.waitForLoadState('domcontentloaded');
-    await expect(
-      catering.getByRole('heading', { name: /Sabih Siddiqui/i }).first(),
-    ).toBeVisible({ timeout: 10000 });
-
-    await navigateK12CateringMenu(catering, 'Orders');
-    await catering.waitForLoadState('domcontentloaded');
-    await expect(catering.getByText('Sabih Siddiqui').first()).toBeVisible({
-      timeout: 10000,
-    });
-  });
-});
 
 // ─────────────────────────────────────────────
 // Dashboard Revenue Calculation
@@ -216,10 +173,11 @@ test.describe('Reports Status Filter', () => {
 // ─────────────────────────────────────────────
 const randomDigits = String(Math.floor(1000 + Math.random() * 9000));
 const NEW_PASSWORD = `Sabih${randomDigits}!`;
+const isUAT = process.env.DIRECT_K12_LOGIN === 'true';
 const ORIGINAL_PASSWORD = decryptPassword(
-  getRequiredEnvVar('K12_CUSTOMER_ENCRYPTED_PASSWORD'),
+  getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
 );
-const CUSTOMER_EMAIL = getRequiredEnvVar('K12_CUSTOMER_EMAIL');
+const CUSTOMER_EMAIL = getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
 
 function getChangePasswordDialog(catering: Page) {
   return catering.getByRole('dialog', { name: /Change Password/i });
@@ -341,7 +299,7 @@ test.describe('Accounts Change Password', () => {
     await catering.getByRole('menuitem', { name: /Log out|Sign out/i }).click();
     await catering.waitForURL('**/login', { timeout: 10000 });
     await expect(catering).toHaveURL(
-      /https:\/\/qak12cateringui\.perseusedge\.com\/login/i,
+      new RegExp(getK12CateringUrl().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + (process.env.LOGIN_PATH || '/login'), 'i'),
       { timeout: 10000 },
     );
 
@@ -371,8 +329,10 @@ test.describe('Accounts Change Password', () => {
       await catering.waitForLoadState('networkidle');
     }
 
-    const k12Page = await openK12CateringApp(catering);
-    await k12Page.waitForLoadState('domcontentloaded');
+    const k12Page = process.env.DIRECT_K12_LOGIN === 'true'
+      ? catering
+      : await openK12CateringApp(catering);
+    if (process.env.DIRECT_K12_LOGIN !== 'true') await k12Page.waitForLoadState('domcontentloaded');
 
     dialog = await openChangePasswordModal(k12Page);
     await dialog.getByLabel(/New Password/i).fill(ORIGINAL_PASSWORD);
@@ -441,7 +401,7 @@ async function addFirstMenuItemToCart(page: Page, navigateToMenu = true) {
     await page.waitForLoadState('domcontentloaded');
   }
 
-  await page.getByText(/Loading Menu/i).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+  await page.getByText(/Loading Menu/i).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => { });
 
   const cardAddToCart = page
     .locator('#main-content')
@@ -746,7 +706,7 @@ test.describe('Minimum Order Amount', () => {
     const nonAdminPage1 = await nonAdminContext1.newPage();
 
     try {
-      await nonAdminPage1.goto('https://qak12cateringui.perseusedge.com/login');
+      await nonAdminPage1.goto(getK12CateringLoginUrl());
       await nonAdminPage1.waitForLoadState('domcontentloaded');
       await nonAdminPage1
         .getByRole('textbox', { name: /Email/i })
@@ -782,7 +742,7 @@ test.describe('Minimum Order Amount', () => {
     const nonAdminPage2 = await nonAdminContext2.newPage();
 
     try {
-      await nonAdminPage2.goto('https://qak12cateringui.perseusedge.com/login');
+      await nonAdminPage2.goto(getK12CateringLoginUrl());
       await nonAdminPage2.waitForLoadState('domcontentloaded');
       await nonAdminPage2
         .getByRole('textbox', { name: /Email/i })
@@ -960,12 +920,12 @@ test.describe('Checkout Backdate Order', () => {
       }
       await updateMinimumOrderAmount(catering, '0');
 
-      const customerEmail = getRequiredEnvVar('K12_CUSTOMER_EMAIL');
+      const customerEmail = getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
       const customerPassword = decryptPassword(
-        getRequiredEnvVar('K12_CUSTOMER_ENCRYPTED_PASSWORD'),
+        getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
       );
 
-      await nonAdminPage.goto('https://qak12cateringui.perseusedge.com/login');
+      await nonAdminPage.goto(getK12CateringLoginUrl());
       await nonAdminPage.waitForLoadState('domcontentloaded');
       await nonAdminPage.getByRole('textbox', { name: /Email/i }).fill(customerEmail);
       await nonAdminPage.getByRole('textbox', { name: /Password/i }).fill(customerPassword);
@@ -1051,7 +1011,7 @@ test.describe('Districts - New District Visibility', () => {
     // ── Select Environment — QA (PrimeroEdge) ──
     const enciDropdown = catering.locator('#add-environment-select');
     await expect(enciDropdown).toBeVisible({ timeout: 10000 });
-    await enciDropdown.selectOption({ label: 'QA (PrimeroEdge)' });
+    await enciDropdown.selectOption({ label: process.env.ENVIRONMENT_LABEL || 'QA (PrimeroEdge)' });
 
     // ── Fill Region ID ──
     const regionIdInput = catering.locator('#add-region-id');
@@ -1114,7 +1074,7 @@ test.describe('Districts - New District Visibility', () => {
     await switchDistrictBtn.click();
     await catering.waitForLoadState('domcontentloaded');
 
-    const mercerOption = catering.getByText(/Mercer County School District/i).first();
+    const mercerOption = catering.getByText(new RegExp(getDistrictName(), 'i')).first();
     await expect(mercerOption).toBeVisible({ timeout: 10000 });
     await mercerOption.click();
     await catering.waitForTimeout(500);

@@ -133,15 +133,15 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
 
     await editInput.clear();
     await editInput.fill('Should Not Save');
-    await catering.keyboard.press('Escape');
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
     await catering.waitForTimeout(300);
-    await expect(dialog.getByText(originalName)).toBeVisible({ timeout: 10000 });
+    await expect(dialog.getByText(originalName).first()).toBeVisible({ timeout: 10000 });
 
     await catering.getByRole('button', { name: 'Edit ingredient' }).first().click();
     await editInput.clear();
     await editInput.fill(originalName + ' Updated');
     await editInput.press('Enter');
-    await expect(dialog.getByText(originalName + ' Updated')).toBeVisible({ timeout: 10000 });
+    await expect(dialog.getByText(originalName + ' Updated').first()).toBeVisible({ timeout: 10000 });
 
     await catering.getByRole('button', { name: 'Edit ingredient' }).first().click();
     await editInput.clear();

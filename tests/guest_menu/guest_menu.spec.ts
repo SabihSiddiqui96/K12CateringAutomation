@@ -2,6 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 import {
   loginToK12Catering,
   navigateK12CateringMenu,
+  getDistrictName,
 } from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -35,7 +36,7 @@ test.describe('Guest Menu', () => {
       .filter({ has: page.locator('h2, h3, h4') });
 
   test('Guest Menu - Header shows district name, item count, and navigation buttons', async () => {
-    await expect(catering.getByRole('heading', { name: /Mercer County School District/i })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: new RegExp(getDistrictName(), 'i') })).toBeVisible({ timeout: 10000 });
     await expect(catering.getByText(/\d+ menu items available/i)).toBeVisible();
     await expect(catering.locator('header').first().getByRole('button', { name: 'Return to menu page' })).toBeVisible();
     await expect(catering.locator('header').first().getByRole('button', { name: 'Return to dashboard' })).toBeVisible();
@@ -90,10 +91,11 @@ test.describe('Guest Menu', () => {
   test('Guest Menu - District dropdown opens with searchable list and selecting updates menu', async () => {
     await catering.getByRole('button', { name: 'Select a district to view menu' }).click();
     await expect(catering.getByPlaceholder(/search/i)).toBeVisible({ timeout: 5000 });
-    await expect(catering.getByText('Berkeley School District')).toBeVisible();
+    const secondaryDistrict = process.env.SECONDARY_DISTRICT_NAME || 'Berkeley School District';
+    await expect(catering.getByText(secondaryDistrict)).toBeVisible();
 
-    await catering.getByPlaceholder(/search/i).fill('Berkeley');
-    await catering.getByText('Berkeley School District').click();
+    await catering.getByPlaceholder(/search/i).fill(secondaryDistrict.split(' ')[0]);
+    await catering.getByText(secondaryDistrict).click();
     await catering.waitForLoadState('networkidle');
     await expect(banner(catering).getByText(/\d+ items/)).toBeVisible({ timeout: 10000 });
   });

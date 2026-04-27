@@ -23,7 +23,7 @@ export class LoginPage {
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await this.page.goto('/login.aspx', {
+        await this.page.goto(process.env.LOGIN_PATH || '/login.aspx', {
           waitUntil: 'domcontentloaded',
           timeout: 60000,
         });
