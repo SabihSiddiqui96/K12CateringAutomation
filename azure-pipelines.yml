@@ -35,7 +35,7 @@ stages:
     jobs:
       - job: PlaywrightTests
         displayName: Playwright smoke tests
-        timeoutInMinutes: 60
+        timeoutInMinutes: 90
 
         steps:
           - checkout: self
