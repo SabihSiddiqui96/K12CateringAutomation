@@ -25,9 +25,8 @@ stages:
             displayName: Deploy app to QA
 
   # ─────────────────────────────────────────────
-  # Stage 2 – Run tests on BrowserStack
-  #   BrowserStack handles parallelism via
-  #   parallelsPerPlatform in browserstack.yml
+  # Stage 2 – Run tests (4 parallel shards)
+  #   Each shard saves a summary JSON artifact
   # ─────────────────────────────────────────────
   - stage: Run_Playwright_QA
     displayName: Run Playwright smoke tests on QA
@@ -35,8 +34,10 @@ stages:
     condition: succeeded()
     jobs:
       - job: PlaywrightTests
-        displayName: Playwright smoke tests (BrowserStack)
-        timeoutInMinutes: 60
+        displayName: Playwright smoke tests (Shard $(System.JobPositionInPhase)/4)
+        timeoutInMinutes: 45
+        strategy:
+          parallel: 4
 
         steps:
           - checkout: self
@@ -49,26 +50,29 @@ stages:
           - script: npm ci
             displayName: Install npm packages
 
-          - script: npx playwright install chromium
+          - script: npx playwright install --with-deps chromium
             displayName: Install Playwright browsers
 
-          # ── Notify that the run has started ──────────────────────────────
+          # ── Notify once that the run has started (shard 1 only) ──────────
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d "{\"text\": \"🚀 K12Catering Automation started.\n\n🔗 Monitor: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)\"}" || true
             displayName: Notify RingCentral - Started
+            condition: eq(variables['System.JobPositionInPhase'], '1')
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
-          # ── Run all tests on BrowserStack ─────────────────────────────────
-          - script: npx browserstack-node-sdk playwright test
-            displayName: Run Playwright tests on BrowserStack
+          # ── Stagger starts to avoid simultaneous login bursts ─────────────
+          - script: |
+              SHARD_IDX=$(System.JobPositionInPhase)
+              SLEEP_SEC=$(( (SHARD_IDX - 1) * 20 ))
+              if [ "$SLEEP_SEC" -gt 0 ]; then sleep "$SLEEP_SEC"; fi
+              npx playwright test --shard=$(System.JobPositionInPhase)/4
+            displayName: Run Playwright tests (Shard $(System.JobPositionInPhase)/4)
             env:
               CI: true
               BASE_URL: $(BASE_URL)
-              BROWSERSTACK_USERNAME: $(BROWSERSTACK_USERNAME)
-              BROWSERSTACK_ACCESS_KEY: $(BROWSERSTACK_ACCESS_KEY)
               PE_USERNAME: $(PE_USERNAME)
               ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
               ENCRYPTION_KEY: $(ENCRYPTION_KEY)
@@ -77,55 +81,11 @@ stages:
               K12_CUSTOMER_EMAIL: $(K12_CUSTOMER_EMAIL)
               K12_CUSTOMER_ENCRYPTED_PASSWORD: $(K12_CUSTOMER_ENCRYPTED_PASSWORD)
 
-          - task: PublishTestResults@2
-            displayName: Publish JUnit test results
-            condition: succeededOrFailed()
-            inputs:
-              testResultsFormat: 'JUnit'
-              testResultsFiles: 'test-results/results.xml'
-              failTaskOnFailedTests: true
-              testRunTitle: 'Playwright QA Smoke - BrowserStack'
-
-          - task: PublishPipelineArtifact@1
-            displayName: Publish Playwright HTML report
-            condition: succeededOrFailed()
-            inputs:
-              targetPath: 'playwright-report'
-              artifact: 'playwright-report'
-              publishLocation: 'pipeline'
-
-          - task: PublishPipelineArtifact@1
-            displayName: Publish test artifacts
-            condition: succeededOrFailed()
-            inputs:
-              targetPath: 'test-results'
-              artifact: 'playwright-test-results'
-              publishLocation: 'pipeline'
-
-  # ─────────────────────────────────────────────
-  # Stage 3 – Consolidated webhook notification
-  # ─────────────────────────────────────────────
-  - stage: Notify
-    displayName: Send consolidated notification
-    dependsOn: Run_Playwright_QA
-    condition: always()
-    jobs:
-      - job: SendWebhook
-        displayName: Send RingCentral notification
-        steps:
-          - task: DownloadPipelineArtifact@2
-            displayName: Download test results
-            condition: always()
-            inputs:
-              artifact: 'playwright-test-results'
-              path: 'test-results'
-
+          # ── Write a per-shard summary so Stage 3 can merge them ──────────
           - script: |
               node -e "
-              const fs    = require('fs');
-              const https = require('https');
-              const url   = require('url');
-
+              const fs = require('fs');
+              const resultsPath = 'test-results/results.json';
               let total = 0, passed = 0, failed = 0;
 
               function walkSuite(suite) {
@@ -140,10 +100,116 @@ stages:
                 for (const child of (suite.suites || [])) walkSuite(child);
               }
 
-              const resultsPath = 'test-results/results.json';
               if (fs.existsSync(resultsPath)) {
                 const data = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
                 (data.suites || []).forEach(walkSuite);
+              }
+
+              fs.mkdirSync('shard-summary', { recursive: true });
+              fs.writeFileSync(
+                'shard-summary/shard-' + process.env.SHARD_INDEX + '.json',
+                JSON.stringify({ total, passed, failed })
+              );
+              console.log('Shard ' + process.env.SHARD_INDEX + ' summary:', { total, passed, failed });
+              "
+            displayName: Write shard summary
+            condition: succeededOrFailed()
+            env:
+              SHARD_INDEX: $(System.JobPositionInPhase)
+
+          - task: PublishTestResults@2
+            displayName: Publish JUnit test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'test-results/results.xml'
+              failTaskOnFailedTests: true
+              testRunTitle: 'Playwright QA Smoke - Shard $(System.JobPositionInPhase)'
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish Playwright HTML report
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: 'playwright-report'
+              artifact: 'playwright-report-shard-$(System.JobPositionInPhase)'
+              publishLocation: 'pipeline'
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish test artifacts
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: 'test-results'
+              artifact: 'playwright-test-results-shard-$(System.JobPositionInPhase)'
+              publishLocation: 'pipeline'
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish shard summary
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: 'shard-summary'
+              artifact: 'shard-summary-$(System.JobPositionInPhase)'
+              publishLocation: 'pipeline'
+
+  # ─────────────────────────────────────────────
+  # Stage 3 – Consolidated webhook notification
+  # ─────────────────────────────────────────────
+  - stage: Notify
+    displayName: Send consolidated notification
+    dependsOn: Run_Playwright_QA
+    condition: always()
+    jobs:
+      - job: SendWebhook
+        displayName: Merge results and notify RingCentral
+        steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: Download shard summary 1
+            condition: always()
+            inputs:
+              artifact: 'shard-summary-1'
+              path: 'shard-summaries'
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download shard summary 2
+            condition: always()
+            inputs:
+              artifact: 'shard-summary-2'
+              path: 'shard-summaries'
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download shard summary 3
+            condition: always()
+            inputs:
+              artifact: 'shard-summary-3'
+              path: 'shard-summaries'
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download shard summary 4
+            condition: always()
+            inputs:
+              artifact: 'shard-summary-4'
+              path: 'shard-summaries'
+
+          - script: |
+              node -e "
+              const fs   = require('fs');
+              const https = require('https');
+              const url   = require('url');
+
+              let total = 0, passed = 0, failed = 0;
+              const dir = 'shard-summaries';
+
+              if (fs.existsSync(dir)) {
+                fs.readdirSync(dir).forEach(file => {
+                  if (!file.endsWith('.json')) return;
+                  try {
+                    const s = JSON.parse(fs.readFileSync(dir + '/' + file, 'utf8'));
+                    total  += (s.total  || 0);
+                    passed += (s.passed || 0);
+                    failed += (s.failed || 0);
+                  } catch(e) {
+                    console.warn('Could not parse', file, e.message);
+                  }
+                });
               }
 
               const buildUrl = process.env.COLLECTION_URI
