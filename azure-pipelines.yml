@@ -34,10 +34,8 @@ stages:
     condition: succeeded()
     jobs:
       - job: PlaywrightTests
-        displayName: Playwright smoke tests (Shard $(System.JobPositionInPhase)/4)
-        timeoutInMinutes: 45
-        strategy:
-          parallel: 4
+        displayName: Playwright smoke tests
+        timeoutInMinutes: 60
 
         steps:
           - checkout: self
@@ -53,23 +51,18 @@ stages:
           - script: npx playwright install --with-deps chromium
             displayName: Install Playwright browsers
 
-          # ── Notify once that the run has started (shard 1 only) ──────────
+          # ── Notify that the run has started ──────────────────────────────
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d "{\"text\": \"🚀 K12Catering Automation started.\n\n🔗 Monitor: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)\"}" || true
             displayName: Notify RingCentral - Started
-            condition: eq(variables['System.JobPositionInPhase'], '1')
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
-          # ── Stagger starts to avoid simultaneous login bursts ─────────────
-          - script: |
-              SHARD_IDX=$(System.JobPositionInPhase)
-              SLEEP_SEC=$(( (SHARD_IDX - 1) * 20 ))
-              if [ "$SLEEP_SEC" -gt 0 ]; then sleep "$SLEEP_SEC"; fi
-              npx playwright test --shard=$(System.JobPositionInPhase)/4
-            displayName: Run Playwright tests (Shard $(System.JobPositionInPhase)/4)
+          # ── Run all tests in a single pipeline ───────────────────────────
+          - script: npx playwright test
+            displayName: Run Playwright tests
             env:
               CI: true
               BASE_URL: $(BASE_URL)
@@ -81,11 +74,55 @@ stages:
               K12_CUSTOMER_EMAIL: $(K12_CUSTOMER_EMAIL)
               K12_CUSTOMER_ENCRYPTED_PASSWORD: $(K12_CUSTOMER_ENCRYPTED_PASSWORD)
 
-          # ── Write a per-shard summary so Stage 3 can merge them ──────────
+          - task: PublishTestResults@2
+            displayName: Publish JUnit test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'test-results/results.xml'
+              failTaskOnFailedTests: true
+              testRunTitle: 'Playwright QA Smoke'
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish Playwright HTML report
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: 'playwright-report'
+              artifact: 'playwright-report'
+              publishLocation: 'pipeline'
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish test artifacts
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: 'test-results'
+              artifact: 'playwright-test-results'
+              publishLocation: 'pipeline'
+
+  # ─────────────────────────────────────────────
+  # Stage 3 – Consolidated webhook notification
+  # ─────────────────────────────────────────────
+  - stage: Notify
+    displayName: Send consolidated notification
+    dependsOn: Run_Playwright_QA
+    condition: always()
+    jobs:
+      - job: SendWebhook
+        displayName: Send RingCentral notification
+        steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: Download test results
+            condition: always()
+            inputs:
+              artifact: 'playwright-test-results'
+              path: 'test-results'
+
           - script: |
               node -e "
-              const fs = require('fs');
-              const resultsPath = 'test-results/results.json';
+              const fs   = require('fs');
+              const https = require('https');
+              const url   = require('url');
+
               let total = 0, passed = 0, failed = 0;
 
               function walkSuite(suite) {
@@ -100,116 +137,10 @@ stages:
                 for (const child of (suite.suites || [])) walkSuite(child);
               }
 
+              const resultsPath = 'test-results/results.json';
               if (fs.existsSync(resultsPath)) {
                 const data = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
                 (data.suites || []).forEach(walkSuite);
-              }
-
-              fs.mkdirSync('shard-summary', { recursive: true });
-              fs.writeFileSync(
-                'shard-summary/shard-' + process.env.SHARD_INDEX + '.json',
-                JSON.stringify({ total, passed, failed })
-              );
-              console.log('Shard ' + process.env.SHARD_INDEX + ' summary:', { total, passed, failed });
-              "
-            displayName: Write shard summary
-            condition: succeededOrFailed()
-            env:
-              SHARD_INDEX: $(System.JobPositionInPhase)
-
-          - task: PublishTestResults@2
-            displayName: Publish JUnit test results
-            condition: succeededOrFailed()
-            inputs:
-              testResultsFormat: 'JUnit'
-              testResultsFiles: 'test-results/results.xml'
-              failTaskOnFailedTests: true
-              testRunTitle: 'Playwright QA Smoke - Shard $(System.JobPositionInPhase)'
-
-          - task: PublishPipelineArtifact@1
-            displayName: Publish Playwright HTML report
-            condition: succeededOrFailed()
-            inputs:
-              targetPath: 'playwright-report'
-              artifact: 'playwright-report-shard-$(System.JobPositionInPhase)'
-              publishLocation: 'pipeline'
-
-          - task: PublishPipelineArtifact@1
-            displayName: Publish test artifacts
-            condition: succeededOrFailed()
-            inputs:
-              targetPath: 'test-results'
-              artifact: 'playwright-test-results-shard-$(System.JobPositionInPhase)'
-              publishLocation: 'pipeline'
-
-          - task: PublishPipelineArtifact@1
-            displayName: Publish shard summary
-            condition: succeededOrFailed()
-            inputs:
-              targetPath: 'shard-summary'
-              artifact: 'shard-summary-$(System.JobPositionInPhase)'
-              publishLocation: 'pipeline'
-
-  # ─────────────────────────────────────────────
-  # Stage 3 – Consolidated webhook notification
-  # ─────────────────────────────────────────────
-  - stage: Notify
-    displayName: Send consolidated notification
-    dependsOn: Run_Playwright_QA
-    condition: always()
-    jobs:
-      - job: SendWebhook
-        displayName: Merge results and notify RingCentral
-        steps:
-          - task: DownloadPipelineArtifact@2
-            displayName: Download shard summary 1
-            condition: always()
-            inputs:
-              artifact: 'shard-summary-1'
-              path: 'shard-summaries'
-
-          - task: DownloadPipelineArtifact@2
-            displayName: Download shard summary 2
-            condition: always()
-            inputs:
-              artifact: 'shard-summary-2'
-              path: 'shard-summaries'
-
-          - task: DownloadPipelineArtifact@2
-            displayName: Download shard summary 3
-            condition: always()
-            inputs:
-              artifact: 'shard-summary-3'
-              path: 'shard-summaries'
-
-          - task: DownloadPipelineArtifact@2
-            displayName: Download shard summary 4
-            condition: always()
-            inputs:
-              artifact: 'shard-summary-4'
-              path: 'shard-summaries'
-
-          - script: |
-              node -e "
-              const fs   = require('fs');
-              const https = require('https');
-              const url   = require('url');
-
-              let total = 0, passed = 0, failed = 0;
-              const dir = 'shard-summaries';
-
-              if (fs.existsSync(dir)) {
-                fs.readdirSync(dir).forEach(file => {
-                  if (!file.endsWith('.json')) return;
-                  try {
-                    const s = JSON.parse(fs.readFileSync(dir + '/' + file, 'utf8'));
-                    total  += (s.total  || 0);
-                    passed += (s.passed || 0);
-                    failed += (s.failed || 0);
-                  } catch(e) {
-                    console.warn('Could not parse', file, e.message);
-                  }
-                });
               }
 
               const buildUrl = process.env.COLLECTION_URI
