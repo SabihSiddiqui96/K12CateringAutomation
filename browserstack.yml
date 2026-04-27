@@ -11,7 +11,7 @@ testFramework:
   name: playwright
 
 parallelsPerPlatform: 5
-browserstackLocal: false
+browserstackLocal: true
 
 buildName: K12Catering-QA-TestAutomation
 projectName: K12Catering-QA-TestAutomation
