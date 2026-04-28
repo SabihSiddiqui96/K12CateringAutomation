@@ -20,7 +20,7 @@ export default defineConfig({
   testDir: './tests',
   timeout: 90000,
   expect: { timeout: 10000 },
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 3 : undefined,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   reporter: [
