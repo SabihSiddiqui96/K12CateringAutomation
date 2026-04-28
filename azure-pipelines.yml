@@ -148,20 +148,13 @@ stages:
                 + '/_build/results?buildId=' + process.env.BUILD_ID
                 + '&view=ms.vss-test-web.build-test-results-tab';
 
-              let text;
-              if (total === 0) {
-                text = '⚠️ K12Catering Automation — Pipeline Error (no test results found).\n\n🔗 Pipeline: '
-                     + process.env.COLLECTION_URI + process.env.TEAM_PROJECT
-                     + '/_build/results?buildId=' + process.env.BUILD_ID;
-              } else if (failed === 0) {
-                text = '✅ K12Catering Automation — All Tests Passed.\n\nPassed: ' + passed
-                     + ' | Failed: ' + failed + ' | Total: ' + total
-                     + '\n\n🔗 Results: ' + buildUrl;
-              } else {
-                text = '❌ K12Catering Automation — Tests Failed.\n\nPassed: ' + passed
-                     + ' | Failed: ' + failed + ' | Total: ' + total
-                     + '\n\n🔗 Results: ' + buildUrl;
-              }
+              const text = total === 0
+                ? 'K12Catering Automation completed. Below are the results:\n\nNo test results found.\n\n🔗 Pipeline: '
+                  + process.env.COLLECTION_URI + process.env.TEAM_PROJECT
+                  + '/_build/results?buildId=' + process.env.BUILD_ID
+                : 'K12Catering Automation completed. Below are the results:\n\nPassed: ' + passed
+                  + ' | Failed: ' + failed + ' | Total: ' + total
+                  + '\n\n🔗 Results: ' + buildUrl;
 
               console.log('Sending webhook:', text);
 
