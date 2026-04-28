@@ -60,9 +60,35 @@ stages:
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
-          # ── Run all tests in a single pipeline ───────────────────────────
-          - script: npx playwright test
-            displayName: Run Playwright tests
+          # ── Run the suite in 3 separate chunks ──────────────────────────────
+          - script: npx playwright test --shard=1/3 --workers=1
+            displayName: Run Playwright tests - Shard 1/3
+            env:
+              CI: true
+              BASE_URL: $(BASE_URL)
+              PE_USERNAME: $(PE_USERNAME)
+              ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
+              ENCRYPTION_KEY: $(ENCRYPTION_KEY)
+              PE_DISTRICT_EMAIL: $(PE_DISTRICT_EMAIL)
+              PE_DISTRICT_ENCRYPTED_PASSWORD: $(PE_DISTRICT_ENCRYPTED_PASSWORD)
+              K12_CUSTOMER_EMAIL: $(K12_CUSTOMER_EMAIL)
+              K12_CUSTOMER_ENCRYPTED_PASSWORD: $(K12_CUSTOMER_ENCRYPTED_PASSWORD)
+
+          - script: npx playwright test --shard=2/3 --workers=1
+            displayName: Run Playwright tests - Shard 2/3
+            env:
+              CI: true
+              BASE_URL: $(BASE_URL)
+              PE_USERNAME: $(PE_USERNAME)
+              ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
+              ENCRYPTION_KEY: $(ENCRYPTION_KEY)
+              PE_DISTRICT_EMAIL: $(PE_DISTRICT_EMAIL)
+              PE_DISTRICT_ENCRYPTED_PASSWORD: $(PE_DISTRICT_ENCRYPTED_PASSWORD)
+              K12_CUSTOMER_EMAIL: $(K12_CUSTOMER_EMAIL)
+              K12_CUSTOMER_ENCRYPTED_PASSWORD: $(K12_CUSTOMER_ENCRYPTED_PASSWORD)
+
+          - script: npx playwright test --shard=3/3 --workers=1
+            displayName: Run Playwright tests - Shard 3/3
             env:
               CI: true
               BASE_URL: $(BASE_URL)
