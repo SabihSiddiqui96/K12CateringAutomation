@@ -3,11 +3,13 @@ import {
   loginToK12Catering,
   navigateK12CateringMenu,
 } from '../../utils/helpers';
+import { placeBasicCheckoutOrder } from '../../utils/orderFlow';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Dashboard - Trending Chart', () => {
   let catering: Page;
+  let seededTrendingData = false;
 
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -15,7 +17,10 @@ test.describe('Dashboard - Trending Chart', () => {
     catering = await loginToK12Catering(page, { navigateTo: 'Dashboard' });
   });
 
-  test.beforeEach(async () => {
+  const trendingSection = () => catering.getByRole('region', { name: 'Trending data visualization' }).first();
+  const noTrendingData = () => trendingSection().getByText(/No Trending Data/i);
+
+  async function openTrendingChart(): Promise<void> {
     await navigateK12CateringMenu(catering, 'Dashboard');
     await catering.waitForLoadState('domcontentloaded');
 
@@ -30,9 +35,26 @@ test.describe('Dashboard - Trending Chart', () => {
     await expect(catering.getByRole('button', { name: 'Filter by Last 7 Days' })).toHaveAttribute('aria-pressed', 'true');
     await catering.getByRole('button', { name: 'Switch to Bar Chart view' }).click();
     await catering.getByRole('textbox', { name: 'Search trending items' }).clear();
-  });
+    await expect(trendingSection()).toBeVisible({ timeout: 15000 });
+  }
 
-  const trendingSection = () => catering.getByRole('region', { name: 'Trending data visualization' }).first();
+  async function ensureTrendingData(): Promise<void> {
+    await openTrendingChart();
+
+    if (seededTrendingData) return;
+    if (!(await noTrendingData().isVisible({ timeout: 3000 }).catch(() => false))) {
+      return;
+    }
+
+    await placeBasicCheckoutOrder(catering);
+    seededTrendingData = true;
+    await openTrendingChart();
+    await expect(noTrendingData()).toBeHidden({ timeout: 30000 });
+  }
+
+  test.beforeEach(async () => {
+    await ensureTrendingData();
+  });
 
   test('Trending - Section loads with heading, day filters, chart toggles and search input', async () => {
     await expect(trendingSection()).toBeVisible({ timeout: 15000 });
@@ -66,9 +88,17 @@ test.describe('Dashboard - Trending Chart', () => {
     await trendingSection().getByRole('button', { name: 'Switch to Details view' }).click();
     await expect(trendingSection().getByRole('table')).toBeVisible({ timeout: 10000 });
 
+    const firstItem = (await trendingSection()
+      .getByRole('row')
+      .nth(1)
+      .getByRole('cell')
+      .first()
+      .textContent())?.trim();
+    expect(firstItem).toBeTruthy();
+
     const searchInput = catering.getByRole('textbox', { name: 'Search trending items' });
-    await searchInput.fill('apple');
-    await expect(trendingSection()).toContainText('apple', { timeout: 10000 });
+    await searchInput.fill(firstItem!.split(/\s+/)[0]);
+    await expect(trendingSection()).toContainText(firstItem!, { timeout: 10000 });
 
     await searchInput.clear();
     await searchInput.fill('zzznomatch');
