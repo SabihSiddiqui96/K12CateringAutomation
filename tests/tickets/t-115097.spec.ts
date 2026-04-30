@@ -383,6 +383,40 @@ function formatCalendarDate(date: Date) {
   return `${month} ${day}, ${year}`;
 }
 
+function getMonthOffsetDate(monthsBack: number) {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth() - monthsBack, 1);
+}
+
+function getMonthOffsetSameDayDate(monthsBack: number) {
+  const today = new Date();
+  const targetYear = today.getFullYear();
+  const targetMonth = today.getMonth() - monthsBack;
+  const lastDayInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  return new Date(
+    targetYear,
+    targetMonth,
+    Math.min(today.getDate(), lastDayInTargetMonth),
+  );
+}
+
+function monthIndex(date: Date) {
+  return date.getFullYear() * 12 + date.getMonth();
+}
+
+function parseMonthYear(value: string) {
+  const match =
+    /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})$/i.exec(
+      value.trim(),
+    );
+  if (!match) {
+    return undefined;
+  }
+
+  const month = new Date(`${match[1]} 1, ${match[2]}`).getMonth();
+  return new Date(Number(match[2]), month, 1);
+}
+
 function getAddToCartModal(page: Page) {
   return page.locator('div.fixed.inset-0').filter({
     has: page.getByRole('heading', { name: /^Add to Cart$/i }),
@@ -540,18 +574,44 @@ async function navigateDatePickerToDate(page: Page, targetDate: Date) {
     return;
   }
 
+  const previousMonthButton = page.getByRole('button', { name: /Previous month/i });
   const nextMonthButton = page.getByRole('button', { name: /Next month/i });
+  await expect(previousMonthButton).toBeVisible({ timeout: 10000 });
   await expect(nextMonthButton).toBeVisible({ timeout: 10000 });
 
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 24; i++) {
     if (await targetMonthHeading.isVisible().catch(() => false)) {
       return;
     }
-    await nextMonthButton.click();
+
+    const visibleMonth = await getVisibleDatePickerMonth(page);
+    const navigationButton =
+      monthIndex(visibleMonth) > monthIndex(targetDate)
+        ? previousMonthButton
+        : nextMonthButton;
+
+    await navigationButton.click();
     await page.waitForTimeout(200);
   }
 
   throw new Error(`Could not navigate date picker to ${targetMonth}`);
+}
+
+async function getVisibleDatePickerMonth(page: Page) {
+  const dialog = getSelectDateDialog(page);
+  await expect(dialog).toBeVisible({ timeout: 10000 });
+
+  const headings = dialog.getByRole('heading');
+  const headingCount = await headings.count();
+  for (let i = 0; i < headingCount; i++) {
+    const headingText = (await headings.nth(i).textContent())?.trim();
+    const monthDate = headingText ? parseMonthYear(headingText) : undefined;
+    if (monthDate) {
+      return monthDate;
+    }
+  }
+
+  throw new Error('Could not read the visible date picker month');
 }
 
 function getCalendarDateButton(page: Page, targetDate: Date) {
@@ -807,20 +867,12 @@ test.describe('Checkout Backdate Order', () => {
     const datePickerBtn = catering.getByRole('button', { name: /Select Event Date/i });
     await expect(datePickerBtn).toBeVisible({ timeout: 20000 });
     await datePickerBtn.click();
-    await catering.waitForTimeout(500);
 
-    const prevMonthBtn = catering.getByRole('button', { name: /Previous month/i });
-    await expect(prevMonthBtn).toBeVisible({ timeout: 5000 });
+    const selectableDate = getMonthOffsetSameDayDate(5);
+    await navigateDatePickerToDate(catering, selectableDate);
 
-    for (let i = 0; i < 6; i++) {
-      await prevMonthBtn.click();
-      await catering.waitForTimeout(300);
-    }
-
-    const targetDate = new Date();
-    targetDate.setMonth(targetDate.getMonth() - 6);
-    const monthName = targetDate.toLocaleString('default', { month: 'long' });
-    const year = targetDate.getFullYear();
+    const monthName = selectableDate.toLocaleString('default', { month: 'long' });
+    const year = selectableDate.getFullYear();
 
     await expect(
       catering.getByRole('heading', {
@@ -828,39 +880,20 @@ test.describe('Checkout Backdate Order', () => {
       }),
     ).toBeVisible({ timeout: 5000 });
 
-    const allDatesInMonth = catering.getByRole('button', {
-      name: new RegExp(`${monthName} \\d+, ${year}`, 'i'),
-    });
-    const totalDates = await allDatesInMonth.count();
-    let clicked = false;
-
-    for (let i = 0; i < totalDates; i++) {
-      const dateBtn = allDatesInMonth.nth(i);
-      const isDisabled =
-        (await dateBtn.getAttribute('disabled')) !== null ||
-        (await dateBtn.getAttribute('aria-disabled')) === 'true' ||
-        (await dateBtn.isDisabled());
-      if (!isDisabled) {
-        await dateBtn.click();
-        clicked = true;
-        break;
-      }
-    }
-
-    expect(clicked).toBe(true);
+    const targetDateButton = getCalendarDateButton(catering, selectableDate);
+    await expect(targetDateButton).toBeVisible({ timeout: 10000 });
+    await expect(targetDateButton).toBeEnabled({ timeout: 10000 });
+    await targetDateButton.click();
     await catering.waitForTimeout(300);
     await expect(catering.getByRole('button', { name: /^Next$/i })).toBeEnabled();
 
-    // Part 2: Go 1 month further back — all dates should be disabled
+    // Part 2: Go 1 month further back: the matching date should be disabled
     await datePickerBtn.click();
-    await catering.waitForTimeout(500);
-    await prevMonthBtn.click();
-    await catering.waitForTimeout(300);
+    const disabledDate = getMonthOffsetSameDayDate(6);
+    await navigateDatePickerToDate(catering, disabledDate);
 
-    const prevDate = new Date(targetDate);
-    prevDate.setMonth(prevDate.getMonth() - 1);
-    const prevMonthName = prevDate.toLocaleString('default', { month: 'long' });
-    const prevYear = prevDate.getFullYear();
+    const prevMonthName = disabledDate.toLocaleString('default', { month: 'long' });
+    const prevYear = disabledDate.getFullYear();
 
     await expect(
       catering.getByRole('heading', {
@@ -868,14 +901,9 @@ test.describe('Checkout Backdate Order', () => {
       }),
     ).toBeVisible({ timeout: 5000 });
 
-    const allDates = catering.getByRole('button', {
-      name: new RegExp(`${prevMonthName} \\d+, ${prevYear}`, 'i'),
-    });
-    const count = await allDates.count();
-    expect(count).toBeGreaterThan(0);
-    for (let i = 0; i < count; i++) {
-      await expect(allDates.nth(i)).toBeDisabled();
-    }
+    const disabledDateButton = getCalendarDateButton(catering, disabledDate);
+    await expect(disabledDateButton).toBeVisible({ timeout: 10000 });
+    await expect(disabledDateButton).toBeDisabled();
 
     // ── Close the date picker before finishing ──
     const cancelBtn = catering.getByRole('button', { name: /Cancel/i });

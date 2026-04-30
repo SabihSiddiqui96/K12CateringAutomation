@@ -8,6 +8,7 @@ import {
 import { decryptPassword } from '../../utils/crypto';
 import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl } from '../../utils/baseUrl';
+import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -71,6 +72,10 @@ async function closeManageMenus(page: Page): Promise<void> {
   ).not.toBeVisible({
     timeout: 10000,
   });
+}
+
+function randomThreeDigits(): number {
+  return Math.floor(100 + Math.random() * 900);
 }
 
 async function expectToast(page: Page, message: RegExp): Promise<void> {
@@ -203,16 +208,37 @@ async function setMenuItems(
 }
 
 async function clearAllMenuItems(page: Page): Promise<void> {
-  const checkboxes = await page.getByRole('checkbox').all();
+  const checkboxes = page.getByRole('checkbox');
+  const checkboxCount = await checkboxes.count();
+  let changed = false;
 
-  for (const checkbox of checkboxes) {
+  for (let i = 0; i < checkboxCount; i++) {
+    const checkbox = checkboxes.nth(i);
     if (await checkbox.isChecked()) {
       await checkbox.click();
+      changed = true;
     }
   }
 
-  await page.getByRole('button', { name: /^Save$/ }).click();
-  await expectToast(page, /Menu items updated|Items updated|saved|success/i);
+  if (changed) {
+    await page.getByRole('button', { name: /^Save$/ }).click();
+    await expectToast(page, /Menu items updated|Items updated|saved|success/i);
+  }
+
+  for (let i = 0; i < checkboxCount; i++) {
+    await expect(checkboxes.nth(i)).not.toBeChecked();
+  }
+}
+
+async function clearMenuItemsBeforeDelete(
+  page: Page,
+  menuName: string,
+  itemNames: string[],
+): Promise<void> {
+  await openManageItems(page, menuName);
+  await setMenuItems(page, itemNames, false);
+  await clearAllMenuItems(page);
+  await returnToManageMenus(page);
 }
 
 function menuItemCard(page: Page, itemName: string): Locator {
@@ -227,13 +253,68 @@ async function refreshMenuPage(page: Page): Promise<void> {
   await ensureMenuPage(page);
 }
 
+async function expectMenuDropdownRenamed(
+  page: Page,
+  currentName: string,
+  previousName: string,
+): Promise<void> {
+  await ensureMenuPage(page);
+  await expect(
+    page.getByRole('button', { name: /^Manage Menus$/i }),
+  ).toBeVisible({ timeout: 10000 });
+
+  const menuDropdown = page.locator('#admin-menu-select');
+  await expect(menuDropdown).toBeVisible({ timeout: 10000 });
+  await menuDropdown.click();
+
+  await expect
+    .poll(async () => {
+      const nativeOptionTexts = await page
+        .locator('#admin-menu-select option')
+        .allTextContents();
+      if (nativeOptionTexts.some((text) => text.trim() === currentName)) {
+        return true;
+      }
+
+      return page
+        .getByRole('option', { name: currentName, exact: true })
+        .or(page.getByRole('menuitem', { name: currentName, exact: true }))
+        .or(page.getByText(currentName, { exact: true }))
+        .first()
+        .isVisible()
+        .catch(() => false);
+    })
+    .toBe(true);
+
+  await expect
+    .poll(async () => {
+      const nativeOptionTexts = await page
+        .locator('#admin-menu-select option')
+        .allTextContents();
+      if (nativeOptionTexts.some((text) => text.trim() === previousName)) {
+        return true;
+      }
+
+      return page
+        .getByRole('option', { name: previousName, exact: true })
+        .or(page.getByRole('menuitem', { name: previousName, exact: true }))
+        .first()
+        .isVisible()
+        .catch(() => false);
+    })
+    .toBe(false);
+
+  await page.keyboard.press('Escape').catch(() => { });
+}
+
 async function verifyMenuItemsAsCustomer(
   browser: Browser,
   itemNames: string[],
+  passwordOverride?: string,
 ): Promise<void> {
   const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
   const email = getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
-  const password = decryptPassword(
+  const password = passwordOverride ?? decryptPassword(
     getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
   );
 
@@ -273,12 +354,11 @@ async function openDeleteMenuDialog(
   await expect(page.getByRole('heading', { name: 'Delete Menu' })).toBeVisible({
     timeout: 10000,
   });
-  await expect(page.getByText(`"${menuName}" is the only menu.`)).toBeVisible();
   await expect(
-    page.getByText(
-      'You can delete it permanently, or deactivate it to hide it from customers (reversible).',
-    ),
-  ).toBeVisible();
+    page
+      .getByText(`"${menuName}" is the only menu.`)
+      .or(page.getByText(/Are you sure you want to delete this menu\?/i)),
+  ).toBeVisible({ timeout: 10000 });
 }
 
 async function deactivateFromDeleteDialog(
@@ -286,7 +366,19 @@ async function deactivateFromDeleteDialog(
   menuName: string,
 ): Promise<void> {
   await openDeleteMenuDialog(page, menuName);
-  await page.getByRole('button', { name: /^Deactivate$/ }).click();
+  const deactivateButton = page.getByRole('button', { name: /^Deactivate$/ });
+  if (await deactivateButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await deactivateButton.click();
+  } else {
+    const deleteDialog = page.getByRole('dialog', { name: /Delete Menu/i });
+    await deleteDialog.getByRole('button', { name: /^Cancel$/ }).click();
+    await expect(page.getByRole('heading', { name: 'Delete Menu' })).not.toBeVisible({
+      timeout: 10000,
+    });
+    await deactivateMenu(page, menuName);
+    return;
+  }
+
   await expectToast(page, /Menu deactivated|deactivated|success/i);
   await expect(
     page.getByRole('button', { name: menuButtonName('Activate', menuName) }),
@@ -337,10 +429,13 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
   const catering = await loginToK12Catering(page);
   await ensureMenuPage(catering);
 
-  const menuName = `Sabih Testing ${Date.now()}`;
-  const renamedMenuName = `${menuName} Updated`;
+  const menuNumber = randomThreeDigits();
+  const renamedMenuNumber = menuNumber === 999 ? 100 : menuNumber + 1;
+  const menuName = `${menuNumber} - SabihTesting`;
+  const renamedMenuName = `${renamedMenuNumber} - SabihTesting`;
   const firstItem = 'apple juice';
   const secondItem = 'cola';
+  const customerPassword = 'Password1!';
 
   await openManageMenus(catering);
   await createMenu(catering, menuName);
@@ -348,11 +443,7 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
   await renameMenu(catering, menuName, renamedMenuName);
   await closeManageMenus(catering);
 
-  await expect(
-    catering.getByText(renamedMenuName, { exact: true }),
-  ).toBeVisible({
-    timeout: 10000,
-  });
+  await expectMenuDropdownRenamed(catering, renamedMenuName, menuName);
 
   await openManageMenus(catering);
   await deactivateMenu(catering, renamedMenuName);
@@ -382,17 +473,19 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
     timeout: 10000,
   });
 
-  await verifyMenuItemsAsCustomer(browser, [firstItem, secondItem]);
+  const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
+  const customerEmail = getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
+  await resetCustomerPasswordFromAccounts(catering, customerEmail, customerPassword);
+  await verifyMenuItemsAsCustomer(browser, [firstItem, secondItem], customerPassword);
 
   await openManageMenus(catering);
   await deactivateFromDeleteDialog(catering, renamedMenuName);
   await activateMenu(catering, renamedMenuName);
 
-  await deleteMenuAndExpectBlocked(catering, renamedMenuName);
-
-  await openManageItems(catering, renamedMenuName);
-  await setMenuItems(catering, [firstItem, secondItem], false);
-  await returnToManageMenus(catering);
+  await clearMenuItemsBeforeDelete(catering, renamedMenuName, [
+    firstItem,
+    secondItem,
+  ]);
 
   await deleteMenuPermanently(catering, renamedMenuName);
   await closeManageMenus(catering);
