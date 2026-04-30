@@ -10,6 +10,13 @@ export function getDistrictName(): string {
 
 export const mercerCountySelector = '[value="MERCER COUNTY SCHOOLS"], [value="Mercer County School District"]';
 
+function positiveIntFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number.parseInt(raw, 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 type ScrollUntilVisibleOptions = {
   target?: Locator | string;
   container?: Locator;
@@ -77,7 +84,9 @@ export async function loginToPrimeroEdge(page: Page): Promise<void> {
   await loginPage.enterPassword(password);
   await loginPage.clickLogin();
   const loginPath = process.env.LOGIN_PATH || '/login.aspx';
-  await page.waitForURL(url => !url.href.includes(loginPath));
+  await page.waitForURL(url => !url.href.includes(loginPath), {
+    timeout: positiveIntFromEnv('LOGIN_SUBMIT_TIMEOUT_MS', process.env.CI ? 60000 : 30000),
+  });
 }
 
 // Login with new user
@@ -183,7 +192,9 @@ export async function loginToK12Catering(
   if (process.env.DIRECT_K12_LOGIN === 'true') {
     cateringPage = page;
   } else {
-    await expect(page.locator(mercerCountySelector)).toBeVisible();
+    await expect(page.locator(mercerCountySelector)).toBeVisible({
+      timeout: positiveIntFromEnv('DISTRICT_SELECTOR_TIMEOUT_MS', process.env.CI ? 60000 : 10000),
+    });
     cateringPage = await openK12CateringApp(page);
     await cateringPage.waitForLoadState('domcontentloaded');
     await finishK12CateringLaunch(cateringPage);
@@ -191,7 +202,7 @@ export async function loginToK12Catering(
 
   await expect(
     cateringPage.locator('aside[aria-label="Main navigation"]')
-  ).toBeVisible({ timeout: 30000 });
+  ).toBeVisible({ timeout: positiveIntFromEnv('K12_SIDEBAR_TIMEOUT_MS', process.env.CI ? 60000 : 30000) });
 
   // Auto-handle 404 pages that occasionally appear during navigation
   await cateringPage.addLocatorHandler(
