@@ -39,6 +39,18 @@ export default defineConfig({
   use: {
     baseURL: getEnvVar('BASE_URL', { required: false }) || 'https://qa.primeroedge.co',
     headless: !!process.env.CI,
+    ignoreHTTPSErrors: true,
+    userAgent: process.env.CI
+      ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+      : undefined,
+    launchOptions: process.env.CI
+      ? {
+          args: [
+            '--disable-http2',
+            '--ignore-certificate-errors',
+          ],
+        }
+      : undefined,
     actionTimeout: 15000,
     navigationTimeout: positiveIntFromEnv('NAVIGATION_TIMEOUT_MS', process.env.CI ? 60000 : 45000),
     trace: 'on-first-retry',

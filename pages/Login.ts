@@ -44,6 +44,11 @@ export class LoginPage {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
+        const apiResponse = await this.page.request.get(loginPath, {
+          timeout: navigationTimeout,
+        });
+        console.log(`[login] API precheck ${loginPath}: HTTP ${apiResponse.status()}`);
+
         const response = await this.page.goto(loginPath, {
           waitUntil: 'commit',
           timeout: navigationTimeout,
