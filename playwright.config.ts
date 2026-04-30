@@ -1,9 +1,11 @@
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getEnvVar } from './utils/env';
 
 function resolveEnvFile(): string {
-  if (process.env.ENV_FILE) return process.env.ENV_FILE.trim();
+  const envFile = getEnvVar('ENV_FILE', { required: false });
+  if (envFile) return envFile;
   try {
     const settings = JSON.parse(fs.readFileSync(path.resolve(__dirname, '.vscode/settings.json'), 'utf8'));
     return settings?.['playwright.env']?.ENV_FILE?.trim() || '.env';
@@ -35,7 +37,7 @@ export default defineConfig({
     ['json', { outputFile: 'test-results/results.json' }],
   ],
   use: {
-    baseURL: process.env.BASE_URL?.trim() || 'https://qa.primeroedge.co',
+    baseURL: getEnvVar('BASE_URL', { required: false }) || 'https://qa.primeroedge.co',
     headless: !!process.env.CI,
     actionTimeout: 15000,
     navigationTimeout: positiveIntFromEnv('NAVIGATION_TIMEOUT_MS', process.env.CI ? 60000 : 45000),

@@ -6,7 +6,7 @@ import {
   navigateK12CateringMenu,
 } from '../../utils/helpers';
 import { decryptPassword } from '../../utils/crypto';
-import { getRequiredEnvVar } from '../../utils/env';
+import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl } from '../../utils/baseUrl';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -231,7 +231,7 @@ async function verifyMenuItemsAsCustomer(
   browser: Browser,
   itemNames: string[],
 ): Promise<void> {
-  const isUAT = process.env.DIRECT_K12_LOGIN === 'true';
+  const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
   const email = getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
   const password = decryptPassword(
     getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),

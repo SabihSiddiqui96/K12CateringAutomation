@@ -9,6 +9,7 @@ pool:
 variables:
   NODE_VERSION: 20.x
   BASE_URL: https://qa.primeroedge.co
+  LOGIN_PATH: /login.aspx
 
 stages:
   - stage: Deploy_QA

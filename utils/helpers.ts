@@ -1,11 +1,11 @@
 import { expect, Locator, Page } from '@playwright/test';
 import { LoginPage } from '../pages/Login';
 import { decryptPassword } from './crypto';
-import { getRequiredEnvVar } from './env';
+import { getEnvVar, getRequiredEnvVar } from './env';
 import { getK12CateringUrl } from './baseUrl';
 
 export function getDistrictName(): string {
-  return process.env.DISTRICT_NAME || 'Mercer County School District';
+  return getEnvVar('DISTRICT_NAME', { required: false }) || 'Mercer County School District';
 }
 
 export const mercerCountySelector = '[value="MERCER COUNTY SCHOOLS"], [value="Mercer County School District"]';
@@ -83,7 +83,7 @@ export async function loginToPrimeroEdge(page: Page): Promise<void> {
   await loginPage.enterUsername(username);
   await loginPage.enterPassword(password);
   await loginPage.clickLogin();
-  const loginPath = process.env.LOGIN_PATH || '/login.aspx';
+  const loginPath = getEnvVar('LOGIN_PATH', { required: false }) || '/login.aspx';
   await page.waitForURL(url => !url.href.includes(loginPath), {
     timeout: positiveIntFromEnv('LOGIN_SUBMIT_TIMEOUT_MS', process.env.CI ? 60000 : 30000),
   });
@@ -91,7 +91,7 @@ export async function loginToPrimeroEdge(page: Page): Promise<void> {
 
 // Login with new user
 export async function loginToK12CateringAsDistrictUser(page: Page): Promise<void> {
-  const isUAT = process.env.DIRECT_K12_LOGIN === 'true';
+  const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
   const username = getRequiredEnvVar(isUAT ? 'PE_UAT_DISTRICT_EMAIL' : 'PE_DISTRICT_EMAIL');
   const encryptedPassword = getRequiredEnvVar(isUAT ? 'PE_UAT_DISTRICT_ENCRYPTED_PASSWORD' : 'PE_DISTRICT_ENCRYPTED_PASSWORD');
   const password = decryptPassword(encryptedPassword);
@@ -189,7 +189,7 @@ export async function loginToK12Catering(
 
   let cateringPage: Page;
 
-  if (process.env.DIRECT_K12_LOGIN === 'true') {
+  if (getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true') {
     cateringPage = page;
   } else {
     await expect(page.locator(mercerCountySelector)).toBeVisible({

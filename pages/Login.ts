@@ -1,4 +1,5 @@
 import { Locator, Page } from '@playwright/test';
+import { getEnvVar } from '../utils/env';
 
 function positiveIntFromEnv(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
@@ -35,7 +36,7 @@ export class LoginPage {
   }
 
   async goto(): Promise<void> {
-    const loginPath = process.env.LOGIN_PATH || '/login.aspx';
+    const loginPath = getEnvVar('LOGIN_PATH', { required: false }) || '/login.aspx';
     const maxAttempts = positiveIntFromEnv('LOGIN_MAX_ATTEMPTS', 3);
     const navigationTimeout = positiveIntFromEnv('LOGIN_NAVIGATION_TIMEOUT_MS', process.env.CI ? 30000 : 60000);
     const formTimeout = positiveIntFromEnv('LOGIN_FORM_TIMEOUT_MS', process.env.CI ? 30000 : 60000);

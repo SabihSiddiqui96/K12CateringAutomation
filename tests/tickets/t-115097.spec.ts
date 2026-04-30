@@ -10,7 +10,7 @@ import {
   getDistrictName,
 } from '../../utils/helpers';
 import { decryptPassword } from '../../utils/crypto';
-import { getRequiredEnvVar } from '../../utils/env';
+import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl, getK12CateringUrl } from '../../utils/baseUrl';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -173,7 +173,7 @@ test.describe('Reports Status Filter', () => {
 // ─────────────────────────────────────────────
 const randomDigits = String(Math.floor(1000 + Math.random() * 9000));
 const NEW_PASSWORD = `Sabih${randomDigits}!`;
-const isUAT = process.env.DIRECT_K12_LOGIN === 'true';
+const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
 const ORIGINAL_PASSWORD = decryptPassword(
   getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
 );
@@ -299,7 +299,7 @@ test.describe('Accounts Change Password', () => {
     await catering.getByRole('menuitem', { name: /Log out|Sign out/i }).click();
     await catering.waitForURL('**/login', { timeout: 10000 });
     await expect(catering).toHaveURL(
-      new RegExp(getK12CateringUrl().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + (process.env.LOGIN_PATH || '/login'), 'i'),
+      new RegExp(getK12CateringUrl().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + (getEnvVar('LOGIN_PATH', { required: false }) || '/login'), 'i'),
       { timeout: 10000 },
     );
 
@@ -329,10 +329,10 @@ test.describe('Accounts Change Password', () => {
       await catering.waitForLoadState('networkidle');
     }
 
-    const k12Page = process.env.DIRECT_K12_LOGIN === 'true'
+    const k12Page = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true'
       ? catering
       : await openK12CateringApp(catering);
-    if (process.env.DIRECT_K12_LOGIN !== 'true') await k12Page.waitForLoadState('domcontentloaded');
+    if (getEnvVar('DIRECT_K12_LOGIN', { required: false }) !== 'true') await k12Page.waitForLoadState('domcontentloaded');
 
     dialog = await openChangePasswordModal(k12Page);
     await dialog.getByLabel(/New Password/i).fill(ORIGINAL_PASSWORD);
@@ -1011,7 +1011,7 @@ test.describe('Districts - New District Visibility', () => {
     // ── Select Environment — QA (PrimeroEdge) ──
     const enciDropdown = catering.locator('#add-environment-select');
     await expect(enciDropdown).toBeVisible({ timeout: 10000 });
-    await enciDropdown.selectOption({ label: process.env.ENVIRONMENT_LABEL || 'QA (PrimeroEdge)' });
+    await enciDropdown.selectOption({ label: getEnvVar('ENVIRONMENT_LABEL', { required: false }) || 'QA (PrimeroEdge)' });
 
     // ── Fill Region ID ──
     const regionIdInput = catering.locator('#add-region-id');

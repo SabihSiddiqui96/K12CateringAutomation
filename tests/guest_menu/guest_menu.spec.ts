@@ -4,6 +4,7 @@ import {
   navigateK12CateringMenu,
   getDistrictName,
 } from '../../utils/helpers';
+import { getEnvVar } from '../../utils/env';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -91,7 +92,7 @@ test.describe('Guest Menu', () => {
   test('Guest Menu - District dropdown opens with searchable list and selecting updates menu', async () => {
     await catering.getByRole('button', { name: 'Select a district to view menu' }).click();
     await expect(catering.getByPlaceholder(/search/i)).toBeVisible({ timeout: 5000 });
-    const secondaryDistrict = process.env.SECONDARY_DISTRICT_NAME || 'Berkeley School District';
+    const secondaryDistrict = getEnvVar('SECONDARY_DISTRICT_NAME', { required: false }) || 'Berkeley School District';
     await expect(catering.getByText(secondaryDistrict)).toBeVisible();
 
     await catering.getByPlaceholder(/search/i).fill(secondaryDistrict.split(' ')[0]);

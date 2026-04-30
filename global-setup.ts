@@ -5,8 +5,9 @@ import * as path from 'path';
 import { getPlaywrightBaseUrl } from './utils/baseUrl';
 import { loginToPrimeroEdge } from './utils/helpers';
 import { getAuthMetaPath, getAuthStoragePath } from './utils/authStorage';
+import { getEnvVar } from './utils/env';
 
-dotenv.config({ path: process.env.ENV_FILE?.trim() || '.env' });
+dotenv.config({ path: getEnvVar('ENV_FILE', { required: false }) || '.env' });
 
 export default async function globalSetup(_config: FullConfig): Promise<void> {
   const username = process.env.PE_USERNAME?.trim();
