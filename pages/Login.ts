@@ -38,14 +38,14 @@ export class LoginPage {
   async goto(): Promise<void> {
     const loginPath = getEnvVar('LOGIN_PATH', { required: false }) || '/login.aspx';
     const maxAttempts = positiveIntFromEnv('LOGIN_MAX_ATTEMPTS', 3);
-    const navigationTimeout = positiveIntFromEnv('LOGIN_NAVIGATION_TIMEOUT_MS', process.env.CI ? 30000 : 60000);
-    const formTimeout = positiveIntFromEnv('LOGIN_FORM_TIMEOUT_MS', process.env.CI ? 30000 : 60000);
+    const navigationTimeout = positiveIntFromEnv('LOGIN_NAVIGATION_TIMEOUT_MS', process.env.CI ? 60000 : 60000);
+    const formTimeout = positiveIntFromEnv('LOGIN_FORM_TIMEOUT_MS', process.env.CI ? 60000 : 60000);
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const response = await this.page.goto(loginPath, {
-          waitUntil: 'domcontentloaded',
+          waitUntil: 'commit',
           timeout: navigationTimeout,
         });
 

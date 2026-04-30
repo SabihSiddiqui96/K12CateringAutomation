@@ -45,6 +45,11 @@ stages:
             displayName: Install Playwright browsers
 
           - script: |
+              echo "Checking QA login reachability..."
+              curl -I --location --max-time 30 "$(BASE_URL)$(LOGIN_PATH)"
+            displayName: Check QA login reachability
+
+          - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
                 -d "{\"text\":\"K12Catering Automation started.\n\nMonitor: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)\"}" || true
