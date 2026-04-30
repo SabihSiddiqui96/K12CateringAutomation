@@ -41,7 +41,7 @@ stages:
           - script: npm ci
             displayName: Install npm packages
 
-          - script: npx playwright install --with-deps chromium
+          - script: npx playwright install --with-deps chrome
             displayName: Install Playwright browsers
 
           - script: |
@@ -113,6 +113,8 @@ stages:
     displayName: Send consolidated notification
     dependsOn: Run_Playwright_QA
     condition: always()
+    variables:
+      RUN_PLAYWRIGHT_RESULT: $[ stageDependencies.Run_Playwright_QA.PlaywrightTests.result ]
     jobs:
       - job: SendWebhook
         displayName: Send RingCentral notification
@@ -132,6 +134,7 @@ stages:
               const url = require('url');
 
               let total = 0, passed = 0, failed = 0;
+              const runResult = (process.env.RUN_PLAYWRIGHT_RESULT || '').toLowerCase();
 
               function walkSuite(suite) {
                 for (const spec of (suite.specs || [])) {
@@ -156,11 +159,16 @@ stages:
                 + '/_build/results?buildId=' + process.env.BUILD_ID;
               const resultsUrl = pipelineUrl + '&view=ms.vss-test-web.build-test-results-tab';
 
-              const text = total === 0
-                ? 'K12Catering Automation completed. No test results were published.\n\nPipeline: ' + pipelineUrl
-                : 'K12Catering Automation completed.\n\nPassed: ' + passed
+              let text;
+              if (runResult === 'canceled' || runResult === 'cancelled') {
+                text = 'K12Catering Automation was canceled before test results were published.\n\nPipeline: ' + pipelineUrl;
+              } else if (total === 0) {
+                text = 'K12Catering Automation ended before test results were published.\n\nPipeline: ' + pipelineUrl;
+              } else {
+                text = 'K12Catering Automation completed.\n\nPassed: ' + passed
                   + ' | Failed: ' + failed + ' | Total: ' + total
                   + '\n\nResults: ' + resultsUrl;
+              }
 
               console.log('Sending webhook:', text);
 
@@ -199,3 +207,4 @@ stages:
               COLLECTION_URI: $(System.CollectionUri)
               TEAM_PROJECT: $(System.TeamProject)
               BUILD_ID: $(Build.BuildId)
+              RUN_PLAYWRIGHT_RESULT: $(RUN_PLAYWRIGHT_RESULT)
