@@ -40,8 +40,7 @@ async function updatePaymentDisplayLabel(
   page: Page,
   newLabel: string,
 ): Promise<string> {
-  await navigateK12CateringMenu(page, 'Settings');
-  await page.waitForLoadState('domcontentloaded');
+  await goToK12Settings(page);
 
   await scrollUntilVisible(page, {
     target: page.getByText(paymentDisplayLabelHeading, { exact: false }),
@@ -75,8 +74,7 @@ async function updatePaymentDisplayLabel(
 async function setPaymentFieldFormatRuleToAllowAnyText(
   page: Page,
 ): Promise<void> {
-  await navigateK12CateringMenu(page, 'Settings');
-  await page.waitForLoadState('domcontentloaded');
+  await goToK12Settings(page);
 
   await scrollUntilVisible(page, {
     target: page.getByText(paymentFieldFormatRequirementsHeading, {
@@ -99,6 +97,85 @@ async function setPaymentFieldFormatRuleToAllowAnyText(
   await requirementsSelect.selectOption({ label: 'Allow any text' });
 
   const saveBtn = page.getByRole('button', { name: /Save Changes/i });
+  await saveBtn.scrollIntoViewIfNeeded();
+  await saveBtn.click();
+
+  const toast = page.getByRole('alert');
+  if (await toast.isVisible({ timeout: 10000 }).catch(() => false)) {
+    await page.waitForTimeout(1000);
+    await expect(toast).not.toBeVisible({ timeout: 30000 });
+  }
+}
+
+async function ensureInK12CateringApp(page: Page): Promise<void> {
+  // Dismiss any open modal/toast that might block navigation
+  await page.keyboard.press('Escape').catch(() => undefined);
+
+  const sidebar = page.locator('aside[aria-label="Main navigation"]');
+  if (await sidebar.isVisible({ timeout: 2000 }).catch(() => false)) {
+    return;
+  }
+
+  // PrimeroEdge launcher page — click the K12 token link to re-enter
+  const launcherLink = page.locator('a[href*="/login?token="]').first();
+  if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await launcherLink.click();
+    await page.waitForLoadState('domcontentloaded');
+  }
+
+  await expect(sidebar).toBeVisible({ timeout: 30000 });
+}
+
+async function goToK12Settings(page: Page): Promise<void> {
+  await ensureInK12CateringApp(page);
+  await navigateK12CateringMenu(page, 'Settings');
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('h1')).toContainText('Settings', { timeout: 15000 });
+}
+
+async function setMaxEventDateToTwoMonths(page: Page): Promise<void> {
+  await goToK12Settings(page);
+
+  const heading = page.getByRole('heading', { name: /Max Event Date/i }).first();
+  await scrollUntilVisible(page, { target: heading });
+  await expect(heading).toBeVisible({ timeout: 10000 });
+
+  // Try several reasonable variants of the edit button name
+  const editBtn = page
+    .getByRole('button', { name: /Edit\s+max(imum)?\s+event\s+date/i })
+    .or(page.getByRole('button', { name: /Edit\s+max(imum)?\s+event\s+time/i }))
+    .or(
+      page.getByRole('button', {
+        name: /^Edit$/i,
+      }).and(
+        page.locator(
+          'xpath=//*[self::section or self::div][.//*[contains(normalize-space(.),"Max Event Date")]]//button',
+        ),
+      ),
+    )
+    .first();
+  await expect(editBtn).toBeVisible({ timeout: 10000 });
+  await editBtn.scrollIntoViewIfNeeded();
+  await editBtn.click();
+  await page.waitForTimeout(500);
+
+  const valueInput = page
+    .getByRole('spinbutton')
+    .or(page.getByRole('textbox', { name: /max(imum)?\s*(value|event)/i }))
+    .first();
+  await expect(valueInput).toBeVisible({ timeout: 10000 });
+  await valueInput.click();
+  await valueInput.fill('');
+  await valueInput.fill('2');
+
+  const timeUnitSelect = page
+    .getByRole('combobox', { name: /time\s*unit/i })
+    .or(page.locator('select').last())
+    .first();
+  await expect(timeUnitSelect).toBeVisible({ timeout: 10000 });
+  await timeUnitSelect.selectOption({ label: 'Months' });
+
+  const saveBtn = page.getByRole('button', { name: /Save Changes|^Save$/i });
   await saveBtn.scrollIntoViewIfNeeded();
   await saveBtn.click();
 
@@ -152,7 +229,7 @@ async function selectFirstContactCardInSection(
   await card.click();
 }
 
-async function selectAvailableEventDate(page: Page): Promise<void> {
+async function selectEventDateOneMonthAhead(page: Page): Promise<void> {
   const dateButton = page.getByRole('button', { name: /Select Event Date/i });
   await expect(dateButton).toBeVisible({ timeout: 20000 });
   await dateButton.click();
@@ -162,8 +239,14 @@ async function selectAvailableEventDate(page: Page): Promise<void> {
   ).toBeVisible({ timeout: 10000 });
 
   const nextMonthButton = page.getByRole('button', { name: /Next month/i });
+  await expect(nextMonthButton).toBeVisible({ timeout: 10000 });
 
-  for (let monthAttempt = 0; monthAttempt < 4; monthAttempt++) {
+  // Advance the picker exactly one month forward
+  await nextMonthButton.click();
+  await page.waitForTimeout(400);
+
+  // Find the first available weekday in the now-visible (next) month
+  for (let attempt = 0; attempt < 2; attempt++) {
     const dateButtons = await page
       .locator('button[aria-label*=","]:not([disabled])')
       .all();
@@ -196,19 +279,20 @@ async function selectAvailableEventDate(page: Page): Promise<void> {
       if (!unavailable) return;
     }
 
+    // If nothing available in this month, try the next one
     if (await nextMonthButton.isVisible({ timeout: 1000 }).catch(() => false)) {
       await nextMonthButton.click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(400);
     }
   }
 
-  throw new Error('Could not find an available checkout event date.');
+  throw new Error('Could not find an available event date one month ahead.');
 }
 
 async function placeOrderUsingDisplayLabel(
   page: Page,
   displayLabel: string,
-): Promise<void> {
+): Promise<string> {
   await navigateK12CateringMenu(page, 'Menu');
   await page.waitForLoadState('domcontentloaded');
   await page
@@ -234,7 +318,7 @@ async function placeOrderUsingDisplayLabel(
   await page.getByRole('button', { name: /Proceed to Checkout/i }).click();
   await expect(page).toHaveURL(/\/checkout/i, { timeout: 15000 });
 
-  await selectAvailableEventDate(page);
+  await selectEventDateOneMonthAhead(page);
   await clickNext(page);
 
   await pickTimeAndConfirm(page, eventStartTimeInput);
@@ -322,57 +406,190 @@ async function placeOrderUsingDisplayLabel(
       .getByRole('heading', { name: /Order Management/i })
       .waitFor({ state: 'visible', timeout: 20000 }),
   ]);
+
+  // Capture the most recent order ID off the View Details aria-label
+  await expect(
+    page.getByRole('heading', { name: /Order Management/i }),
+  ).toBeVisible({ timeout: 20000 });
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1000);
+
+  const detailsBtn = page
+    .getByRole('button', { name: /View details for order/i })
+    .first();
+  await expect(detailsBtn).toBeVisible({ timeout: 15000 });
+  const detailsLabel = (await detailsBtn.getAttribute('aria-label')) ?? '';
+  const orderId = detailsLabel.replace(/^View details for order\s*/i, '').trim();
+  if (!orderId) {
+    throw new Error(
+      `Could not capture order ID from aria-label: "${detailsLabel}"`,
+    );
+  }
+  return orderId;
 }
 
 // ─── Reports → Order Exports → CSV ─────────────────────────────────────────
 
-function formatDateInput(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${month}/${day}/${year}`;
+function formatMonthYear(date: Date): string {
+  return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 }
 
-async function fillDateField(
-  page: Page,
-  matcher: RegExp,
-  value: string,
-): Promise<void> {
-  const input = page
-    .getByLabel(matcher)
-    .or(page.getByRole('textbox', { name: matcher }))
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function monthIndex(date: Date): number {
+  return date.getFullYear() * 12 + date.getMonth();
+}
+
+async function getVisibleCalendarMonth(page: Page): Promise<Date> {
+  const monthHeading = page
+    .getByRole('heading')
+    .filter({
+      hasText:
+        /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}$/i,
+    })
     .first();
 
-  await expect(input).toBeVisible({ timeout: 10000 });
-  await input.click();
-  await input.fill('');
-  await input.fill(value);
-  await page.keyboard.press('Tab');
+  await expect(monthHeading).toBeVisible({ timeout: 10000 });
+  const text = (await monthHeading.textContent())?.trim() ?? '';
+  const [monthName, yearStr] = text.split(/\s+/);
+  return new Date(`${monthName} 1, ${yearStr}`);
 }
 
-async function exportOrderExportsCsv(page: Page): Promise<string> {
+async function navigateCalendarToMonth(
+  page: Page,
+  target: Date,
+): Promise<void> {
+  const targetHeading = page.getByRole('heading', {
+    name: new RegExp(`^${escapeRegExp(formatMonthYear(target))}$`, 'i'),
+  }).first();
+
+  if (await targetHeading.isVisible().catch(() => false)) return;
+
+  const previousMonthBtn = page.getByRole('button', { name: /Previous month/i });
+  const nextMonthBtn = page.getByRole('button', { name: /Next month/i });
+
+  for (let i = 0; i < 24; i++) {
+    if (await targetHeading.isVisible().catch(() => false)) return;
+
+    const visible = await getVisibleCalendarMonth(page);
+    const btn =
+      monthIndex(visible) > monthIndex(target) ? previousMonthBtn : nextMonthBtn;
+
+    await btn.click();
+    await page.waitForTimeout(200);
+  }
+
+  throw new Error(`Could not navigate calendar to ${formatMonthYear(target)}`);
+}
+
+async function pickDateFromCalendar(page: Page, target: Date): Promise<void> {
+  await navigateCalendarToMonth(page, target);
+
+  const dayLabel = String(target.getDate());
+  const fullLabel = target.toLocaleString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  const dayBtn = page
+    .getByRole('button', {
+      name: new RegExp(escapeRegExp(fullLabel), 'i'),
+    })
+    .or(
+      page
+        .locator('button')
+        .filter({ hasText: new RegExp(`^${escapeRegExp(dayLabel)}$`) })
+        .filter({ hasNot: page.locator('[disabled]') }),
+    )
+    .first();
+
+  await expect(dayBtn).toBeVisible({ timeout: 10000 });
+  await expect(dayBtn).toBeEnabled({ timeout: 10000 });
+  await dayBtn.click();
+  await page.waitForTimeout(200);
+
+  const confirmBtn = page.getByRole('button', {
+    name: /Confirm date selection|Apply|OK|Done/i,
+  });
+  if (await confirmBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await confirmBtn.click();
+  }
+}
+
+async function pickDateForButton(
+  page: Page,
+  buttonId: string,
+  target: Date,
+): Promise<void> {
+  const trigger = page.locator(buttonId);
+  await expect(trigger).toBeVisible({ timeout: 10000 });
+  await trigger.click();
+
+  await expect(
+    page.getByRole('button', { name: /Previous month/i }),
+  ).toBeVisible({ timeout: 10000 });
+
+  await pickDateFromCalendar(page, target);
+}
+
+async function navigateToReportsFromAnywhere(page: Page): Promise<void> {
   // Dismiss any post-order success modal/toast so the sidebar is clickable
   const closeBtn = page.getByRole('button', { name: /^Close$|Dismiss/i });
   if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
     await closeBtn.click().catch(() => undefined);
   }
+  await page.keyboard.press('Escape').catch(() => undefined);
+  await page
+    .locator('div.fixed.inset-0')
+    .first()
+    .waitFor({ state: 'hidden', timeout: 3000 })
+    .catch(() => undefined);
+
+  // Land on the dashboard first so the sidebar is in a known state
   const homeBtn = page.getByRole('button', { name: 'Go to home page' });
-  if (await homeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await homeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
     await homeBtn.click();
     await page.waitForLoadState('domcontentloaded');
   }
 
-  await navigateK12CateringMenu(page, 'Reports');
-  await page.waitForLoadState('domcontentloaded');
+  // Click the Reports sidebar item explicitly and wait for the Reports page
+  const sidebar = page.locator('aside[aria-label="Main navigation"]');
+  await expect(sidebar).toBeVisible({ timeout: 10000 });
 
+  const reportsButton = sidebar.getByLabel('Navigate to Reports', {
+    exact: true,
+  });
+  await expect(reportsButton).toBeVisible({ timeout: 10000 });
+  await reportsButton.scrollIntoViewIfNeeded();
+  await reportsButton.click();
+
+  // Confirm we actually landed on the Reports page (not Orders)
+  await expect(page.locator('h1')).toContainText('Reports', { timeout: 15000 });
+  await expect(page).toHaveURL(/\/reports/i, { timeout: 15000 });
+  await page.waitForLoadState('domcontentloaded');
+}
+
+async function exportOrderExportsCsv(page: Page): Promise<string> {
+  await navigateToReportsFromAnywhere(page);
+
+  // Scroll the Reports list until "Order Exports" is in view, then click it
   const orderExportsBtn = page
-    .getByRole('button', { name: /Order Exports/i })
-    .or(page.getByRole('link', { name: /Order Exports/i }))
+    .getByRole('button', { name: /Orders?\s+Exports?/i })
+    .or(page.getByRole('link', { name: /Orders?\s+Exports?/i }))
     .first();
+
+  await scrollUntilVisible(page, { target: orderExportsBtn });
   await expect(orderExportsBtn).toBeVisible({ timeout: 15000 });
   await orderExportsBtn.scrollIntoViewIfNeeded();
   await orderExportsBtn.click();
   await page.waitForLoadState('domcontentloaded');
+
+  await expect(
+    page.getByRole('heading', { name: /Orders?\s+Exports?/i }).first(),
+  ).toBeVisible({ timeout: 15000 });
 
   const today = new Date();
   const startDate = new Date(today);
@@ -380,8 +597,36 @@ async function exportOrderExportsCsv(page: Page): Promise<string> {
   const endDate = new Date(today);
   endDate.setMonth(endDate.getMonth() + 1);
 
-  await fillDateField(page, /Start Date/i, formatDateInput(startDate));
-  await fillDateField(page, /End Date/i, formatDateInput(endDate));
+  await pickDateForButton(page, '#start-date', startDate);
+  await pickDateForButton(page, '#end-date', endDate);
+
+  // Deselect all order statuses then re-select only "Accepted" so the export
+  // contains a single, predictable row to validate
+  const deselectAllBtn = page
+    .getByRole('button', { name: /Deselect All/i })
+    .first();
+  if (await deselectAllBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await deselectAllBtn.click();
+    await page.waitForTimeout(300);
+  }
+
+  const acceptedToggle = page
+    .getByRole('checkbox', { name: /^Accepted$/i })
+    .or(page.getByRole('button', { name: /^Accepted$/i }))
+    .or(page.getByLabel(/^Accepted$/i))
+    .first();
+  await expect(acceptedToggle).toBeVisible({ timeout: 10000 });
+  const isCheckable = await acceptedToggle
+    .evaluate((el) => (el as HTMLInputElement).type === 'checkbox')
+    .catch(() => false);
+  if (isCheckable) {
+    if (!(await acceptedToggle.isChecked().catch(() => false))) {
+      await acceptedToggle.check();
+    }
+  } else {
+    await acceptedToggle.click();
+  }
+  await page.waitForTimeout(300);
 
   const exportBtn = page
     .getByRole('button', { name: /Export.*CSV|CSV.*Export|Download.*CSV/i })
@@ -399,6 +644,84 @@ async function exportOrderExportsCsv(page: Page): Promise<string> {
   }
 
   return fs.readFileSync(downloadPath, 'utf-8');
+}
+
+// ─── Orders → cancel the order we just placed ──────────────────────────────
+
+async function cancelOrderById(page: Page, orderId: string): Promise<void> {
+  // Dismiss anything modal then make sure we're inside the K12 app
+  await page.keyboard.press('Escape').catch(() => undefined);
+  await ensureInK12CateringApp(page);
+
+  const homeBtn = page.getByRole('button', { name: 'Go to home page' });
+  if (await homeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await homeBtn.click();
+    await page.waitForLoadState('domcontentloaded');
+  }
+  await ensureInK12CateringApp(page);
+
+  await navigateK12CateringMenu(page, 'Orders');
+  await page.waitForLoadState('domcontentloaded');
+  await ensureInK12CateringApp(page);
+  await expect(page.locator('h1')).toContainText(/Order/i, { timeout: 15000 });
+
+  // Search by the captured order ID
+  const searchBox = page
+    .getByRole('textbox', { name: /Search orders/i })
+    .first();
+  await expect(searchBox).toBeVisible({ timeout: 10000 });
+  await searchBox.fill(orderId);
+  await page.waitForTimeout(800);
+
+  const detailsBtn = page
+    .getByRole('button', {
+      name: new RegExp(
+        `View details for order\\s*${escapeRegExp(orderId)}`,
+        'i',
+      ),
+    })
+    .first();
+  await expect(detailsBtn).toBeVisible({ timeout: 10000 });
+  await detailsBtn.click();
+  await page.waitForLoadState('domcontentloaded');
+  await ensureInK12CateringApp(page);
+
+  // Confirm we're on the order details page for this specific order
+  await expect(
+    page.getByRole('heading', {
+      name: new RegExp(`Order\\s*#?\\s*${escapeRegExp(orderId)}`, 'i'),
+    }),
+  ).toBeVisible({ timeout: 15000 });
+
+  // Click "Cancel this order" on the order details page
+  const cancelOrderBtn = page
+    .getByRole('button', { name: /Cancel this order/i })
+    .or(page.getByRole('button', { name: /^Cancel Order$/i }))
+    .first();
+  await expect(cancelOrderBtn).toBeVisible({ timeout: 15000 });
+  await cancelOrderBtn.scrollIntoViewIfNeeded();
+  await cancelOrderBtn.click();
+
+  // Confirm in the dialog (dialog role may not be set — fall back to a
+  // visible "Cancel Order" or "Confirm" / "Yes" button on the page)
+  const dialogConfirm = page
+    .getByRole('dialog')
+    .getByRole('button', { name: /^Cancel Order$|^Confirm$|^Yes/i })
+    .first();
+  const fallbackConfirm = page
+    .getByRole('button', { name: /^Cancel Order$/i })
+    .last();
+  const confirmCancelBtn = dialogConfirm.or(fallbackConfirm).first();
+  await expect(confirmCancelBtn).toBeVisible({ timeout: 10000 });
+  await confirmCancelBtn.click();
+  await ensureInK12CateringApp(page);
+
+  // Verify the order is now cancelled
+  await expect(
+    page
+      .getByText(/order.*cancel(l)?ed|cancel(l)?ed successfully|cancel(l)?ed/i)
+      .first(),
+  ).toBeVisible({ timeout: 15000 });
 }
 
 function parseCsv(csv: string): string[][] {
@@ -462,11 +785,15 @@ test('Catering - Reports - Order Exports CSV reflects Payment Display Label sett
   // accounting string entered at checkout is not blocked by a format rule
   await setPaymentFieldFormatRuleToAllowAnyText(catering);
 
+  // Set Max Event Date to 2 months so the next-month checkout date is allowed
+  await setMaxEventDateToTwoMonths(catering);
+
   // Step 4: place an order using the Payment Display Label payment type
-  await placeOrderUsingDisplayLabel(catering, newDisplayLabel);
+  // and capture its order ID for later cancellation
+  const orderId = await placeOrderUsingDisplayLabel(catering, newDisplayLabel);
 
   // Step 5-6: navigate to Reports → Order Exports and export CSV across
-  // a past start date and a future end date
+  // a past start date and a future end date (Accepted only)
   const csvText = await exportOrderExportsCsv(catering);
   const rows = parseCsv(csvText);
   expect(rows.length).toBeGreaterThan(1);
@@ -520,9 +847,9 @@ test('Catering - Reports - Order Exports CSV reflects Payment Display Label sett
     'Expected Payment Method to contain "Credit Card" or the Display Label.',
   ).toBeTruthy();
 
-  // Verify "[Program Name] - [Payment Display Label]" appears in the
-  // display-label column for the order we just placed
-  const expectedCombinedValue = `${PROGRAM_NAME} - ${newDisplayLabel}`;
+  // Verify the row for our order is "[Program Name] - [Accounting String]"
+  // under the Payment Display Label column
+  const expectedCombinedValue = `${PROGRAM_NAME} - ${ACCOUNTING_STRING}`;
   const hasCombinedValue = displayLabelColumnValues.some(
     (v) => v === expectedCombinedValue,
   );
@@ -535,4 +862,8 @@ test('Catering - Reports - Order Exports CSV reflects Payment Display Label sett
     body: csvText,
     contentType: 'text/csv',
   });
+
+  // Step 7: navigate back to Orders, find the order we placed, view details,
+  // and cancel it from the dialog. Verify the cancellation succeeded.
+  await cancelOrderById(catering, orderId);
 });

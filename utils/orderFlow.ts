@@ -237,3 +237,28 @@ export async function placeBasicCheckoutOrder(page: Page): Promise<void> {
       .waitFor({ state: 'visible', timeout: 20000 }),
   ]);
 }
+
+/**
+ * Make sure at least one order exists in the district. Navigates to Orders,
+ * checks for an existing order card, and only places a new one if none are
+ * found. Use in beforeAll for tests that depend on having order data
+ * (Dashboard widgets, calendars, recent/upcoming order lists, etc.).
+ */
+export async function ensureAtLeastOneOrder(page: Page): Promise<void> {
+  await navigateK12CateringMenu(page, 'Orders');
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('h1')).toContainText(/Order/i, { timeout: 15000 });
+
+  // Existing orders show a "View details for order …" button on each card
+  const anyExistingOrder = page
+    .getByRole('button', { name: /View details for order/i })
+    .first();
+
+  if (await anyExistingOrder.isVisible({ timeout: 5000 }).catch(() => false)) {
+    return;
+  }
+
+  // No orders found — place one via the standard checkout flow
+  await placeBasicCheckoutOrder(page);
+}

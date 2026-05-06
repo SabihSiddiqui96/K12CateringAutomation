@@ -3,6 +3,7 @@ import {
   loginToK12Catering,
   navigateK12CateringMenu,
 } from '../../utils/helpers';
+import { ensureAtLeastOneOrder } from '../../utils/orderFlow';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -13,6 +14,9 @@ test.describe('Dashboard - Overview (Stats, Quick Actions, Filters)', () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     catering = await loginToK12Catering(page, { navigateTo: 'Dashboard' });
+
+    // Seed an order if the district has none, so stats / widgets aren't empty
+    await ensureAtLeastOneOrder(catering);
   });
 
   test.beforeEach(async () => {
