@@ -177,7 +177,7 @@ const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
 const ORIGINAL_PASSWORD = decryptPassword(
   getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
 );
-const CUSTOMER_EMAIL = getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
+const CUSTOMER_EMAIL = 'SabihQATesting@outlook.com';
 
 function getChangePasswordDialog(catering: Page) {
   return catering.getByRole('dialog', { name: /Change Password/i });
@@ -948,10 +948,8 @@ test.describe('Checkout Backdate Order', () => {
       }
       await updateMinimumOrderAmount(catering, '0');
 
-      const customerEmail = getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
-      const customerPassword = decryptPassword(
-        getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
-      );
+      const customerEmail = CUSTOMER_EMAIL;
+      const customerPassword = ORIGINAL_PASSWORD;
 
       await nonAdminPage.goto(getK12CateringLoginUrl());
       await nonAdminPage.waitForLoadState('domcontentloaded');
@@ -990,13 +988,26 @@ test.describe('Checkout Backdate Order', () => {
         await expect(allDatesInPrevMonth.nth(i)).toBeDisabled();
       }
     } finally {
-      await nonAdminContext.close();
+      await nonAdminContext.close().catch(() => undefined);
 
-      await catering.getByRole('button', { name: 'Go to home page' }).click();
-      await catering.waitForLoadState('domcontentloaded');
-      await navigateK12CateringMenu(catering, 'Settings');
-      await catering.waitForLoadState('domcontentloaded');
-      await updateMinimumOrderAmount(catering, originalMinimumOrderAmount);
+      // Guard the cleanup so a closed `catering` page doesn't mask the real
+      // test failure with a "Target page... has been closed" error.
+      if (!catering.isClosed()) {
+        try {
+          await catering.getByRole('button', { name: 'Go to home page' }).click();
+          await catering.waitForLoadState('domcontentloaded');
+          await navigateK12CateringMenu(catering, 'Settings');
+          await catering.waitForLoadState('domcontentloaded');
+          await updateMinimumOrderAmount(catering, originalMinimumOrderAmount);
+        } catch (cleanupErr) {
+          test
+            .info()
+            .annotations.push({
+              type: 'cleanup-failed',
+              description: `Cleanup after test failed: ${(cleanupErr as Error)?.message ?? cleanupErr}`,
+            });
+        }
+      }
     }
   });
 });

@@ -311,9 +311,12 @@ async function verifyMenuItemsAsCustomer(
   browser: Browser,
   itemNames: string[],
   passwordOverride?: string,
+  emailOverride?: string,
 ): Promise<void> {
   const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
-  const email = getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
+  const email =
+    emailOverride ??
+    getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
   const password = passwordOverride ?? decryptPassword(
     getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
   );
@@ -433,8 +436,6 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
   const renamedMenuNumber = menuNumber === 999 ? 100 : menuNumber + 1;
   const menuName = `${menuNumber} - SabihTesting`;
   const renamedMenuName = `${renamedMenuNumber} - SabihTesting`;
-  const firstItem = 'apple juice';
-  const secondItem = 'cola';
   const customerPassword = 'Password1!';
 
   await openManageMenus(catering);
@@ -449,7 +450,26 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
   await deactivateMenu(catering, renamedMenuName);
   await activateMenu(catering, renamedMenuName);
 
+  // Pick the first two available menu items dynamically (the QA catalog
+  // changes over time — hardcoded names like "apple juice" go stale).
   await openManageItems(catering, renamedMenuName);
+  const checkboxes = catering.getByRole('checkbox');
+  await expect(checkboxes.first()).toBeVisible({ timeout: 10000 });
+  const checkboxCount = await checkboxes.count();
+  const itemNames: string[] = [];
+  for (let i = 0; i < checkboxCount && itemNames.length < 2; i++) {
+    const name =
+      (await checkboxes.nth(i).getAttribute('aria-label')) ??
+      (await checkboxes.nth(i).getAttribute('name'));
+    const cleaned = (name ?? '').trim();
+    if (cleaned && !itemNames.includes(cleaned)) itemNames.push(cleaned);
+  }
+  expect(
+    itemNames.length,
+    'Expected at least 2 menu items in the manage-items dialog',
+  ).toBeGreaterThanOrEqual(2);
+  const [firstItem, secondItem] = itemNames;
+
   await setMenuItems(catering, [firstItem], true);
   expect(await checkedState(catering, firstItem)).toBe(true);
   await catering.getByRole('button', { name: 'Close modal' }).last().click();
@@ -473,10 +493,15 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
     timeout: 10000,
   });
 
-  const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
-  const customerEmail = getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_EMAIL' : 'K12_CUSTOMER_EMAIL');
+  // Use the dedicated QA test customer for the customer-side verification
+  const customerEmail = 'SabihQATesting@outlook.com';
   await resetCustomerPasswordFromAccounts(catering, customerEmail, customerPassword);
-  await verifyMenuItemsAsCustomer(browser, [firstItem, secondItem], customerPassword);
+  await verifyMenuItemsAsCustomer(
+    browser,
+    [firstItem, secondItem],
+    customerPassword,
+    customerEmail,
+  );
 
   await openManageMenus(catering);
   await deactivateFromDeleteDialog(catering, renamedMenuName);

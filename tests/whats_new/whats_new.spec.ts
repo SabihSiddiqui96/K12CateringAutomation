@@ -31,9 +31,34 @@ test.describe("What's New", () => {
     await catering.getByRole('tab', { name: /Release Notes/i }).click();
     await catering.waitForTimeout(500);
 
-    const hasReleases = await catering.getByRole('article').first().isVisible({ timeout: 3000 }).catch(() => false);
-    const hasEmptyState = await catering.getByText(/No releases/i).first().isVisible({ timeout: 3000 }).catch(() => false);
-    expect(hasReleases || hasEmptyState).toBe(true);
+    // The redesigned Release Notes view renders a "Version History" panel
+    // with version badges (e.g. "v16.4.1 ACTIVE") and a "Version <number>"
+    // heading for each release card. Treat any of those as "has content".
+    const hasVersionHistory = await catering
+      .getByRole('heading', { name: /Version History/i })
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    const hasVersionHeading = await catering
+      .getByRole('heading', { name: /^Version\s+\d+(\.\d+)+/i })
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const hasVersionBadge = await catering
+      .getByText(/^v\d+(\.\d+)+/i)
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const hasEmptyState = await catering
+      .getByText(/No releases|No release notes|No versions/i)
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+
+    expect(
+      hasVersionHistory || hasVersionHeading || hasVersionBadge || hasEmptyState,
+      'Expected Release Notes content (version history, version heading, version badge) or empty state',
+    ).toBe(true);
   });
 
   test("What's New - Resources tab switches content and sidebar sections are visible", async () => {
