@@ -12,6 +12,7 @@ import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl } from '../../utils/baseUrl';
 
 test.use({ storageState: { cookies: [], origins: [] } });
+test.describe.configure({ mode: 'serial' });
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 

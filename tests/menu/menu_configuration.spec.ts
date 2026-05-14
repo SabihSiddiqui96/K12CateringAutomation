@@ -7,6 +7,7 @@ import {
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)', () => {
+  test.describe.configure({ mode: 'serial' });
   let catering: Page;
 
   test.beforeAll(async ({ browser }) => {

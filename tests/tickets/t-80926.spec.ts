@@ -13,6 +13,7 @@ import {
 } from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
+test.describe.configure({ mode: 'serial' });
 
 // ─── Selectors ───────────────────────────────────────────────────────────────
 

@@ -11,6 +11,7 @@ import {
 
 
 test.use({ storageState: { cookies: [], origins: [] } });
+test.describe.configure({ mode: 'serial' });
 
 const districtShortNameSelector = "#district-short-name";
 const shortUrlTextSelector = "span.font-mono.break-all";
