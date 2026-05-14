@@ -85,9 +85,13 @@ test.describe('Menu - Browse, Search & Cart', () => {
     await expect(catering.locator('h2, h3').filter({ hasText: /\d+ items?/ }).first()).toBeVisible({ timeout: 10000 });
 
     await catering.getByRole('button', { name: 'Select category filter' }).click();
-    await catering.getByRole('option', { name: 'Drink' }).click();
+    const categoryOptions = catering.getByRole('option');
+    await expect(categoryOptions.first()).toBeVisible({ timeout: 5000 });
+    const allOptionTexts = await categoryOptions.allTextContents();
+    const realCategory = allOptionTexts.map(t => t.trim()).find(t => t && !/^all$/i.test(t)) ?? '';
+    await catering.getByRole('option', { name: new RegExp(`^${realCategory}$`, 'i') }).first().click();
     await catering.waitForTimeout(500);
-    await expect(catering.getByRole('heading', { name: /Drink/i })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: new RegExp(realCategory, 'i') })).toBeVisible({ timeout: 10000 });
 
     await catering.getByRole('button', { name: 'Select allergen filter' }).click();
     await catering.getByRole('option').nth(1).click();

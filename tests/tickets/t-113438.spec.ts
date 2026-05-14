@@ -7,6 +7,9 @@ import {
   scrollUntilVisible,
   getDistrictName,
 } from '../../utils/helpers';
+import { decryptPassword } from '../../utils/crypto';
+import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
+import { getK12CateringLoginUrl } from '../../utils/baseUrl';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -18,6 +21,12 @@ const RENAMED_MENU_ITEM = `AutoRenamed ${RANDOM_SUFFIX}`;
 // User performing the test (used to verify "Triggered by" in Sync Log)
 // TODO: confirm this matches the QA test user
 const SYNC_TRIGGERED_BY = 'Sabih Siddiqui';
+
+const CUSTOMER_EMAIL = 'SabihQATesting@outlook.com';
+const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
+const CUSTOMER_PASSWORD = decryptPassword(
+  getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
+);
 
 // ─── Generic helpers ───────────────────────────────────────────────────────
 
@@ -484,6 +493,20 @@ async function getTargetDistrictsFromManageDialog(
   const dialog = page.getByRole('dialog').first();
   await expect(dialog).toBeVisible({ timeout: 10000 });
 
+  // If not all districts are opted in, "Opt in all" is enabled — click it and confirm
+  const optInAllBtn = dialog.getByRole('button', { name: /opt\s*in\s*all/i }).first();
+  const optInAllDisabled = await optInAllBtn.isDisabled().catch(() => true);
+  if (!optInAllDisabled) {
+    await optInAllBtn.click();
+    const confirmDialog = page.getByRole('dialog').last();
+    await expect(confirmDialog).toBeVisible({ timeout: 10000 });
+    await confirmDialog
+      .getByRole('button', { name: /yes,?\s*opt\s*in\s*all/i })
+      .first()
+      .click();
+    await expect(optInAllBtn).toBeDisabled({ timeout: 15000 });
+  }
+
   // The dialog renders rows like:
   //   "Berkeley School District   Primary (source)"
   //   "Mercer County School District   Opted in"
@@ -586,6 +609,15 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     .or(catering.getByLabel(/Auto[\s-]?sync/i))
     .first();
   await expect(autoSyncToggle).toBeVisible({ timeout: 10000 });
+
+  // If Auto-sync is off (aria-checked="false"), enable it so the frequency dropdown is accessible
+  const autoSyncChecked = await autoSyncToggle.getAttribute('aria-checked').catch(() => null);
+  if (autoSyncChecked === 'false') {
+    await autoSyncToggle.click();
+    await expect(
+      catering.getByText(/Auto-sync settings saved/i).first(),
+    ).toBeVisible({ timeout: 10000 });
+  }
 
   // Sync frequency dropdown — verify both day-based and weekly options
   // produce the right scheduled-time text below the dropdown
@@ -1121,16 +1153,16 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
   const customerPage = await customerContext.newPage();
   try {
     await customerPage.goto(
-      'https://qak12cateringui.perseusedge.com/login',
+      getK12CateringLoginUrl(),
       { waitUntil: 'domcontentloaded' },
     );
 
     await customerPage
       .getByRole('textbox', { name: /Email/i })
-      .fill('SabihQATesting@outlook.com');
+      .fill(CUSTOMER_EMAIL);
     await customerPage
       .getByRole('textbox', { name: /Password/i })
-      .fill('Password1!');
+      .fill(CUSTOMER_PASSWORD);
     await customerPage.getByRole('button', { name: /Sign in/i }).click();
 
     await customerPage.waitForLoadState('networkidle').catch(() => undefined);

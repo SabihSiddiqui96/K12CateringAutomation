@@ -137,16 +137,19 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
     await catering.waitForTimeout(300);
     await expect(dialog.getByText(originalName).first()).toBeVisible({ timeout: 10000 });
 
+    const updatedName = `UpdateTest${Math.floor(10 + Math.random() * 90)}`;
     await catering.getByRole('button', { name: 'Edit ingredient' }).first().click();
     await editInput.clear();
-    await editInput.fill(originalName + ' Updated');
+    await editInput.fill(updatedName);
     await editInput.press('Enter');
-    await expect(dialog.getByText(originalName + ' Updated').first()).toBeVisible({ timeout: 10000 });
+    await expect(editInput).not.toBeVisible({ timeout: 5000 });
+    await expect(dialog.getByText(updatedName).first()).toBeVisible({ timeout: 10000 });
 
     await catering.getByRole('button', { name: 'Edit ingredient' }).first().click();
     await editInput.clear();
     await editInput.fill(originalName);
     await editInput.press('Enter');
+    await expect(editInput).not.toBeVisible({ timeout: 5000 });
     await catering.getByRole('button', { name: 'Close' }).last().click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });

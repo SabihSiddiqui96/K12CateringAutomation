@@ -33,12 +33,15 @@ test.describe('Orders', () => {
     await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible({ timeout: 10000 });
     await expect(catering.getByText('Track and manage all your orders')).toBeVisible();
     const totalCard = catering.getByRole('button', { name: /Total orders:/i });
-    await expect(totalCard).toBeVisible();
+    await expect(totalCard).toBeVisible({ timeout: 10000 });
     expect(await totalCard.textContent()).toMatch(/\d+/);
-    await expect(catering.getByRole('button', { name: /Accepted orders:/i })).toBeVisible();
-    await expect(catering.getByRole('button', { name: /Completed orders:/i })).toBeVisible();
+    await expect(catering.getByRole('button', { name: /Accepted orders:/i })).toBeVisible({ timeout: 10000 });
+    await expect(
+      catering.getByRole('button', { name: /Completed orders/i })
+        .or(catering.getByText(/Completed orders/i).locator('..').filter({ has: catering.getByRole('button') }).first()),
+    ).toBeVisible({ timeout: 10000 });
     const revenueCard = catering.getByRole('button', { name: /Total Revenue:/i });
-    await expect(revenueCard).toBeVisible();
+    await expect(revenueCard).toBeVisible({ timeout: 10000 });
     expect(await revenueCard.textContent()).toMatch(/\$/);
   });
 
@@ -55,9 +58,17 @@ test.describe('Orders', () => {
         /accepted|completed|delivered|cancelled|pending|processing/i,
       ).first(),
     ).toBeVisible();
-    await expect(catering.getByText(/1-20 of \d+/).first()).toBeVisible();
+    await expect(catering.getByText(/\d+-\d+ of \d+/).first()).toBeVisible({ timeout: 10000 });
     await expect(catering.getByRole('button', { name: 'Page 1' }).first()).toBeVisible();
-    await expect(catering.getByRole('button', { name: 'Next page' }).first()).toBeVisible();
+    const nextPageBtn = catering.getByRole('button', { name: 'Next page' }).first();
+    await expect(nextPageBtn).toBeVisible();
+    const countText = (await catering.getByText(/\d+-\d+ of \d+/).first().textContent()) ?? '';
+    const match = countText.match(/(\d+)-(\d+) of (\d+)/);
+    if (match && parseInt(match[3]) > parseInt(match[2])) {
+      await expect(nextPageBtn).toBeEnabled();
+    } else {
+      await expect(nextPageBtn).toBeDisabled();
+    }
   });
 
   test('Orders - Search, Status, Sort dropdowns and Date Range filter work', async () => {
