@@ -11,7 +11,7 @@ import { getK12CateringLoginUrl } from '../../utils/baseUrl';
 import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-test.describe.configure({ mode: 'serial' });
+
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

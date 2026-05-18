@@ -7,12 +7,10 @@ import {
   scrollUntilVisible,
   getDistrictName,
 } from '../../utils/helpers';
-import { decryptPassword } from '../../utils/crypto';
-import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl } from '../../utils/baseUrl';
+import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-test.describe.configure({ mode: 'serial' });
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -22,12 +20,6 @@ const RENAMED_MENU_ITEM = `AutoRenamed ${RANDOM_SUFFIX}`;
 // User performing the test (used to verify "Triggered by" in Sync Log)
 // TODO: confirm this matches the QA test user
 const SYNC_TRIGGERED_BY = 'Sabih Siddiqui';
-
-const CUSTOMER_EMAIL = 'SabihQATesting@outlook.com';
-const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
-const CUSTOMER_PASSWORD = decryptPassword(
-  getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
-);
 
 // ─── Generic helpers ───────────────────────────────────────────────────────
 
@@ -97,28 +89,11 @@ async function switchDistrict(page: Page, districtName: string): Promise<void> {
   await page.waitForTimeout(500);
 
   // Wait for the bottom action bar (Switch District button) to render —
-  // "Set as default" sits next to it and only appears once a district is
-  // selected.
+  // it only appears once a district is selected.
   const confirmBtn = page
     .getByRole('button', { name: /^Switch District$/i })
     .last();
   await expect(confirmBtn).toBeVisible({ timeout: 10000 });
-
-  // When switching back to Mercer, "Set as default" is already checked
-  // (Mercer is the default district). Always toggle it off so the confirm
-  // doesn't fail with "District Switch Failed". The control is an
-  // <input aria-label="Set selected district as default">.
-  if (/Mercer County School District/i.test(districtName)) {
-    const setAsDefaultInput = page
-      .getByLabel(/Set selected district as default/i)
-      .or(page.locator('[aria-label="Set selected district as default"]'))
-      .first();
-    await expect(setAsDefaultInput).toBeVisible({ timeout: 5000 });
-    await setAsDefaultInput.scrollIntoViewIfNeeded();
-    await setAsDefaultInput.click();
-    await page.waitForTimeout(300);
-  }
-
   await confirmBtn.click();
 
   // Success can be signalled by either the "District Switched" toast OR the
@@ -1146,10 +1121,28 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
   // Restore Mercer as the active district at the end
   await switchDistrict(catering, getDistrictName());
 
+  // Let the post-switch toast / page reload settle before we navigate the
+  // sidebar — otherwise the next sidebar click (Accounts inside
+  // resetCustomerPasswordFromAccounts) can race the toast overlay and never
+  // actually land.
+  await catering.waitForLoadState('networkidle').catch(() => undefined);
+  await catering.waitForTimeout(1500);
+  await ensureInK12CateringApp(catering);
+
   // ── Step 11: Verify non-admin/customer role cannot access Data Sync ──
-  // Open a fresh browser context (no shared auth) and log in as the customer
-  // user via the public K12 catering login page, then assert the Data Sync
-  // sidebar item is not present.
+  // First reset the customer's password from the admin session so the
+  // upcoming customer login is guaranteed to succeed (Accounts → search by
+  // email → Actions ⋯ → Change Password → "Password1!").
+  const customerEmail = 'SabihQATesting@outlook.com';
+  const customerPassword = 'Password1!';
+  await resetCustomerPasswordFromAccounts(
+    catering,
+    customerEmail,
+    customerPassword,
+  );
+
+  // Now open a fresh browser context (no shared auth) and log in as the
+  // customer, then assert the Data Sync sidebar item is not present.
   const customerContext = await browser.newContext();
   const customerPage = await customerContext.newPage();
   try {
@@ -1160,10 +1153,10 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
 
     await customerPage
       .getByRole('textbox', { name: /Email/i })
-      .fill(CUSTOMER_EMAIL);
+      .fill(customerEmail);
     await customerPage
       .getByRole('textbox', { name: /Password/i })
-      .fill(CUSTOMER_PASSWORD);
+      .fill(customerPassword);
     await customerPage.getByRole('button', { name: /Sign in/i }).click();
 
     await customerPage.waitForLoadState('networkidle').catch(() => undefined);

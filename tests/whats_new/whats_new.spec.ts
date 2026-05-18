@@ -34,7 +34,7 @@ test.describe("What's New", () => {
     // The redesigned Release Notes view renders a "Version History" panel
     // with version badges (e.g. "v16.4.1 ACTIVE") and a "Version <number>"
     // heading for each release card. Treat any of those as "has content".
-    const hasVersionHistory = await catering
+    const hasVersionHistory = await catering 
       .getByRole('heading', { name: /Version History/i })
       .first()
       .isVisible({ timeout: 5000 })
