@@ -108,7 +108,14 @@ export async function openK12CateringApp(page: Page): Promise<Page> {
     .waitForEvent('page', { timeout: 15_000 })
     .catch(() => undefined);
 
-  await page.getByRole('link', { name: 'K12Catering' }).click();
+  // The page has TWO links to /K12Catering/K12Catering.aspx — one in the
+  // hidden left-nav module list (off-screen) and the visible Workspace
+  // tile. Use Playwright's `:visible` pseudo to pick the visible one.
+  const cateringLink = page
+    .locator('a[href*="K12Catering.aspx" i]:visible')
+    .first();
+  await cateringLink.scrollIntoViewIfNeeded().catch(() => undefined);
+  await cateringLink.click();
 
   const openedPage = await newTabPromise;
   return openedPage ?? page;
