@@ -89,6 +89,28 @@ export async function loginToPrimeroEdge(page: Page): Promise<void> {
   });
 }
 
+// Logs in to SchoolCafé (qa.perseusedge.com) — a separate platform from
+// PrimeroEdge Classic, with its own credentials (qaSchoolCafeEmail /
+// qaSchoolCafePassword, the password stored encrypted in .env like the others).
+export async function loginToSchoolCafe(page: Page): Promise<void> {
+  const email = getRequiredEnvVar('qaSchoolCafeEmail');
+  const password = decryptPassword(getRequiredEnvVar('qaSchoolCafePassword'));
+  const baseUrl =
+    getEnvVar('SCHOOLCAFE_URL', { required: false }) || 'https://qa.perseusedge.com';
+
+  await page.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('textbox', { name: 'Email' }).fill(email);
+  await page.getByRole('textbox', { name: 'Password' }).fill(password);
+  // The submit button's accessible name is "button-child"; match its visible text.
+  await page.locator('button:has-text("SIGN IN")').click();
+
+  // The module nav renders the workspace modules (each is a <div title="…">).
+  // Wait for the always-present Home module to confirm we're logged in.
+  await expect(page.locator('nav [title="Home"]')).toBeVisible({
+    timeout: positiveIntFromEnv('SCHOOLCAFE_LOGIN_TIMEOUT_MS', process.env.CI ? 60000 : 30000),
+  });
+}
+
 // Login with new user
 export async function loginToK12CateringAsDistrictUser(page: Page): Promise<void> {
   const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
