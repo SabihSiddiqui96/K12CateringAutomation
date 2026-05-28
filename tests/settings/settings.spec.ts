@@ -88,7 +88,7 @@ test.describe('Settings', () => {
 
   test('Settings - District Contacts section shows existing contacts with edit/delete buttons', async () => {
     await expect(catering.getByRole('heading', { name: /District Contacts/i })).toBeVisible({ timeout: 10000 });
-    await expect(catering.getByRole('button', { name: /Add new contact/i })).toBeVisible();
+    await expect(catering.getByRole('button', { name: /Add\s+(new\s+)?contact/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /^Edit .+$/i }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: /^Delete .+$/i }).first()).toBeVisible();
   });

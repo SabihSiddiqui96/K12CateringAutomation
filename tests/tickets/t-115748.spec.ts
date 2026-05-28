@@ -68,7 +68,7 @@ async function addTestLocation(page: Page): Promise<void> {
     timeout: 15000,
   });
   await expect(
-    page.getByRole('button', { name: /Delete office location/i }),
+    page.getByRole('button', { name: /Delete office location/i }).first(),
   ).toBeVisible({
     timeout: 10000,
   });
@@ -124,7 +124,14 @@ async function deleteFirstLocation(page: Page): Promise<string> {
     'i',
   );
 
-  await page.getByRole('button', { name: deleteLocationButtonName }).click();
+  // The address book can hold several locations sharing the same name (each
+  // run adds an "office"), so target the first match and assert the count
+  // drops by one rather than expecting the name to disappear entirely.
+  const deleteButtons = page.getByRole('button', {
+    name: deleteLocationButtonName,
+  });
+  const countBefore = await deleteButtons.count();
+  await deleteButtons.first().click();
 
   const confirmDeleteButton = page.getByRole('button', {
     name: /Delete and proceed with action/i,
@@ -136,9 +143,9 @@ async function deleteFirstLocation(page: Page): Promise<string> {
     page.getByText(/deleted|removed.*successfully|success/i).first(),
   ).toBeVisible({ timeout: 10000 });
 
-  await expect(
-    page.getByRole('button', { name: deleteLocationButtonName }),
-  ).not.toBeVisible({ timeout: 10000 });
+  await expect
+    .poll(() => deleteButtons.count(), { timeout: 10000 })
+    .toBe(countBefore - 1);
 
   return locationName;
 }

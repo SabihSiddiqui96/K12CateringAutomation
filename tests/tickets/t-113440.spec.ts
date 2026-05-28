@@ -430,6 +430,11 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
   page,
   browser,
 }) => {
+  // Long end-to-end flow (create/rename/toggle/assign items/customer-side
+  // verify/delete) that runs much slower in CI; give it ample headroom so it
+  // doesn't trip the default per-test timeout there.
+  test.setTimeout(6 * 60 * 1000);
+
   const catering = await loginToK12Catering(page);
   await ensureMenuPage(catering);
 

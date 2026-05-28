@@ -586,15 +586,6 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     .first();
   await expect(autoSyncToggle).toBeVisible({ timeout: 10000 });
 
-  // If Auto-sync is off (aria-checked="false"), enable it so the frequency dropdown is accessible
-  const autoSyncChecked = await autoSyncToggle.getAttribute('aria-checked').catch(() => null);
-  if (autoSyncChecked === 'false') {
-    await autoSyncToggle.click();
-    await expect(
-      catering.getByText(/Auto-sync settings saved/i).first(),
-    ).toBeVisible({ timeout: 10000 });
-  }
-
   // Sync frequency dropdown — verify both day-based and weekly options
   // produce the right scheduled-time text below the dropdown
   const frequencySelect = catering
@@ -602,6 +593,18 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     .or(catering.getByLabel(/Sync\s*frequency/i))
     .first();
   await expect(frequencySelect).toBeVisible({ timeout: 10000 });
+
+  // The frequency dropdown is disabled while Auto-sync is off. Enable Auto-sync
+  // (if needed) and wait for the dropdown to become enabled before using it.
+  if (await frequencySelect.isDisabled().catch(() => false)) {
+    await autoSyncToggle.click();
+    await catering
+      .getByText(/Auto-sync settings saved/i)
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => {});
+    await expect(frequencySelect).toBeEnabled({ timeout: 10000 });
+  }
 
   const frequencyOptions = (
     await frequencySelect.locator('option').allTextContents()

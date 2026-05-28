@@ -380,6 +380,10 @@ async function selectAvailableEventDate(page: Page) {
 test('Catering - Settings - Add district customization settings for Payment display label and requirements', async ({
   page,
 }) => {
+  // Long settings-customization flow (~85s locally) that runs slower in CI;
+  // give it headroom beyond the default per-test timeout so it doesn't time out.
+  test.setTimeout(5 * 60 * 1000);
+
   const catering = await loginToK12Catering(page, { navigateTo: 'Settings' });
 
   await catering.waitForLoadState('domcontentloaded');
