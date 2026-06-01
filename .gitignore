@@ -36,3 +36,6 @@ Thumbs.db
 /test-encrypt.js
 /tests/placeholder/
 /tests/placeholder/placeholder.ts
+
+# Local Claude permissions (volatile, machine-specific — rewritten each session)
+.claude/settings.local.json
