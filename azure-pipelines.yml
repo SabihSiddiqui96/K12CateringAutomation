@@ -133,25 +133,53 @@ stages:
               const https = require('https');
               const url = require('url');
 
-              let total = 0, passed = 0, failed = 0;
+              let total = 0, passed = 0, failed = 0, durationMs = 0;
               const runResult = (process.env.RUN_PLAYWRIGHT_RESULT || '').toLowerCase();
 
-              function walkSuite(suite) {
+              const failedList = [];
+              function walkSuite(suite, ancestors, file) {
                 for (const spec of (suite.specs || [])) {
+                  const fullTitle = [...ancestors, spec.title].filter(Boolean).join(' › ');
                   for (const test of (spec.tests || [])) {
                     total++;
                     const results = test.results || [];
                     if (results.some(r => r.status === 'passed')) passed++;
-                    else if (results.some(r => ['failed', 'timedOut', 'interrupted'].includes(r.status))) failed++;
+                    else if (results.some(r => ['failed', 'timedOut', 'interrupted'].includes(r.status))) {
+                      failed++;
+                      failedList.push({ file: spec.file || file || '', title: fullTitle });
+                    }
                   }
                 }
-                for (const child of (suite.suites || [])) walkSuite(child);
+                for (const child of (suite.suites || [])) {
+                  walkSuite(child, [...ancestors, child.title].filter(Boolean), file);
+                }
               }
 
               const resultsPath = 'test-results/results.json';
               if (fs.existsSync(resultsPath)) {
                 const data = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
-                (data.suites || []).forEach(walkSuite);
+                (data.suites || []).forEach(s => walkSuite(s, [], s.file || s.title || ''));
+                durationMs = (data.stats && data.stats.duration) || 0;
+              }
+
+              const pct = n => (total ? Math.round(n / total * 100) : 0);
+              const totalSecs = Math.round(durationMs / 1000);
+              const duration = Math.floor(totalSecs / 60) + 'm ' + (totalSecs % 60) + 's';
+              const fence = String.fromCharCode(96, 96, 96);
+
+              // Short, readable label per failed test: ticket tag from the file
+              // (t-113438.spec.ts -> T-113438) + the test title, since one file
+              // can hold several tests.
+              function tagFor(file) {
+                const base = (file || '').split(/[\\/]/).pop().replace(/\.spec\.(ts|js)$/i, '');
+                const m = base.match(/t-?(\d+)/i);
+                return m ? ('T-' + m[1]) : (base || 'test');
+              }
+              let failedSection = '';
+              if (failed > 0 && failedList.length) {
+                failedSection = '\n\nFailed Tests:\n' + fence + '\n'
+                  + failedList.map(f => '• ' + tagFor(f.file) + ': ' + f.title).join('\n')
+                  + '\n' + fence;
               }
 
               const pipelineUrl = process.env.COLLECTION_URI
@@ -165,8 +193,14 @@ stages:
               } else if (total === 0) {
                 text = 'K12Catering Automation ended before test results were published.\n\nPipeline: ' + pipelineUrl;
               } else {
-                text = 'K12Catering Automation completed.\n\nPassed: ' + passed
-                  + ' | Failed: ' + failed + ' | Total: ' + total
+                text = 'K12Catering Automation completed. See results below.\n\n'
+                  + fence + '\n'
+                  + '✅ ' + 'Passed:'.padEnd(10) + passed + ' (' + pct(passed) + '%)\n'
+                  + '❌ ' + 'Failed:'.padEnd(10) + failed + ' (' + pct(failed) + '%)\n'
+                  + '📊 ' + 'Total:'.padEnd(10) + total + '\n'
+                  + '⏱ ' + 'Duration:'.padEnd(10) + duration + '\n'
+                  + fence
+                  + failedSection
                   + '\n\nResults: ' + resultsUrl;
               }
 
@@ -208,3 +242,66 @@ stages:
               TEAM_PROJECT: $(System.TeamProject)
               BUILD_ID: $(Build.BuildId)
               RUN_PLAYWRIGHT_RESULT: $(RUN_PLAYWRIGHT_RESULT)
+
+  # Auto re-run the failed tests, but ONLY for the scheduled (nightly ~3am) run
+  # and ONLY when the test stage actually had failures. Runs after Notify so the
+  # normal completion webhook goes out first; this posts a second, updated one.
+  # It re-runs once and posts the result — no loop.
+  - stage: Rerun_Failed
+    displayName: Auto re-run failed tests (scheduled only)
+    dependsOn:
+      - Run_Playwright_QA
+      - Notify
+    condition: >-
+      and(eq(variables['Build.Reason'], 'Schedule'),
+          eq(dependencies.Run_Playwright_QA.result, 'Failed'))
+    jobs:
+      - job: RerunFailed
+        displayName: Re-run failed tests and notify
+        timeoutInMinutes: 120
+        steps:
+          - checkout: self
+
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(NODE_VERSION)
+            displayName: Install Node.js
+
+          - script: npm ci
+            displayName: Install npm packages
+
+          - script: npx playwright install --with-deps chrome
+            displayName: Install Playwright browsers
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download original test results
+            inputs:
+              artifact: playwright-test-results
+              path: test-results
+
+          - script: node scripts/ci-rerun-failed.js
+            displayName: Re-run failed tests and post RingCentral update
+            env:
+              CI: true
+              BASE_URL: $(BASE_URL)
+              PE_USERNAME: $(PE_USERNAME)
+              ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
+              ENCRYPTION_KEY: $(ENCRYPTION_KEY)
+              PE_DISTRICT_EMAIL: $(PE_DISTRICT_EMAIL)
+              PE_DISTRICT_ENCRYPTED_PASSWORD: $(PE_DISTRICT_ENCRYPTED_PASSWORD)
+              K12_CUSTOMER_EMAIL: $(K12_CUSTOMER_EMAIL)
+              K12_CUSTOMER_ENCRYPTED_PASSWORD: $(K12_CUSTOMER_ENCRYPTED_PASSWORD)
+              DIRECT_K12_LOGIN: $(DIRECT_K12_LOGIN)
+              LOGIN_PATH: $(LOGIN_PATH)
+              K12_CATERING_URL: $(K12_CATERING_URL)
+              DISTRICT_NAME: $(DISTRICT_NAME)
+              SECONDARY_DISTRICT_NAME: $(SECONDARY_DISTRICT_NAME)
+              ENVIRONMENT_LABEL: $(ENVIRONMENT_LABEL)
+              PE_UAT_DISTRICT_EMAIL: $(PE_UAT_DISTRICT_EMAIL)
+              PE_UAT_DISTRICT_ENCRYPTED_PASSWORD: $(PE_UAT_DISTRICT_ENCRYPTED_PASSWORD)
+              K12_UATCUSTOMER_EMAIL: $(K12_UATCUSTOMER_EMAIL)
+              K12_UATCUSTOMER_ENCRYPTED_PASSWORD: $(K12_UATCUSTOMER_ENCRYPTED_PASSWORD)
+              RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
+              COLLECTION_URI: $(System.CollectionUri)
+              TEAM_PROJECT: $(System.TeamProject)
+              BUILD_ID: $(Build.BuildId)

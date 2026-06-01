@@ -1066,8 +1066,10 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
   await expect(topEntry).toContainText(
     new RegExp(escapeRegExp(SYNC_TRIGGERED_BY), 'i'),
   );
+  // Accept both full and abbreviated month names — the Sync Log renders dates
+  // like "Jun 01, 2026 11:13 AM" (abbreviated), not "June 01, 2026".
   await expect(topEntry).toContainText(
-    /(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}[,\s]+\d{1,2}:\d{2}/i,
+    /(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},\s+\d{4}[,\s]+\d{1,2}:\d{2}/i,
   );
 
   await closeOpenDialog(catering);
