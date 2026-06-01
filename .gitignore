@@ -8,6 +8,9 @@
 # Dependencies
 node_modules/
 
+# Local rerun ledger (tracks which builds were already re-run; personal, not shared)
+.rerun-history.json
+
 # Playwright output, cache, saved sessions
 /test-results/
 /playwright-report/
