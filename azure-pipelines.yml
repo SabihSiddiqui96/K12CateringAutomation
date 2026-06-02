@@ -163,7 +163,6 @@ stages:
               const pct = n => (total ? Math.round(n / total * 100) : 0);
               const totalSecs = Math.round(durationMs / 1000);
               const duration = Math.floor(totalSecs / 60) + 'm ' + (totalSecs % 60) + 's';
-              const fence = String.fromCharCode(96, 96, 96);
 
               // Short, readable label per failed test: ticket tag from the file
               // (t-113438.spec.ts -> T-113438) + the test title, since one file
@@ -191,7 +190,7 @@ stages:
                   if (titles.length === 1) lines.push('• ' + tag);
                   else { lines.push('• ' + tag + ':'); titles.forEach(t => lines.push('    - ' + t)); }
                 }
-                failedSection = '\n\nFailed Tests:\n' + fence + '\n' + lines.join('\n') + '\n' + fence;
+                failedSection = '\n\nFailed Tests:\n' + lines.join('\n');
               }
 
               const pipelineUrl = process.env.COLLECTION_URI
@@ -206,12 +205,10 @@ stages:
                 text = 'K12Catering Automation ended before test results were published.\n\nPipeline: ' + pipelineUrl;
               } else {
                 text = 'K12Catering Automation completed. See results below.\n\n'
-                  + fence + '\n'
                   + '✅ ' + 'Passed:'.padEnd(10) + passed + ' (' + pct(passed) + '%)\n'
                   + '❌ ' + 'Failed:'.padEnd(10) + failed + ' (' + pct(failed) + '%)\n'
                   + '📊 ' + 'Total:'.padEnd(10) + total + '\n'
-                  + '⏱ ' + 'Duration:'.padEnd(10) + duration + '\n'
-                  + fence
+                  + '⏱ ' + 'Duration:'.padEnd(10) + duration
                   + failedSection
                   + '\n\nResults: ' + resultsUrl;
               }
