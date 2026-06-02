@@ -214,42 +214,86 @@ export async function loginToK12Catering(
 ): Promise<Page> {
   const { navigateTo } = options;
 
+  // Authenticate to PrimeroEdge once. LoginPage.goto() already retries the
+  // login page itself, and the observed flakiness is downstream (the catering
+  // launch), so this stays outside the launch-retry loop below.
   await loginToPrimeroEdge(page);
 
-  let cateringPage: Page;
+  const directLogin = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
 
-  if (getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true') {
-    cateringPage = page;
-  } else {
-    await expect(page.locator(mercerCountySelector)).toBeVisible({
-      timeout: positiveIntFromEnv('DISTRICT_SELECTOR_TIMEOUT_MS', process.env.CI ? 60000 : 10000),
-    });
-    cateringPage = await openK12CateringApp(page);
-    await cateringPage.waitForLoadState('domcontentloaded');
-    await finishK12CateringLaunch(cateringPage);
+  // Smart login-phase retry: opening the K12 Catering app and waiting for its
+  // sidebar is intermittently flaky (the new tab / sidebar sometimes never
+  // renders) even when the test itself is fine. Retry ONLY this login/launch
+  // phase a few times. Once the sidebar is visible we hand control back to the
+  // test — any failure AFTER this point is a genuine test failure and is NOT
+  // retried here (a "fail is a fail" once we're actually inside the app).
+  const maxAttempts = positiveIntFromEnv('K12_LOGIN_RETRIES', 3);
+  let cateringPage: Page | undefined;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      // On a retry, wait a (growing) moment first — the failure is usually a
+      // transiently-slow backend (worst around the 3am scheduled run), so
+      // spacing the attempts out rides over the slow window instead of hammering
+      // back-to-back like a plain Playwright retry does. Then refresh the
+      // workspace (PrimeroEdge stays authenticated) so the catering tile /
+      // sidebar starts from a clean state before re-launch.
+      if (attempt > 1) {
+        const backoffMs = positiveIntFromEnv('K12_LOGIN_RETRY_BACKOFF_MS', 5000) * (attempt - 1);
+        await page.waitForTimeout(backoffMs);
+        await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
+      }
+
+      if (directLogin) {
+        cateringPage = page;
+      } else {
+        await expect(page.locator(mercerCountySelector)).toBeVisible({
+          timeout: positiveIntFromEnv('DISTRICT_SELECTOR_TIMEOUT_MS', process.env.CI ? 60000 : 10000),
+        });
+        cateringPage = await openK12CateringApp(page);
+        await cateringPage.waitForLoadState('domcontentloaded');
+        await finishK12CateringLaunch(cateringPage);
+      }
+
+      await expect(
+        cateringPage.locator('aside[aria-label="Main navigation"]')
+      ).toBeVisible({ timeout: positiveIntFromEnv('K12_SIDEBAR_TIMEOUT_MS', process.env.CI ? 60000 : 30000) });
+
+      break; // sidebar is up — login/launch succeeded, stop retrying
+    } catch (err) {
+      lastError = err;
+      // Discard a half-opened catering tab so the next attempt starts clean
+      // (the main `page` stays on the PrimeroEdge workspace to re-launch from).
+      if (cateringPage && cateringPage !== page) {
+        await cateringPage.close().catch(() => { });
+      }
+      cateringPage = undefined;
+      if (attempt >= maxAttempts) throw lastError;
+      const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+      console.log(`[login] launch attempt ${attempt}/${maxAttempts} failed (${msg}); retrying login...`);
+    }
   }
 
-  await expect(
-    cateringPage.locator('aside[aria-label="Main navigation"]')
-  ).toBeVisible({ timeout: positiveIntFromEnv('K12_SIDEBAR_TIMEOUT_MS', process.env.CI ? 60000 : 30000) });
+  const catering = cateringPage as Page;
 
   // Auto-handle 404 pages that occasionally appear during navigation
-  await cateringPage.addLocatorHandler(
-    cateringPage.getByText(/Error Code: 404/i),
+  await catering.addLocatorHandler(
+    catering.getByText(/Error Code: 404/i),
     async () => {
-      const backBtn = cateringPage.getByRole('button', { name: /Back to previous page/i });
+      const backBtn = catering.getByRole('button', { name: /Back to previous page/i });
       if (await backBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         await backBtn.click();
-        await cateringPage.waitForLoadState('domcontentloaded');
+        await catering.waitForLoadState('domcontentloaded');
       }
     }
   );
 
   if (navigateTo) {
-    await navigateK12CateringMenu(cateringPage, navigateTo);
+    await navigateK12CateringMenu(catering, navigateTo);
   }
 
-  return cateringPage;
+  return catering;
 }
 
 export async function navigateK12CateringMenu(

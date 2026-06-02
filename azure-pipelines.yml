@@ -175,11 +175,25 @@ stages:
                 const m = base.match(/t-?(\d+)/i);
                 return m ? ('T-' + m[1]) : (base || 'test');
               }
+              // Group failures by ticket tag (one tag per spec file). One failure
+              // in a file -> just the tag (e.g. '• T-113438'); several -> the tag
+              // then each failing test title indented underneath.
               let failedSection = '';
               if (failed > 0 && failedList.length) {
-                failedSection = '\n\nFailed Tests:\n' + fence + '\n'
-                  + failedList.map(f => '• ' + tagFor(f.file) + ': ' + f.title).join('\n')
-                  + '\n' + fence;
+                const order = [];
+                const byTag = new Map();
+                for (const f of failedList) {
+                  const tag = tagFor(f.file);
+                  if (!byTag.has(tag)) { byTag.set(tag, []); order.push(tag); }
+                  byTag.get(tag).push(f.title);
+                }
+                const lines = [];
+                for (const tag of order) {
+                  const titles = byTag.get(tag);
+                  if (titles.length === 1) lines.push('• ' + tag);
+                  else { lines.push('• ' + tag + ':'); titles.forEach(t => lines.push('    - ' + t)); }
+                }
+                failedSection = '\n\nFailed Tests:\n' + fence + '\n' + lines.join('\n') + '\n' + fence;
               }
 
               const pipelineUrl = process.env.COLLECTION_URI
