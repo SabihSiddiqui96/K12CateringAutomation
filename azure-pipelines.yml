@@ -165,7 +165,10 @@ stages:
 
               const pct = n => (total ? Math.round(n / total * 100) : 0);
               const totalSecs = Math.round(durationMs / 1000);
-              const duration = Math.floor(totalSecs / 60) + 'm ' + (totalSecs % 60) + 's';
+              const _mins = Math.floor(totalSecs / 60);
+              const duration = _mins >= 60
+                ? Math.floor(_mins / 60) + 'h ' + (_mins % 60) + 'm'
+                : _mins + 'm ' + (totalSecs % 60) + 's';
 
               // Short, readable label per failed test: ticket tag from the file
               // (t-113438.spec.ts -> T-113438) + the test title, since one file
