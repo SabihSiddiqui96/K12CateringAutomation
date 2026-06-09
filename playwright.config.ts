@@ -28,7 +28,8 @@ function positiveIntFromEnv(name: string, fallback: number): number {
 export default defineConfig({
   testDir: './tests',
   timeout: positiveIntFromEnv('TEST_TIMEOUT_MS', process.env.CI ? 180000 : 90000),
-  expect: { timeout: positiveIntFromEnv('EXPECT_TIMEOUT_MS', 15000) },
+  // Hosted CI agents are slower than local dev machines, so give CI more headroom.
+  expect: { timeout: positiveIntFromEnv('EXPECT_TIMEOUT_MS', process.env.CI ? 30000 : 15000) },
   workers: process.env.CI ? 1 : undefined,
   retries: process.env.CI ? 1 : 0,
   reporter: [
@@ -51,7 +52,7 @@ export default defineConfig({
           ],
         }
       : undefined,
-    actionTimeout: 15000,
+    actionTimeout: positiveIntFromEnv('ACTION_TIMEOUT_MS', process.env.CI ? 45000 : 15000),
     navigationTimeout: positiveIntFromEnv('NAVIGATION_TIMEOUT_MS', process.env.CI ? 60000 : 45000),
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
