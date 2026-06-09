@@ -77,6 +77,9 @@ stages:
               PE_UAT_DISTRICT_ENCRYPTED_PASSWORD: $(PE_UAT_DISTRICT_ENCRYPTED_PASSWORD)
               K12_UATCUSTOMER_EMAIL: $(K12_UATCUSTOMER_EMAIL)
               K12_UATCUSTOMER_ENCRYPTED_PASSWORD: $(K12_UATCUSTOMER_ENCRYPTED_PASSWORD)
+              qaSchoolCafeEmail: $(qaSchoolCafeEmail)
+              qaSchoolCafePassword: $(qaSchoolCafePassword)
+              SCHOOLCAFE_URL: $(SCHOOLCAFE_URL)
 
           - script: mkdir -p playwright-report test-results
             displayName: Ensure report artifact folders exist
@@ -310,6 +313,9 @@ stages:
               PE_UAT_DISTRICT_ENCRYPTED_PASSWORD: $(PE_UAT_DISTRICT_ENCRYPTED_PASSWORD)
               K12_UATCUSTOMER_EMAIL: $(K12_UATCUSTOMER_EMAIL)
               K12_UATCUSTOMER_ENCRYPTED_PASSWORD: $(K12_UATCUSTOMER_ENCRYPTED_PASSWORD)
+              qaSchoolCafeEmail: $(qaSchoolCafeEmail)
+              qaSchoolCafePassword: $(qaSchoolCafePassword)
+              SCHOOLCAFE_URL: $(SCHOOLCAFE_URL)
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
               COLLECTION_URI: $(System.CollectionUri)
               TEAM_PROJECT: $(System.TeamProject)
