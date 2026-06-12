@@ -182,6 +182,7 @@ type K12CateringNavItem =
   | 'Menu'
   | 'Guest Menu'
   | 'Orders'
+  | 'Data Sync'
   | 'Accounts'
   | 'Reports'
   | 'Districts'
@@ -448,4 +449,119 @@ export async function clickAndCaptureNewTab(
 
   await newTab.waitForLoadState('domcontentloaded');
   return newTab;
+}
+
+/**
+ * Set a paginated list's page-size control (e.g. "20 / page") to `size`
+ * (default 100). Handles both a native <select> and a click-to-open combobox.
+ * Best-effort: silently returns if no page-size control is on the page.
+ */
+export async function setListPageSize(page: Page, size = 100): Promise<void> {
+  const control = page
+    .getByRole('combobox', { name: /per page|page size|rows per page/i })
+    .or(page.getByRole('button', { name: /\d+\s*\/\s*page/i }))
+    .or(page.locator('select').filter({ hasText: /\d+\s*\/\s*page/i }))
+    .first();
+
+  if (!(await control.isVisible({ timeout: 5000 }).catch(() => false))) return;
+
+  await control.click();
+
+  // Native <select>: selectOption handles either spacing of the label.
+  for (const label of [`${size} / page`, `${size}/page`]) {
+    const ok = await control.selectOption({ label }).catch(() => null);
+    if (ok) {
+      await page.waitForTimeout(600);
+      return;
+    }
+  }
+
+  // Otherwise it is a popup menu — click the matching option.
+  await page
+    .getByRole('option', { name: new RegExp(`^\\s*${size}\\s*/\\s*page\\s*$`, 'i') })
+    .first()
+    .click()
+    .catch(() => {});
+  await page.waitForTimeout(600);
+}
+
+type FindRowAcrossPagesOptions = {
+  /** Text/regex the target row must contain (e.g. the menu-item name). */
+  match: string | RegExp;
+  /** CSS for the row elements. Default: table rows / ARIA grid rows. */
+  rowSelector?: string;
+  /** Bump to this page size before searching; pass null to leave it as-is. */
+  pageSize?: number | null;
+  /** Max pages to walk before giving up. */
+  maxPages?: number;
+  /** How long to wait for the row to appear on each page. */
+  timeoutPerPageMs?: number;
+};
+
+/**
+ * Find a row in a paginated list, walking pages when needed.
+ *
+ * Some filters (e.g. Data Sync's "Local Overrides") only evaluate the items on
+ * the CURRENT page, so a matching row can hide on page 2+. This first bumps the
+ * page size (default 100 / page) to pull more rows onto one page, then — if the
+ * row still is not visible — clicks through to the next page until it appears or
+ * the pages run out.
+ *
+ * Returns the matching row Locator (scrolled into view). Throws if not found.
+ *
+ * Example:
+ *   const row = await findRowAcrossPages(catering, { match: itemName });
+ *   await expect(row.getByText(/^Overrides$/i)).toBeVisible();
+ */
+export async function findRowAcrossPages(
+  page: Page,
+  options: FindRowAcrossPagesOptions
+): Promise<Locator> {
+  const {
+    match,
+    rowSelector = 'table tbody tr, [role="row"]',
+    pageSize = 100,
+    maxPages = 10,
+    timeoutPerPageMs = 4000,
+  } = options;
+
+  if (pageSize != null) {
+    await setListPageSize(page, pageSize);
+  }
+
+  for (let pageIndex = 1; pageIndex <= maxPages; pageIndex++) {
+    const row = page.locator(rowSelector).filter({ hasText: match }).first();
+    if (await row.isVisible({ timeout: timeoutPerPageMs }).catch(() => false)) {
+      await row.scrollIntoViewIfNeeded().catch(() => {});
+      return row;
+    }
+
+    // Advance to the next page. Prefer an explicit Next control; fall back to
+    // the numbered page button for the next index (e.g. "2", "3", ...).
+    const nextByLabel = page
+      .getByRole('button', { name: /next page|^next$|^›$|^»$|^>$/i })
+      .first();
+    const nextByNumber = page
+      .getByRole('button', { name: new RegExp(`^\\s*${pageIndex + 1}\\s*$`) })
+      .first();
+
+    const next = (await nextByLabel
+      .isVisible({ timeout: 1000 })
+      .catch(() => false))
+      ? nextByLabel
+      : nextByNumber;
+
+    const canAdvance =
+      (await next.isVisible({ timeout: 1000 }).catch(() => false)) &&
+      (await next.isEnabled().catch(() => false));
+    if (!canAdvance) break;
+
+    await next.click();
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForTimeout(700);
+  }
+
+  throw new Error(
+    `findRowAcrossPages: no row matching ${String(match)} found within ${maxPages} page(s).`
+  );
 }

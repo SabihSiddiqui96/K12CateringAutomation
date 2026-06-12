@@ -1,23 +1,33 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { loginToK12Catering, navigateK12CateringMenu } from '../../utils/helpers';
+import {
+  loginToK12Catering,
+  navigateK12CateringMenu,
+  getDistrictName,
+} from '../../utils/helpers';
+import {
+  goToDataSync,
+  setGlobalSyncToggle,
+  runPushSyncNow,
+  switchDistrict,
+  selectTheRealMenu,
+  firstMenuItemName,
+  editMenuItem,
+  readMenuItemPrice,
+  resetLocalOverride,
+  findItemUnderLocalOverridesFilter,
+  escapeRegExp,
+} from '../../utils/dataSync';
 
 /**
  * Catering - Data Sync - Add granular overrides for specific fields  (ADO PBI 117617).
  *
- * Feature: in Catering > Data Sync, the "Target Districts > Manage" dialog exposes a
- * "Menu Item Sync Attributes - Global defaults" section with a toggle per attribute
- * (Name, Description, Price, Image, Allergens, Ingredients, Categories, Varieties).
- * The "Push sync now" dialog reflects those toggles as a read-only list of the
- * attributes that will be pushed.
+ * Kept as TWO tests on a shared session. Test A is the quick toggles + Push-sync
+ * check; Test B is the long cross-district sync + local-override flow. They are NOT
+ * merged into one test: the combined ~2.5-min, district-switch-heavy run reliably
+ * trips the PrimeroEdge launcher (token refresh), whereas the two shorter tests pass
+ * and a launcher hit only fails (and cheaply retries) the affected one.
  *
- * Automated here (the deterministic, UI-level contract):
- *   A) the 8 attribute toggles render and persist across re-opens.
- *   B) the "Push sync now" dialog reflects the toggles (a toggled-OFF attribute is
- *      omitted from the "global defaults" list shown before syncing).
- *
- * NOT automated (see T-117617 manual notes): the end-to-end data propagation
- * (edit source -> sync -> verify per-attribute on a target district), auto-sync
- * (schedule-triggered), and per-item local overrides (multi-district stateful flow).
+ * NOT automated (manual): the schedule-triggered auto-sync (~9 PM CDT).
  */
 
 const ATTRS = [
@@ -73,59 +83,128 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     }
   }
 
-  // ── Test A ───────────────────────────────────────────────────────────────────
-  test('A - global attribute toggles render and persist', async () => {
+  // ── Test A: toggles render + persist, then Push-sync reflects them ─────────────
+  test('global attribute toggles render, persist, and drive Push Sync Now', async () => {
     const dialog = await openManage();
-
-    // Step 1 — all 8 attribute toggles are present.
     for (const name of ATTRS) {
       await expect(attrToggle(dialog, name)).toBeVisible({ timeout: 10000 });
     }
-
-    // Step 2 — flip one toggle (Sync Price) and confirm it changed.
     const price = attrToggle(dialog, 'Sync Price');
     const original = await isOn(price);
     await price.click();
     await expect(price).toHaveAttribute('aria-checked', String(!original), { timeout: 5000 });
-
-    // Step 3 — close and re-open; the change persisted.
     await closeDialog();
     const dialog2 = await openManage();
-    const price2 = attrToggle(dialog2, 'Sync Price');
-    await expect(price2).toHaveAttribute('aria-checked', String(!original), { timeout: 5000 });
-
-    // Step 4 — restore the original state (leave env unchanged).
-    await setToggle(dialog2, 'Sync Price', original);
-    await closeDialog();
-  });
-
-  // ── Test B ───────────────────────────────────────────────────────────────────
-  test('B - Push Sync Now reflects the global default toggles', async () => {
-    // Step 1 — turn Sync Price OFF (keep Sync Name ON) and close.
-    const dialog = await openManage();
-    await setToggle(dialog, 'Sync Price', false);
-    await setToggle(dialog, 'Sync Name', true);
+    await expect(attrToggle(dialog2, 'Sync Price')).toHaveAttribute('aria-checked', String(!original), { timeout: 5000 });
+    await setToggle(dialog2, 'Sync Price', false);
+    await setToggle(dialog2, 'Sync Name', true);
     await closeDialog();
 
-    // Step 2 — open "Push sync now"; the confirm dialog lists the global-default attributes.
     await catering.getByRole('button', { name: /Push sync now/i }).first().click();
     const dlg = catering.getByRole('dialog').first();
     await expect(dlg).toBeVisible({ timeout: 10000 });
     await expect(dlg.getByText(/Push sync now\?/i)).toBeVisible({ timeout: 10000 });
     await expect(dlg.getByText(/Menu item attributes/i)).toBeVisible({ timeout: 10000 });
-
-    // Step 3 — the dialog reflects the toggles: an ON attribute (Name) is listed, and the
-    // OFF attribute (Price) shows the "will not be synced (globally off)" notice.
+    // The "...will not be synced (globally off)" notice lists ALL globally-off
+    // attributes together (e.g. "Description, Price, Image will not be synced..."),
+    // so the list varies run to run - assert Price is INCLUDED, plus the 2nd sentence.
     await expect(dlg.getByText('Name', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await expect(dlg.getByText(/Price will not be synced \(globally off\)/i)).toBeVisible({ timeout: 10000 });
-
-    // Step 4 — Cancel (do NOT run the sync).
+    const offNotice = dlg.getByText(/will not be synced \(globally off\)/i).first();
+    await expect(offNotice).toBeVisible({ timeout: 10000 });
+    await expect(offNotice).toContainText(/Price/i);
+    await expect(dlg.getByText(/Per-item overrides may differ/i).first()).toBeVisible({ timeout: 10000 });
     await dlg.getByRole('button', { name: /^Cancel$/i }).first().click();
     await closeDialog();
-
-    // Step 5 — restore Sync Price ON.
     const restore = await openManage();
-    await setToggle(restore, 'Sync Price', true);
+    await setToggle(restore, 'Sync Price', original);
     await closeDialog();
+  });
+
+  // ── Test B: per-attribute sync across districts + local override [steps 10-17] ─
+  test('per-attribute sync respects toggles across districts, and local overrides win', async () => {
+    test.slow(); // long multi-district flow
+
+    const HOME = getDistrictName(); // Mercer County School District
+    const TARGET = 'Berkeley School District';
+    const stamp = `${Date.now()}`.slice(-6);
+    const uniqueName = `AutoSync ${stamp}`;
+    const PRICE_OFF = '7.77';   // set while Sync Price OFF -> must NOT propagate
+    const PRICE_ON = '8.88';    // set while Sync Price ON  -> must propagate
+    const PRICE_LOCAL = '5.55'; // Berkeley local override
+
+    // Capture the first TheRealMenu item, and clear any leftover override from a
+    // prior interrupted run (keeps this stateful test idempotent).
+    await selectTheRealMenu(catering);
+    const origName = await firstMenuItemName(catering);
+    await goToDataSync(catering);
+    await resetLocalOverride(catering, origName).catch(() => undefined);
+
+    try {
+      // 10 — on Mercer, rename the item + set a known price.
+      await selectTheRealMenu(catering);
+      await editMenuItem(catering, origName, { newName: uniqueName, newPrice: PRICE_OFF });
+
+      // 11 — Data Sync: Sync Name ON, Sync Price OFF.
+      await goToDataSync(catering);
+      await setGlobalSyncToggle(catering, 'Sync Name', true);
+      await setGlobalSyncToggle(catering, 'Sync Price', false);
+
+      // 12 — push sync.
+      await runPushSyncNow(catering);
+
+      // 13 — on Berkeley, the Name synced but the Price did NOT.
+      await switchDistrict(catering, TARGET);
+      await selectTheRealMenu(catering);
+      await expect(
+        catering.getByRole('button', { name: new RegExp(`Edit\\s+${escapeRegExp(uniqueName)}`, 'i') }).first(),
+      ).toBeVisible({ timeout: 20000 });
+      expect(await readMenuItemPrice(catering, uniqueName)).not.toBe('7.77');
+
+      // 14 — back on Mercer: Sync Price ON, change Price, push -> Berkeley Price updates.
+      await switchDistrict(catering, HOME);
+      await goToDataSync(catering);
+      await setGlobalSyncToggle(catering, 'Sync Price', true);
+      await selectTheRealMenu(catering);
+      await editMenuItem(catering, uniqueName, { newPrice: PRICE_ON });
+      await goToDataSync(catering);
+      await runPushSyncNow(catering);
+      await switchDistrict(catering, TARGET);
+      await selectTheRealMenu(catering);
+      expect(await readMenuItemPrice(catering, uniqueName)).toBe('8.88');
+
+      // 15 — on Berkeley, locally edit the Price (creates a local override); back on
+      // Mercer, click the "Local Overrides" filter and confirm the item shows there.
+      await editMenuItem(catering, uniqueName, { newPrice: PRICE_LOCAL });
+      await switchDistrict(catering, HOME);
+      const filtered = await findItemUnderLocalOverridesFilter(catering, uniqueName);
+      await expect(filtered.getByText(/^Overrides$/i).first()).toBeVisible({ timeout: 10000 });
+
+      // 16 — Sync Price ON globally but a local override present -> Berkeley keeps its Price.
+      await runPushSyncNow(catering);
+      await switchDistrict(catering, TARGET);
+      await selectTheRealMenu(catering);
+      expect(await readMenuItemPrice(catering, uniqueName)).toBe('5.55');
+
+      // 17 — reset the local override, push, Berkeley Price updates back to Mercer's.
+      await switchDistrict(catering, HOME);
+      await goToDataSync(catering);
+      expect(await resetLocalOverride(catering, uniqueName)).toBe(true);
+      await runPushSyncNow(catering);
+      await switchDistrict(catering, TARGET);
+      await selectTheRealMenu(catering);
+      expect(await readMenuItemPrice(catering, uniqueName)).toBe('8.88');
+    } finally {
+      // Self-clean so the next run starts from a known state.
+      try {
+        await switchDistrict(catering, HOME);
+        await goToDataSync(catering);
+        await resetLocalOverride(catering, uniqueName).catch(() => undefined);
+        await setGlobalSyncToggle(catering, 'Sync Price', true).catch(() => undefined);
+        await selectTheRealMenu(catering);
+        await editMenuItem(catering, uniqueName, { newName: origName }).catch(() => undefined);
+      } catch {
+        /* best-effort cleanup */
+      }
+    }
   });
 });
