@@ -39,3 +39,16 @@ Thumbs.db
 
 # Local Claude permissions (volatile, machine-specific — rewritten each session)
 .claude/settings.local.json
+
+# Personal / local-only files. Ones already committed stay tracked until you run
+# `git rm --cached <file>` once — .gitignore alone won't drop a tracked file.
+.gitignore
+CLAUDE.md
+site-map.md
+scripts/ci-rerun-failed.js
+scripts/rerun-failed.js
+scripts/create-ticket-testcase.js
+
+# Local-only test tooling / scratch
+tests/cleanup-sabihtesting.spec.ts
+rerun-fails.txt
