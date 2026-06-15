@@ -133,15 +133,20 @@ async function deleteFirstLocation(page: Page): Promise<string> {
   const countBefore = await deleteButtons.count();
   await deleteButtons.first().click();
 
-  const confirmDeleteButton = page.getByRole('button', {
-    name: /Delete and proceed with action/i,
-  });
+  // The confirm dialog's button is now just "Delete" (was "Delete and proceed
+  // with action"), inside a "Delete Location" dialog.
+  const confirmDeleteButton = page
+    .getByRole('dialog', { name: /Delete Location/i })
+    .getByRole('button', { name: 'Delete', exact: true });
   await expect(confirmDeleteButton).toBeVisible({ timeout: 10000 });
   await confirmDeleteButton.click();
 
-  await expect(
-    page.getByText(/deleted|removed.*successfully|success/i).first(),
-  ).toBeVisible({ timeout: 10000 });
+  // Success: a toast may show; the authoritative check is the count dropping below.
+  await page
+    .getByText(/deleted|removed.*successfully|success/i)
+    .first()
+    .waitFor({ state: 'visible', timeout: 8000 })
+    .catch(() => { });
 
   await expect
     .poll(() => deleteButtons.count(), { timeout: 10000 })

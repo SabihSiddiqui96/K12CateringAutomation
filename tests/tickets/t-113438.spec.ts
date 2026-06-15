@@ -595,7 +595,9 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
   await expect(frequencySelect).toBeVisible({ timeout: 10000 });
 
   // The frequency dropdown is disabled while Auto-sync is off. Enable Auto-sync
-  // (if needed) and wait for the dropdown to become enabled before using it.
+  // (if needed) and wait for it to become enabled. The PrimeroEdge launcher
+  // (token refresh) can fire here on a long session — recover via goToDataSync
+  // (re-auths + returns to Data Sync) and retry rather than failing.
   if (await frequencySelect.isDisabled().catch(() => false)) {
     await autoSyncToggle.click();
     await catering
@@ -603,7 +605,13 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .first()
       .waitFor({ state: 'visible', timeout: 10000 })
       .catch(() => {});
-    await expect(frequencySelect).toBeEnabled({ timeout: 10000 });
+    await expect(async () => {
+      const launcher = catering.locator('a[href*="/login?token="]').first();
+      if (await launcher.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await goToDataSync(catering);
+      }
+      expect(await frequencySelect.isEnabled().catch(() => false)).toBeTruthy();
+    }).toPass({ timeout: 40000, intervals: [3000, 5000, 8000] });
   }
 
   const frequencyOptions = (
