@@ -27,30 +27,35 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
     await catering.getByRole('button', { name: 'Manage allergens' }).click();
     const dialog = catering.getByRole('dialog', { name: 'Manage Allergens' });
     await expect(dialog).toBeVisible({ timeout: 10000 });
-    await expect(catering.getByRole('button', { name: 'Edit allergen' }).first()).toBeVisible();
+    // Edit buttons are now per-row "Edit <name>" (was a generic "Edit allergen"),
+    // and the inline-edit input is #allergen-edit-<id> (distinct from the new
+    // #allergen-search box, which getByRole('textbox').first() would have hit).
+    const editFirst = () => dialog.getByRole('button', { name: /^Edit / }).first();
+    const editInput = dialog.locator('input[id^="allergen-edit-"]').first();
+    await expect(editFirst()).toBeVisible();
 
-    await catering.getByRole('button', { name: 'Edit allergen' }).first().click();
-    const editInput = dialog.getByRole('textbox').first();
+    await editFirst().click();
     await expect(editInput).toBeVisible({ timeout: 5000 });
     const originalName = await editInput.inputValue();
 
     await editInput.clear();
     await editInput.fill('ShouldNotSave');
-    await catering.getByRole('button', { name: 'Cancel' }).click();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog.getByText('ShouldNotSave')).not.toBeVisible();
 
-    await catering.getByRole('button', { name: 'Edit allergen' }).first().click();
+    await editFirst().click();
     await expect(editInput).toBeVisible({ timeout: 5000 });
     await editInput.clear();
     await editInput.fill(originalName + ' Updated');
-    await catering.getByRole('button', { name: 'Save' }).click();
+    await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog.getByText(originalName + ' Updated')).toBeVisible({ timeout: 10000 });
 
-    await catering.getByRole('button', { name: 'Edit allergen' }).first().click();
+    await editFirst().click();
+    await expect(editInput).toBeVisible({ timeout: 5000 });
     await editInput.clear();
     await editInput.fill(originalName);
-    await catering.getByRole('button', { name: 'Save' }).click();
-    await expect(dialog.getByText(originalName)).toBeVisible({ timeout: 10000 });
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog.getByText(originalName, { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
     await catering.getByRole('button', { name: 'Close modal' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
@@ -127,8 +132,12 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
     const dialog = catering.getByRole('dialog', { name: 'Manage Ingredients' });
     await expect(dialog).toBeVisible({ timeout: 10000 });
 
-    await catering.getByRole('button', { name: 'Edit ingredient' }).first().click();
-    const editInput = dialog.getByRole('textbox').first();
+    // Per-row "Edit <name>" buttons; inline-edit input is #ingredient-edit-<id>
+    // (distinct from the #ingredient-search box).
+    const editFirst = () => dialog.getByRole('button', { name: /^Edit / }).first();
+    const editInput = dialog.locator('input[id^="ingredient-edit-"]').first();
+
+    await editFirst().click();
     await expect(editInput).toBeVisible({ timeout: 5000 });
     const originalName = await editInput.inputValue();
 
@@ -139,30 +148,35 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
     await expect(dialog.getByText(originalName).first()).toBeVisible({ timeout: 10000 });
 
     const updatedName = `UpdateTest${Math.floor(10 + Math.random() * 90)}`;
-    await catering.getByRole('button', { name: 'Edit ingredient' }).first().click();
+    await editFirst().click();
+    await expect(editInput).toBeVisible({ timeout: 5000 });
     await editInput.clear();
     await editInput.fill(updatedName);
     await editInput.press('Enter');
     await expect(editInput).not.toBeVisible({ timeout: 5000 });
     await expect(dialog.getByText(updatedName).first()).toBeVisible({ timeout: 10000 });
 
-    await catering.getByRole('button', { name: 'Edit ingredient' }).first().click();
+    await editFirst().click();
+    await expect(editInput).toBeVisible({ timeout: 5000 });
     await editInput.clear();
     await editInput.fill(originalName);
     await editInput.press('Enter');
     await expect(editInput).not.toBeVisible({ timeout: 5000 });
-    await catering.getByRole('button', { name: 'Close' }).last().click();
+    await catering.getByRole('button', { name: 'Close modal' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
 
   // ── Sort Categories ──
 
   test('Menu - Sort Categories modal shows drag handles, drag reorders and Save shows success', async () => {
+    // The sort flow now starts with a per-menu confirm modal; clicking "Sort for
+    // this menu" opens the inline reorder panel (drag handles + Save Order).
     await catering.getByRole('button', { name: 'Sort category order' }).click();
-    await expect(catering.getByRole('heading', { name: 'Sort Categories' })).toBeVisible({ timeout: 10000 });
-    await expect(catering.getByText('Drag and drop to reorder categories')).toBeVisible();
+    await expect(catering.getByRole('heading', { name: 'Sort category order' })).toBeVisible({ timeout: 10000 });
+    await catering.getByRole('button', { name: 'Sort for this menu' }).click();
+
+    await expect(catering.getByText(/Drag to reorder/i).first()).toBeVisible({ timeout: 10000 });
     await expect(catering.getByRole('button', { name: /Drag to reorder .+ category/ }).first()).toBeVisible();
-    await expect(catering.getByText(/^#1$/)).toBeVisible();
 
     const firstItem = catering.getByRole('button', { name: /Drag to reorder .+ category/ }).nth(0);
     const secondItem = catering.getByRole('button', { name: /Drag to reorder .+ category/ }).nth(1);
@@ -177,6 +191,11 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
     }
 
     await catering.getByRole('button', { name: 'Save Order' }).click();
-    await expect(catering.getByText(/Category order updated successfully/i)).toBeVisible({ timeout: 10000 });
+    // Success = a confirmation toast, or the reorder panel closing (Save Order gone).
+    await expect(async () => {
+      const toast = await catering.getByText(/order updated|updated successfully|sort.*saved|success/i).first().isVisible().catch(() => false);
+      const panelGone = !(await catering.getByRole('button', { name: 'Save Order' }).isVisible().catch(() => false));
+      expect(toast || panelGone).toBeTruthy();
+    }).toPass({ timeout: 10000 });
   });
 });

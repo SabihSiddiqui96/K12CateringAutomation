@@ -606,6 +606,12 @@ test('Catering - Settings - Add district customization settings for Payment disp
   const numGuestsInput = catering.locator('#num-guests-input');
   await expect(numGuestsInput).toBeVisible();
   await numGuestsInput.fill('2');
+  // Event Name (or Nickname) is a new REQUIRED field at Additional Details (ADO 117619);
+  // without it the "Next" button stays disabled.
+  const eventNameInput = catering.locator('#event-name-input');
+  if (await eventNameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await eventNameInput.fill('Automation Event');
+  }
   await clickNext(catering);
 
   // ── Payment Info ──────────────────────────────────────────────────────────

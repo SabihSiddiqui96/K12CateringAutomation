@@ -52,8 +52,10 @@ test.describe('Menu - Browse, Search & Cart', () => {
   test('Menu - Page header, all controls and grid/list view toggle are visible', async () => {
     await expect(catering.getByRole('heading', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15000 });
     await expect(catering.getByRole('textbox', { name: 'Search menu items' })).toBeVisible();
-    await expect(catering.getByRole('button', { name: 'Select category filter' })).toBeVisible();
-    await expect(catering.getByRole('button', { name: 'Select allergen filter' })).toBeVisible();
+    // Filter triggers are now #category-select / #allergen-select (they show the
+    // current value as text, e.g. "All"; were "Select category/allergen filter").
+    await expect(catering.locator('#category-select')).toBeVisible();
+    await expect(catering.locator('#allergen-select')).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Show advanced filters' })).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Switch to grid view' })).toHaveAttribute('aria-pressed', 'true');
     await catering.getByRole('button', { name: 'Switch to list view' }).click();
@@ -76,15 +78,20 @@ test.describe('Menu - Browse, Search & Cart', () => {
 
   test('Menu - Search by name, clear, and category/allergen filters work', async () => {
     const searchInput = catering.getByRole('textbox', { name: 'Search menu items' });
-    await searchInput.fill('coffee');
-    await catering.waitForTimeout(500);
-    expect((await catering.locator('main[aria-label="Main content"]').textContent())?.toLowerCase()).toContain('coffee');
+    // Search for a term that actually exists in this catalog (derived from the
+    // first card) — a hardcoded word like "coffee" goes stale as the menu changes.
+    const firstItemName = ((await card().first().locator('h3').first().textContent()) ?? '').trim();
+    expect(firstItemName.length, 'a menu item card should be present to search').toBeGreaterThan(0);
+    const term = firstItemName.split(/\s+/).find((w) => w.length >= 4) ?? firstItemName;
+    await searchInput.fill(term);
+    await catering.waitForTimeout(800);
+    expect((await catering.locator('#main-content').textContent())?.toLowerCase()).toContain(term.toLowerCase());
 
     await searchInput.clear();
     await catering.waitForTimeout(500);
     await expect(catering.locator('h2, h3').filter({ hasText: /\d+ items?/ }).first()).toBeVisible({ timeout: 10000 });
 
-    await catering.getByRole('button', { name: 'Select category filter' }).click();
+    await catering.locator('#category-select').click();
     const categoryOptions = catering.getByRole('option');
     await expect(categoryOptions.first()).toBeVisible({ timeout: 5000 });
     const allOptionTexts = await categoryOptions.allTextContents();
@@ -93,7 +100,7 @@ test.describe('Menu - Browse, Search & Cart', () => {
     await catering.waitForTimeout(500);
     await expect(catering.getByRole('heading', { name: new RegExp(realCategory, 'i') })).toBeVisible({ timeout: 10000 });
 
-    await catering.getByRole('button', { name: 'Select allergen filter' }).click();
+    await catering.locator('#allergen-select').click();
     await catering.getByRole('option').nth(1).click();
     await catering.waitForTimeout(500);
     await expect(catering.getByRole('heading', { name: 'Menu', exact: true })).toBeVisible({ timeout: 10000 });
@@ -102,12 +109,23 @@ test.describe('Menu - Browse, Search & Cart', () => {
   test('Menu - Add to Cart modal opens with quantity stepper and confirms add to cart', async () => {
     await openFirstAddToCartModal();
     await expect(catering.getByRole('heading', { name: 'Add to Cart' })).toBeVisible({ timeout: 10000 });
-    await expect(catering.locator('#quantity-input')).toHaveValue('1');
-    await expect(catering.getByRole('button', { name: 'Decrease quantity' })).toBeDisabled();
 
-    await catering.getByRole('button', { name: 'Increase quantity' }).click();
-    await expect(catering.locator('#quantity-input')).toHaveValue('2');
-    await expect(catering.getByRole('button', { name: 'Decrease quantity' })).toBeEnabled();
+    const qty = catering.locator('#quantity-input');
+    const decrease = catering.getByRole('button', { name: 'Decrease quantity' });
+    const increase = catering.getByRole('button', { name: 'Increase quantity' });
+
+    // The item may already be in the cart from prior runs (the modal pre-fills the
+    // existing quantity), so drive the stepper down to the minimum first — that's
+    // where Decrease must be disabled — instead of assuming it opens at 1.
+    for (let i = 0; i < 60 && (await decrease.isEnabled().catch(() => false)); i++) {
+      await decrease.click();
+    }
+    await expect(qty).toHaveValue('1');
+    await expect(decrease).toBeDisabled();
+
+    await increase.click();
+    await expect(qty).toHaveValue('2');
+    await expect(decrease).toBeEnabled();
 
     await modalClose().click();
     await expect(modal()).not.toBeVisible({ timeout: 5000 });

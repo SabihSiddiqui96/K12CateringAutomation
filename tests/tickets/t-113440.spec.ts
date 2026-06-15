@@ -426,6 +426,66 @@ async function deleteMenuPermanently(
   ).not.toBeVisible({ timeout: 10000 });
 }
 
+// Guaranteed teardown: remove whatever "<num> - SabihTesting" menu THIS run
+// created so it doesn't pile up under Manage Menus when the test fails midway
+// (e.g. the launcher kicks the session before the happy-path delete). Pass both
+// the original and renamed names — only one will still exist; the other's Delete
+// button simply won't be present and is skipped. This runs from a finally block,
+// so it must NEVER throw (that would mask the real test failure) — everything is
+// best-effort and swallowed.
+async function cleanupTestMenu(
+  page: Page,
+  candidateNames: string[],
+): Promise<void> {
+  try {
+    // The run may have failed anywhere (launcher page, a stray modal); recover
+    // quietly back to Manage Menus, and bail silently if we can't.
+    await page.keyboard.press('Escape').catch(() => { });
+    await ensureMenuPage(page);
+
+    if (
+      !(await page
+        .getByRole('heading', { name: 'Manage Menus' })
+        .isVisible()
+        .catch(() => false))
+    ) {
+      await openManageMenus(page);
+    }
+
+    for (const name of candidateNames) {
+      const deleteButton = page.getByRole('button', {
+        name: menuButtonName('Delete', name),
+      });
+      if (
+        !(await deleteButton.isVisible({ timeout: 3000 }).catch(() => false))
+      ) {
+        continue; // not created, or already deleted by the happy path
+      }
+
+      // A menu with items can't be deleted, so clear them first:
+      // Manage items -> uncheck everything -> Save -> Back to Manage Menus.
+      try {
+        await openManageItems(page, name);
+        await clearAllMenuItems(page);
+        await returnToManageMenus(page);
+      } catch {
+        // already empty / couldn't open items — fall through and try delete
+      }
+
+      // Delete the menu and confirm in the "Delete Menu" dialog.
+      try {
+        await deleteMenuPermanently(page, name);
+      } catch {
+        // best-effort: leave it rather than fail the run
+      }
+    }
+
+    await closeManageMenus(page).catch(() => { });
+  } catch {
+    // Teardown only — swallow everything so the real test result stands.
+  }
+}
+
 test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and delete', async ({
   page,
   browser,
@@ -444,84 +504,92 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
   const renamedMenuName = `${renamedMenuNumber} - SabihTesting`;
   const customerPassword = 'Password1!';
 
-  await openManageMenus(catering);
-  await createMenu(catering, menuName);
+  try {
+    await openManageMenus(catering);
+    await createMenu(catering, menuName);
 
-  await renameMenu(catering, menuName, renamedMenuName);
-  await closeManageMenus(catering);
+    await renameMenu(catering, menuName, renamedMenuName);
+    await closeManageMenus(catering);
 
-  await expectMenuDropdownRenamed(catering, renamedMenuName, menuName);
+    await expectMenuDropdownRenamed(catering, renamedMenuName, menuName);
 
-  await openManageMenus(catering);
-  await deactivateMenu(catering, renamedMenuName);
-  await activateMenu(catering, renamedMenuName);
+    await openManageMenus(catering);
+    await deactivateMenu(catering, renamedMenuName);
+    await activateMenu(catering, renamedMenuName);
 
-  // Pick the first two available menu items dynamically (the QA catalog
-  // changes over time — hardcoded names like "apple juice" go stale).
-  await openManageItems(catering, renamedMenuName);
-  const checkboxes = catering.getByRole('checkbox');
-  await expect(checkboxes.first()).toBeVisible({ timeout: 10000 });
-  const checkboxCount = await checkboxes.count();
-  const itemNames: string[] = [];
-  for (let i = 0; i < checkboxCount && itemNames.length < 2; i++) {
-    const name =
-      (await checkboxes.nth(i).getAttribute('aria-label')) ??
-      (await checkboxes.nth(i).getAttribute('name'));
-    const cleaned = (name ?? '').trim();
-    if (cleaned && !itemNames.includes(cleaned)) itemNames.push(cleaned);
+    // Pick the first two available menu items dynamically (the QA catalog
+    // changes over time — hardcoded names like "apple juice" go stale).
+    await openManageItems(catering, renamedMenuName);
+    const checkboxes = catering.getByRole('checkbox');
+    await expect(checkboxes.first()).toBeVisible({ timeout: 10000 });
+    const checkboxCount = await checkboxes.count();
+    const itemNames: string[] = [];
+    for (let i = 0; i < checkboxCount && itemNames.length < 2; i++) {
+      const name =
+        (await checkboxes.nth(i).getAttribute('aria-label')) ??
+        (await checkboxes.nth(i).getAttribute('name'));
+      const cleaned = (name ?? '').trim();
+      if (cleaned && !itemNames.includes(cleaned)) itemNames.push(cleaned);
+    }
+    expect(
+      itemNames.length,
+      'Expected at least 2 menu items in the manage-items dialog',
+    ).toBeGreaterThanOrEqual(2);
+    const [firstItem, secondItem] = itemNames;
+
+    await setMenuItems(catering, [firstItem], true);
+    expect(await checkedState(catering, firstItem)).toBe(true);
+    await catering.getByRole('button', { name: 'Close modal' }).last().click();
+
+    await refreshMenuPage(catering);
+    await expect(menuItemCard(catering, firstItem)).toBeVisible({
+      timeout: 10000,
+    });
+
+    await openManageMenus(catering);
+    await openManageItems(catering, renamedMenuName);
+    await setMenuItems(catering, [secondItem], true);
+    expect(await checkedState(catering, secondItem)).toBe(true);
+    await catering.getByRole('button', { name: 'Close modal' }).last().click();
+
+    await refreshMenuPage(catering);
+    await expect(menuItemCard(catering, firstItem)).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(menuItemCard(catering, secondItem)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Use the dedicated QA test customer for the customer-side verification
+    const customerEmail = 'SabihQATesting@outlook.com';
+    await resetCustomerPasswordFromAccounts(catering, customerEmail, customerPassword);
+    await verifyMenuItemsAsCustomer(
+      browser,
+      [firstItem, secondItem],
+      customerPassword,
+      customerEmail,
+    );
+
+    await openManageMenus(catering);
+    await deactivateFromDeleteDialog(catering, renamedMenuName);
+    await activateMenu(catering, renamedMenuName);
+
+    await clearMenuItemsBeforeDelete(catering, renamedMenuName, [
+      firstItem,
+      secondItem,
+    ]);
+
+    await deleteMenuPermanently(catering, renamedMenuName);
+    await closeManageMenus(catering);
+
+    await expect(
+      catering.getByRole('button', { name: renamedMenuName, exact: true }),
+    ).not.toBeVisible({ timeout: 10000 });
+  } finally {
+    // Always remove the menu this run created — covers the case where the test
+    // failed before the happy-path delete above, so it never lingers under
+    // Manage Menus. (If the delete already ran, neither name is found and this
+    // is a no-op.)
+    await cleanupTestMenu(catering, [renamedMenuName, menuName]);
   }
-  expect(
-    itemNames.length,
-    'Expected at least 2 menu items in the manage-items dialog',
-  ).toBeGreaterThanOrEqual(2);
-  const [firstItem, secondItem] = itemNames;
-
-  await setMenuItems(catering, [firstItem], true);
-  expect(await checkedState(catering, firstItem)).toBe(true);
-  await catering.getByRole('button', { name: 'Close modal' }).last().click();
-
-  await refreshMenuPage(catering);
-  await expect(menuItemCard(catering, firstItem)).toBeVisible({
-    timeout: 10000,
-  });
-
-  await openManageMenus(catering);
-  await openManageItems(catering, renamedMenuName);
-  await setMenuItems(catering, [secondItem], true);
-  expect(await checkedState(catering, secondItem)).toBe(true);
-  await catering.getByRole('button', { name: 'Close modal' }).last().click();
-
-  await refreshMenuPage(catering);
-  await expect(menuItemCard(catering, firstItem)).toBeVisible({
-    timeout: 10000,
-  });
-  await expect(menuItemCard(catering, secondItem)).toBeVisible({
-    timeout: 10000,
-  });
-
-  // Use the dedicated QA test customer for the customer-side verification
-  const customerEmail = 'SabihQATesting@outlook.com';
-  await resetCustomerPasswordFromAccounts(catering, customerEmail, customerPassword);
-  await verifyMenuItemsAsCustomer(
-    browser,
-    [firstItem, secondItem],
-    customerPassword,
-    customerEmail,
-  );
-
-  await openManageMenus(catering);
-  await deactivateFromDeleteDialog(catering, renamedMenuName);
-  await activateMenu(catering, renamedMenuName);
-
-  await clearMenuItemsBeforeDelete(catering, renamedMenuName, [
-    firstItem,
-    secondItem,
-  ]);
-
-  await deleteMenuPermanently(catering, renamedMenuName);
-  await closeManageMenus(catering);
-
-  await expect(
-    catering.getByRole('button', { name: renamedMenuName, exact: true }),
-  ).not.toBeVisible({ timeout: 10000 });
 });

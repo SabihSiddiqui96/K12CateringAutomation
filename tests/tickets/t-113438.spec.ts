@@ -879,47 +879,48 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
   await ensureInK12CateringApp(catering);
 
   // ── Step 8: Data Sync — find the renamed item, expect Overrides ──
-  await goToDataSync(catering);
-
-  // Pagination defaults to 20/page — click the control and select 100/page
-  const paginationCombo2 = catering
-    .getByRole('combobox', { name: /per page|page size|rows per page/i })
-    .or(catering.getByRole('button', { name: /\d+\s*\/\s*page/i }))
-    .or(catering.locator('select').filter({ hasText: /\d+\s*\/\s*page/i }))
-    .first();
-  await expect(paginationCombo2).toBeVisible({ timeout: 10000 });
-  await paginationCombo2.click();
-  // If it's a native <select>, selectOption works; otherwise use the option
-  // that pops up after the click.
-  const selected = await paginationCombo2
-    .selectOption({ label: '100 / page' })
-    .catch(() => null);
-  if (!selected) {
-    await paginationCombo2
-      .selectOption({ label: '100/page' })
-      .catch(async () => {
-        await catering
-          .getByRole('option', { name: /^\s*100\s*\/\s*page\s*$/i })
-          .first()
-          .click();
-      });
-  }
-  await catering.waitForTimeout(800);
-
-  // Search Data Sync by the ORIGINAL item name (not the renamed one) — the
-  // home district still has the original name; the override flag indicates
-  // the target district has a local change to that item.
-  const syncSearch2 = catering
-    .getByRole('textbox', { name: /Search( syncable| items)?/i })
-    .first();
-  await syncSearch2.fill(originalMenuItemName);
-  await catering.waitForTimeout(800);
-
+  // Search Data Sync by the ORIGINAL item name (not the renamed one) — the home
+  // district still has the original name; the override flag indicates the target
+  // district has a local change to that item.
   const overrideRow = catering
     .locator('table tbody tr, [role="row"]')
     .filter({ hasText: new RegExp(escapeRegExp(originalMenuItemName), 'i') })
     .first();
-  await expect(overrideRow).toBeVisible({ timeout: 15000 });
+  const syncSearch2 = catering
+    .getByRole('textbox', { name: /Search( syncable| items)?/i })
+    .first();
+
+  // The PrimeroEdge launcher (token refresh) can kick us to the relaunch page
+  // mid-flow, so re-enter Data Sync (goToDataSync re-auths), re-apply 100/page +
+  // the search, and re-find the row — retrying until it actually appears.
+  await expect(async () => {
+    await goToDataSync(catering);
+
+    // Pagination defaults to 20/page — set 100/page.
+    const paginationCombo2 = catering
+      .getByRole('combobox', { name: /per page|page size|rows per page/i })
+      .or(catering.getByRole('button', { name: /\d+\s*\/\s*page/i }))
+      .or(catering.locator('select').filter({ hasText: /\d+\s*\/\s*page/i }))
+      .first();
+    if (await paginationCombo2.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await paginationCombo2.click();
+      const selected = await paginationCombo2.selectOption({ label: '100 / page' }).catch(() => null);
+      if (!selected) {
+        await paginationCombo2.selectOption({ label: '100/page' }).catch(async () => {
+          await catering.getByRole('option', { name: /^\s*100\s*\/\s*page\s*$/i }).first().click().catch(() => undefined);
+        });
+      }
+      await catering.waitForTimeout(800);
+    }
+
+    if (await syncSearch2.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await syncSearch2.fill('');
+      await syncSearch2.fill(originalMenuItemName);
+      await catering.waitForTimeout(800);
+    }
+
+    await expect(overrideRow).toBeVisible({ timeout: 8000 });
+  }).toPass({ timeout: 90000, intervals: [2000, 4000, 6000] });
 
   // Overrides badge on that row — it's a styled <span>, not a button
   const overridesBadge = overrideRow

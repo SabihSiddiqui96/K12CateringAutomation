@@ -42,7 +42,10 @@ async function openFirstNonCancelledOrder(page: Page): Promise<void> {
       .waitFor({ state: 'hidden', timeout: 30000 })
       .catch(() => {});
 
-    await expect(page.getByRole('heading', { name: /Order\s*#/i })).toBeVisible({
+    // Confirm the order DETAILS opened via its "Order Summary" heading. Don't match a
+    // bare "Order #" heading: the Orders-LIST cards now render "<EventName> Order #..."
+    // headings (ADO 117619), so /Order #/ matches many cards and trips strict mode.
+    await expect(page.getByRole('heading', { name: /Order Summary/i }).first()).toBeVisible({
       timeout: 15000,
     });
     return;

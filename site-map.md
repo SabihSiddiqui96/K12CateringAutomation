@@ -113,6 +113,35 @@ Manage Notifications, My Profile, Contact Us, What's New?
 - Account card kebab "Actions for {name}" → menuitem "Change Password" → "Change Password" dialog
   (New Password / Confirm Password fields)
 
+## Page: Reports
+- URL: `/reports`; heading `Reports`. Reached via `navigateK12CateringMenu(page, 'Reports')`
+  or the sidebar `Navigate to Reports` button.
+- Renders a grid of report tiles (role=button), each a title + description. Tiles seen:
+  Payment Analysis, Order Status Summary, Orders Export, Cancellation Analysis,
+  Order Size Analysis, Top Selling Menu Items, Menu Category Performance,
+  Customer Order History, Customer Acquisition & Retention, Revenue by Customer,
+  Repeat Order Analysis, Account Management, Order Fulfillment Performance,
+  Time-Based Analysis, Event & Delivery Schedule, Delivery Performance,
+  Location Performance, Order Lead Time Analysis, Allergen Compliance Report.
+- Open a report by clicking its tile (`getByRole('button', { name: /<title>/i })`).
+
+## Page: Reports — Payment Analysis
+- Reached from Reports by clicking the `Payment Analysis` tile. Heading h1 `Payment Analysis`.
+- Section headings: `Summary Statistics`, `Payment Method Usage`,
+  `Payment Status Breakdown`, `Outstanding Payments (N)` (N = count).
+- Controls: `Export CSV`, `Export PDF`, date-range button `All Time`, `Delivery Date`.
+- Three `<table>`s (real tables/`<th>`), told apart by their headers:
+  - **Payment Method Usage** — `Payment Method | Count | Amount | Percentage | Average Amount`
+    (locate: table with `Payment Method` AND `Percentage` headers).
+  - **Payment Status Breakdown** — `Status | Count | Amount | Percentage | Average Amount`.
+  - **Outstanding Payments** — `Order # | Customer | Amount | Days Outstanding | Payment Method`
+    (locate: table with `Days Outstanding` header).
+- The **Payment Method** column (in both the Usage and Outstanding tables) shows, for
+  orders paid via **Account String**, the **Payment Display Label** from Settings
+  (Settings → `Payment display label`; `Edit accounting string description` button →
+  input `#accounting-string-description-input` → `Save Changes` → toast
+  `Payment display label saved`). Changing that label updates both tables. Verified by T-117638.
+
 ## Launch flow: PrimeroEdge Classic → Catering (rename "K12 Catering" → "Catering")
 - PrimeroEdge Classic workspace (`https://qa.primeroedge.co`) Workspace tile is now
   labelled **"Catering"** (was "K12 Catering"). Tile link: `a[href*="K12Catering.aspx"]:visible`.

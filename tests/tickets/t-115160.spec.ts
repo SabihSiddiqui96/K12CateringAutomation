@@ -353,6 +353,12 @@ async function placeOrderUsingDisplayLabel(
   if (await guestsInput.isVisible({ timeout: 5000 }).catch(() => false)) {
     await guestsInput.fill('2');
   }
+  // Event Name (or Nickname) is a new REQUIRED field at Additional Details (ADO 117619);
+  // without it the "Next" button stays disabled.
+  const eventNameInput = page.locator('#event-name-input');
+  if (await eventNameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await eventNameInput.fill('Automation Event');
+  }
   await clickNext(page);
 
   // ── Payment Info — pick the Payment Display Label radio ──
