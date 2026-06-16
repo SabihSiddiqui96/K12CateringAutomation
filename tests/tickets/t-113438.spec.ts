@@ -516,6 +516,73 @@ async function getTargetDistrictsFromManageDialog(
   return districtNames;
 }
 
+// Clean up leftover local overrides from a prior interrupted run (which renamed a
+// target item to "AutoRenamed ..." and died before its reset step). Name-agnostic:
+// uses the home district's Data Sync "Local Overrides" filter and resets each row,
+// so the target's items start from a synced baseline. Best-effort; never throws.
+async function resetAllLocalOverrides(page: Page): Promise<void> {
+  let resetAny = false;
+  try {
+    for (let i = 0; i < 10; i++) {
+      await goToDataSync(page);
+      const filterBtn = page
+        .getByRole('button', { name: /^Local Overrides$/i })
+        .first();
+      if (!(await filterBtn.isVisible({ timeout: 8000 }).catch(() => false))) break;
+      await filterBtn.click();
+      await page.waitForTimeout(1200);
+
+      const row = page
+        .locator('table tbody tr, [role="row"]')
+        .filter({ has: page.getByText(/^Overrides$/i) })
+        .first();
+      if (!(await row.isVisible({ timeout: 5000 }).catch(() => false))) break; // none left
+
+      const detailsBtn = row.getByRole('button', { name: /^Details$/i }).first();
+      if (!(await detailsBtn.isVisible({ timeout: 3000 }).catch(() => false))) break;
+      await detailsBtn.click();
+
+      const resetBtn = page
+        .getByRole('dialog')
+        .first()
+        .getByRole('button', { name: /Reset Local Overrides/i })
+        .first();
+      if (!(await resetBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
+        await closeOpenDialog(page);
+        break;
+      }
+      await resetBtn.click();
+      const resetDlg = page
+        .getByRole('dialog')
+        .filter({ has: page.getByRole('heading', { name: /Reset Local Overrides/i }) })
+        .first();
+      await expect(resetDlg).toBeVisible({ timeout: 10000 });
+      await resetDlg
+        .getByRole('button', { name: /Reset Overrides|^Reset$|^Confirm$/i })
+        .last()
+        .click();
+      await page
+        .getByText(/Local overrides reset/i)
+        .first()
+        .waitFor({ state: 'visible', timeout: 15000 })
+        .catch(() => {});
+      await closeOpenDialog(page);
+      resetAny = true;
+    }
+
+    // "Reset Local Overrides" only clears the flag so sync may overwrite again —
+    // the target's actual value (e.g. a renamed item) reverts to the home value
+    // only on the next push sync. Run one so the target items truly go back to
+    // their synced names (otherwise the "first item" still reads "AutoRenamed …").
+    if (resetAny) {
+      await goToDataSync(page);
+      await runPushSyncNow(page);
+    }
+  } catch {
+    // best-effort cleanup — don't fail the test on teardown
+  }
+}
+
 // ─── Test ──────────────────────────────────────────────────────────────────
 
 test('Catering - Districts/Data Sync - Group, primary district, sync log and overrides', async ({
@@ -806,6 +873,12 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     targetDistricts.some((d) => /Berkeley School District/i.test(d)),
     `Berkeley School District was not in target districts list: [${targetDistricts.join(', ')}]`,
   ).toBeTruthy();
+
+  // Clean any leftover local overrides from a prior interrupted run BEFORE we
+  // create ours — otherwise the target's first menu item still reads a stale
+  // "AutoRenamed ..." name (a previous run died before its reset step), and the
+  // later Data Sync search (by the home name) never finds the row.
+  await resetAllLocalOverrides(catering);
 
   // Switch to the target district first — we capture the item title there
   // (after the switch) and edit it on the same district.

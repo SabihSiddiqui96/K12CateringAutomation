@@ -196,8 +196,9 @@ async function checkboxStats(
   return stats;
 }
 
-// Best-effort teardown: clear the duplicate's items (Deselect all -> Save) and
-// delete it. Never throws — runs from finally so it can't mask a real failure.
+// Best-effort teardown: delete the duplicate directly. As of ADO 117618 a menu
+// with items can be deleted without clearing them first (the app clears them),
+// so no Deselect-all step is needed. Never throws — runs from finally.
 async function deleteMenu(page: Page, menuName: string): Promise<void> {
   try {
     await openManageMenus(page);
@@ -205,33 +206,9 @@ async function deleteMenu(page: Page, menuName: string): Promise<void> {
       name: menuButtonName('Delete', menuName),
     });
     if (!(await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false))) {
-      return; // never created, or already gone
+      return; // never created, or already deleted by the test
     }
-
-    // Clear items first — a menu with items can't be deleted.
-    try {
-      await openItemsDialog(page, menuName);
-      await page.getByRole('button', { name: /^Deselect all$/i }).click();
-      const save = page.getByRole('button', { name: /^Save$/ });
-      if (await save.isEnabled().catch(() => false)) {
-        await save.click();
-        await page
-          .getByText(/updated|saved|success/i)
-          .first()
-          .waitFor({ state: 'visible', timeout: 8000 })
-          .catch(() => { });
-      }
-      await page.getByRole('button', { name: /Back to Manage Menus/i }).click();
-      await expect(
-        page.getByRole('heading', { name: 'Manage Menus' }),
-      ).toBeVisible({ timeout: 8000 });
-    } catch {
-      // already empty / couldn't open — fall through to delete
-    }
-
-    await page
-      .getByRole('button', { name: menuButtonName('Delete', menuName) })
-      .click();
+    await deleteBtn.click();
     await expect(
       page.getByRole('heading', { name: 'Delete Menu' }),
     ).toBeVisible({ timeout: 8000 });
@@ -317,6 +294,29 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
     const originalAfter = await menuItemNames(catering);
     expect(originalAfter).toEqual(originalItems);
 
+    // ── "Sort Items" per-menu warning (ADO 117618 comment) ────────────────────
+    // The per-category "Sort menu items in <category>" dialog warns the reorder
+    // applies to THIS menu only. Verify that text, then Cancel (the actual drag
+    // reorder + cross-menu comparison stay manual).
+    const sortItemsBtn = catering
+      .locator('#main-content')
+      .getByRole('button', { name: /^Sort menu items in /i })
+      .first();
+    await expect(sortItemsBtn).toBeVisible({ timeout: 10000 });
+    await sortItemsBtn.click();
+    const sortDialog = catering.getByRole('dialog').first();
+    await expect(
+      sortDialog.getByRole('heading', { name: /Sort menu item order/i }),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(sortDialog).toContainText(
+      /This will only update the display order of items in the .+ category of .+/i,
+    );
+    await expect(sortDialog).toContainText(
+      /go to the editing mode for All Items at the top of the screen/i,
+    );
+    await sortDialog.getByRole('button', { name: /^Cancel$/i }).click();
+    await expect(sortDialog).not.toBeVisible({ timeout: 8000 });
+
     // ── "Select all" in the Add-Items pop-up (run on the throwaway duplicate) ──
     await openItemsDialog(catering, dupName);
     const before = await checkboxStats(catering);
@@ -352,9 +352,32 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
       `Expected all but the deselected "${deselectedName}" to be saved`,
     ).toBe(before.total - 1);
     await catering.getByRole('button', { name: /Back to Manage Menus/i }).click();
+    await expect(
+      catering.getByRole('heading', { name: 'Manage Menus' }),
+    ).toBeVisible({ timeout: 8000 });
+
+    // ── Delete-with-items just deletes (ADO 117618 comment) ───────────────────
+    // The duplicate still has items (Select all added them). Deleting it now must
+    // JUST delete — the app clears the items for us — with NO "remove items first"
+    // error; only the Delete Menu prompt warns.
+    await catering
+      .getByRole('button', { name: menuButtonName('Delete', dupName) })
+      .click();
+    await expect(
+      catering.getByRole('heading', { name: 'Delete Menu' }),
+    ).toBeVisible({ timeout: 10000 });
+    await catering.getByRole('button', { name: /^Delete$/ }).last().click();
+    await expect(
+      catering.getByText(/Menu deleted/i).first(),
+    ).toBeVisible({ timeout: 12000 });
+    await expect(
+      catering.getByText(
+        /cannot be deleted|clear the items first|remove items first/i,
+      ),
+    ).toHaveCount(0);
     await closeManageMenus(catering);
   } finally {
-    // Always remove the duplicate this run created.
+    // Backup cleanup if the test failed before the delete step above.
     await deleteMenu(catering, dupName);
   }
 });

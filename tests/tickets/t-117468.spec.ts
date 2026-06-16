@@ -72,6 +72,10 @@ async function openFirstNonCancelledOrder(page: Page): Promise<void> {
 test('Catering - Orders - Editing an order records an Order Edited entry in Order Activity', async ({
   page,
 }) => {
+  // The edit/verify is wrapped in a launcher-aware retry (re-doing the whole edit
+  // if the launcher interrupts the save), so give the test ample headroom.
+  test.setTimeout(7 * 60 * 1000);
+
   const catering = await loginToK12Catering(page);
   await navigateK12CateringMenu(catering, 'Orders');
   await catering.waitForLoadState('domcontentloaded');
@@ -79,53 +83,10 @@ test('Catering - Orders - Editing an order records an Order Edited entry in Orde
   await openFirstNonCancelledOrder(catering);
   const detailsUrl = catering.url();
 
-  // Order Activity section exists on the detail page; capture the baseline
-  // count of "Order edited" entries so we can confirm a new one is appended.
-  await expect(
-    catering.getByRole('heading', { name: 'Order Activity' }),
-  ).toBeVisible({ timeout: 15000 });
-  const editedEntriesBefore = await catering
-    .getByText(orderEditedActivity)
-    .count();
-
-  // Step 5 — open the order editor.
-  await catering.getByRole('button', { name: 'Edit Order' }).click();
-  await expect(catering).toHaveURL(/\/orders\/edit/, { timeout: 15000 });
-
-  // Step 6 — edit the "Guest count and special instructions" section. We change
-  // only the special-instructions text (a unique value) so the edit always
-  // registers without altering order pricing.
-  await catering
-    .getByRole('button', { name: /Guest count and special instructions/i })
-    .click();
-
-  const specialInstructions = catering.locator(
-    '#edit-special-instructions-textarea',
-  );
-  await expect(specialInstructions).toBeVisible({ timeout: 10000 });
-  await specialInstructions.fill(`QA regression edit ${Date.now()}`);
-
-  await catering.getByRole('button', { name: /^Next$/i }).click();
-
-  const confirmButton = catering.getByRole('button', {
-    name: /Confirm Changes/i,
-  });
-  await expect(confirmButton).toBeVisible({ timeout: 10000 });
-  await confirmButton.click();
-
-  // Saving returns to the order detail page; the launcher (token refresh) can
-  // fire here on a long session — re-auth and re-open the order if so.
-  await reauthIfLauncher(catering);
-  if (!/\/orders\/details/.test(catering.url())) {
-    await catering.goto(detailsUrl);
-    await catering.waitForLoadState('domcontentloaded');
-    await reauthIfLauncher(catering);
-  }
-  await expect(catering).toHaveURL(/\/orders\/details/, { timeout: 20000 });
-
-  // Step 7 — Order Activity shows the new "Order edited" entry. Retry across a
-  // possible launcher interruption: re-auth + reload the order details, then
-  // confirm a new "Order edited" entry was appended.
+  // Steps 5-7 — edit the order's special instructions and confirm a NEW
+  // "Order edited" entry appears in Order Activity. The launcher (token refresh)
+  // can interrupt the edit/confirm itself (so nothing saves), so retry the WHOLE
+  // operation — re-baselining the count each attempt — until a new entry lands.
   await expect(async () => {
     await reauthIfLauncher(catering);
     if (!/\/orders\/details/.test(catering.url())) {
@@ -136,7 +97,39 @@ test('Catering - Orders - Editing an order records an Order Edited entry in Orde
     await expect(
       catering.getByRole('heading', { name: 'Order Activity' }),
     ).toBeVisible({ timeout: 10000 });
-    const count = await catering.getByText(orderEditedActivity).count();
-    expect(count).toBeGreaterThan(editedEntriesBefore);
-  }).toPass({ timeout: 90000, intervals: [3000, 5000, 8000] });
+    const before = await catering.getByText(orderEditedActivity).count();
+
+    // Open the editor and change only the special-instructions text (a unique
+    // value, so the edit always registers without altering order pricing).
+    await catering.getByRole('button', { name: 'Edit Order' }).click();
+    await expect(catering).toHaveURL(/\/orders\/edit/, { timeout: 15000 });
+    await reauthIfLauncher(catering);
+    await catering
+      .getByRole('button', { name: /Guest count and special instructions/i })
+      .click();
+    const specialInstructions = catering.locator(
+      '#edit-special-instructions-textarea',
+    );
+    await expect(specialInstructions).toBeVisible({ timeout: 10000 });
+    await specialInstructions.fill(`QA regression edit ${Date.now()}`);
+    await catering.getByRole('button', { name: /^Next$/i }).click();
+    const confirmButton = catering.getByRole('button', {
+      name: /Confirm Changes/i,
+    });
+    await expect(confirmButton).toBeVisible({ timeout: 10000 });
+    await confirmButton.click();
+
+    // Back on the detail page (recover through the launcher if it fired on save).
+    await reauthIfLauncher(catering);
+    if (!/\/orders\/details/.test(catering.url())) {
+      await catering.goto(detailsUrl);
+      await catering.waitForLoadState('domcontentloaded');
+      await reauthIfLauncher(catering);
+    }
+    await expect(
+      catering.getByRole('heading', { name: 'Order Activity' }),
+    ).toBeVisible({ timeout: 10000 });
+    const after = await catering.getByText(orderEditedActivity).count();
+    expect(after).toBeGreaterThan(before);
+  }).toPass({ timeout: 360000, intervals: [5000, 8000, 12000] });
 });
