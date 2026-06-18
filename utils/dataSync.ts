@@ -14,16 +14,65 @@ export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// District names can render with a typographic apostrophe (U+2019), e.g.
+// "Lee’s Summit R-7", while config/code use a straight quote ("Lee's ..."). Build
+// a regex source that matches either apostrophe form so the name still matches.
+function districtPattern(name: string): string {
+  return escapeRegExp(name).replace(/['’]/g, "['’]");
+}
+
+// The PrimeroEdge launcher periodically token-refreshes and reloads the app,
+// which reverts the active district back to the persisted one. Long, district-
+// switch-heavy flows (e.g. 117617 Test B) therefore lose the district they
+// switched to mid-test. A test can opt in to automatic restoration by calling
+// setIntendedDistrict(<name>); ensureInK12CateringApp() then re-switches back to
+// it after any relaunch. Tests that don't opt in (intendedDistrict === null) are
+// completely unaffected.
+let intendedDistrict: string | null = null;
+let restoringDistrict = false;
+export function setIntendedDistrict(name: string | null): void {
+  intendedDistrict = name;
+}
+function headerShowsDistrict(page: Page, districtName: string): Locator {
+  return page
+    .getByRole('button', { name: /Switch district/i })
+    .first()
+    .getByText(new RegExp(districtPattern(districtName), 'i'));
+}
+
 export async function ensureInK12CateringApp(page: Page): Promise<void> {
   await page.keyboard.press('Escape').catch(() => undefined);
   const sidebar = page.locator('aside[aria-label="Main navigation"]');
-  if (await sidebar.isVisible({ timeout: 2000 }).catch(() => false)) return;
-  const launcherLink = page.locator('a[href*="/login?token="]').first();
-  if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await launcherLink.click();
-    await page.waitForLoadState('domcontentloaded');
+  // Relaunch through the launcher link only when the app isn't loaded.
+  if (!(await sidebar.isVisible({ timeout: 2000 }).catch(() => false))) {
+    const launcherLink = page.locator('a[href*="/login?token="]').first();
+    if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await launcherLink.click();
+      await page.waitForLoadState('domcontentloaded');
+    }
+    await expect(sidebar).toBeVisible({ timeout: 30000 });
   }
-  await expect(sidebar).toBeVisible({ timeout: 30000 });
+
+  // The launcher token-refresh can revert the active district back to the
+  // persisted one even when the app reloads cleanly (sidebar stays visible), so
+  // this check must run on EVERY call, not only after a relaunch. Restore the
+  // district the test intends to be on (opt-in via setIntendedDistrict). The
+  // restoringDistrict guard prevents re-entry, since switchDistrict() calls back
+  // into this fn. Tests that don't opt in (intendedDistrict === null) are unaffected.
+  if (intendedDistrict && !restoringDistrict) {
+    const onIntended = await headerShowsDistrict(page, intendedDistrict)
+      .waitFor({ state: 'visible', timeout: 2500 })
+      .then(() => true)
+      .catch(() => false);
+    if (!onIntended) {
+      restoringDistrict = true;
+      try {
+        await switchDistrict(page, intendedDistrict);
+      } finally {
+        restoringDistrict = false;
+      }
+    }
+  }
 }
 
 export async function clickSidebarItem(page: Page, name: string): Promise<void> {
@@ -75,31 +124,68 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
   await switchBtn.click();
   await page.waitForLoadState('domcontentloaded');
 
-  const option = page.getByText(new RegExp(escapeRegExp(districtName), 'i')).first();
-  await expect(option).toBeVisible({ timeout: 10000 });
-  await option.click();
-  await page.waitForTimeout(500);
-
-  const confirmBtn = page.getByRole('button', { name: /^Switch District$/i }).last();
-  await expect(confirmBtn).toBeVisible({ timeout: 10000 });
-  await confirmBtn.click();
-
-  const toastVisible = await page
-    .getByText(/District Switched|switched.*successfully|switched/i)
-    .first()
-    .isVisible({ timeout: 15000 })
-    .catch(() => false);
-  const dialogGone = await page
-    .locator('[role="dialog"]')
-    .first()
-    .waitFor({ state: 'hidden', timeout: 5000 })
+  // Two UIs in the wild:
+  //  - Newer (e.g. UAT): a full "Switch District" page listing one card-button
+  //    per district behind a search box (only the first page of districts shows,
+  //    so the target must be searched for). Clicking a card switches directly.
+  //  - Older (QA): a dialog with plain text options plus a separate
+  //    "Switch District" confirm button.
+  // NB: locator.isVisible() does NOT wait, so probe the new page with waitFor().
+  const searchBox = page.getByRole('textbox', { name: /Search districts/i }).first();
+  const usesSearchPage = await searchBox
+    .waitFor({ state: 'visible', timeout: 10000 })
     .then(() => true)
     .catch(() => false);
-  expect(
-    toastVisible || dialogGone,
-    `District switch confirmation never appeared (toast: ${toastVisible}, dialog gone: ${dialogGone})`,
-  ).toBeTruthy();
+  if (usesSearchPage) {
+    const card = page
+      .getByRole('button', { name: new RegExp(`^${districtPattern(districtName)}\\b`, 'i') })
+      .first();
+    // Only the first page of districts renders, so narrow the list first. Typing
+    // in the search box is the primary filter; if that doesn't surface the card,
+    // fall back to the "Browse by Letter" button for the district's first letter.
+    await searchBox.fill(districtName);
+    await page.waitForTimeout(800);
+    if (!(await card.isVisible().catch(() => false))) {
+      await searchBox.fill('');
+      const letter = districtName.charAt(0).toUpperCase();
+      await page
+        .getByRole('button', { name: new RegExp(`^${escapeRegExp(letter)}\\s*\\(\\d+\\)$`) })
+        .first()
+        .click()
+        .catch(() => undefined);
+      await page.waitForTimeout(500);
+    }
+    await expect(card).toBeVisible({ timeout: 10000 });
+    await card.click();
+    // Some variants pop a confirm after picking a card; wait briefly for it and
+    // click it if it shows (waitFor, since isVisible() doesn't wait).
+    const confirmAfterCard = page.getByRole('button', { name: /^Switch District$/i }).last();
+    if (
+      await confirmAfterCard
+        .waitFor({ state: 'visible', timeout: 4000 })
+        .then(() => true)
+        .catch(() => false)
+    ) {
+      await confirmAfterCard.click();
+    }
+  } else {
+    const option = page.getByText(new RegExp(districtPattern(districtName), 'i')).first();
+    await expect(option).toBeVisible({ timeout: 10000 });
+    await option.click();
+    await page.waitForTimeout(500);
+
+    const confirmBtn = page.getByRole('button', { name: /^Switch District$/i }).last();
+    await expect(confirmBtn).toBeVisible({ timeout: 10000 });
+    await confirmBtn.click();
+  }
+
   await page.waitForLoadState('domcontentloaded');
+  // Source of truth: the header "Switch district" button shows the active
+  // district name. Wait until it reflects the target — the dialog-gone heuristic
+  // passes vacuously on the full-page UI, so verify the switch actually landed.
+  await expect(headerShowsDistrict(page, districtName)).toBeVisible({ timeout: 20000 });
+  // Track the latest switch so a launcher relaunch restores it (opt-in tests).
+  if (intendedDistrict !== null) intendedDistrict = districtName;
   await page.waitForTimeout(1500);
   await ensureInK12CateringApp(page);
 }
@@ -195,6 +281,16 @@ export async function editMenuItem(
   if (changes.newPrice !== undefined) {
     await page.locator('#price-per-item').clear();
     await page.locator('#price-per-item').fill(changes.newPrice);
+  }
+  // Description is a required field; an item without one (e.g. a leftover synced
+  // item) leaves the Update button blocked ("Description is required"). Fill a
+  // placeholder ONLY when it's empty so real descriptions are never overwritten.
+  const description = page.getByRole('textbox', { name: /^Description/i }).first();
+  if (await description.isVisible().catch(() => false)) {
+    const current = (await description.inputValue().catch(() => '')) || '';
+    if (current.trim() === '') {
+      await description.fill(changes.newName ?? name ?? 'Automated test item');
+    }
   }
   await page.getByRole('button', { name: /Update menu item|Update Menu Item|^Update$|^Save$/i }).first().click();
   await expect(page.getByRole('dialog', { name: /Edit Menu Item/i })).not.toBeVisible({ timeout: 15000 });

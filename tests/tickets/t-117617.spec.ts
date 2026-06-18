@@ -4,6 +4,7 @@ import {
   navigateK12CateringMenu,
   getDistrictName,
 } from '../../utils/helpers';
+import { getEnvVar } from '../../utils/env';
 import {
   goToDataSync,
   setGlobalSyncToggle,
@@ -16,6 +17,7 @@ import {
   resetLocalOverride,
   findItemUnderLocalOverridesFilter,
   escapeRegExp,
+  setIntendedDistrict,
 } from '../../utils/dataSync';
 
 /**
@@ -35,6 +37,18 @@ const ATTRS = [
   'Sync Allergens', 'Sync Ingredients', 'Sync Categories', 'Sync Varieties',
 ] as const;
 
+// Data Sync runs from a "primary" district (the default landing district, which
+// pushes) to an opted-in "target" district. Both differ per environment but the
+// roles mirror each other, so keep them configurable:
+//   QA  -> primary = Mercer County School District (default), target = Berkeley
+//   UAT -> primary = Lee's Summit R-7 (DISTRICT_NAME), target = sabihLocal
+// PRIMARY defaults to the env's default district (getDistrictName) just like QA;
+// TARGET is set via DATA_SYNC_TARGET_DISTRICT in .env.release.
+const PRIMARY_DISTRICT =
+  getEnvVar('DATA_SYNC_PRIMARY_DISTRICT', { required: false }) || getDistrictName();
+const TARGET_DISTRICT =
+  getEnvVar('DATA_SYNC_TARGET_DISTRICT', { required: false }) || 'Berkeley School District';
+
 test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]', () => {
   let catering: Page;
 
@@ -42,6 +56,17 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     const context = await browser.newContext();
     const page = await context.newPage();
     catering = await loginToK12Catering(page);
+    // Data Sync only shows for districts where it's enabled. Some envs (e.g. UAT,
+    // whose default district is "Edge County Schools") don't have it on the
+    // default district — switch to the Data Sync-enabled district when the nav
+    // item is missing. QA's default district already has it, so this is a no-op there.
+    const dataSyncNav = catering
+      .locator('aside[aria-label="Main navigation"]')
+      .getByLabel('Navigate to Data Sync');
+    if (!(await dataSyncNav.isVisible({ timeout: 5000 }).catch(() => false))) {
+      await switchDistrict(catering, PRIMARY_DISTRICT);
+      await expect(dataSyncNav).toBeVisible({ timeout: 15000 });
+    }
     await navigateK12CateringMenu(catering, 'Data Sync');
     await expect(catering.getByRole('heading', { name: /Data Sync/i }).first()).toBeVisible({ timeout: 20000 });
     await catering.waitForTimeout(1000);
@@ -81,6 +106,27 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       await catering.waitForTimeout(400);
       await expect(t).toHaveAttribute('aria-checked', String(on), { timeout: 5000 });
     }
+  }
+
+  // On the TARGET district, a pushed change can take a moment to propagate, and
+  // the launcher token-refresh can revert the district mid-wait. So poll: re-open
+  // the menu (district restoration re-applies TARGET each time) and check, until
+  // the synced value holds or we time out. Requires intendedDistrict === TARGET
+  // (set by the preceding switchDistrict(TARGET)).
+  const SYNC_POLL = { timeout: 90000, intervals: [4000, 4000, 6000, 6000] };
+  async function expectItemOnTarget(name: string): Promise<void> {
+    await expect(async () => {
+      await selectTheRealMenu(catering);
+      await expect(
+        catering.getByRole('button', { name: new RegExp(`Edit\\s+${escapeRegExp(name)}`, 'i') }).first(),
+      ).toBeVisible({ timeout: 6000 });
+    }).toPass(SYNC_POLL);
+  }
+  async function expectPriceOnTarget(name: string, price: string): Promise<void> {
+    await expect(async () => {
+      await selectTheRealMenu(catering);
+      expect(await readMenuItemPrice(catering, name)).toBe(price);
+    }).toPass(SYNC_POLL);
   }
 
   // ── Test A: toggles render + persist, then Push-sync reflects them ─────────────
@@ -124,13 +170,20 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
   test('per-attribute sync respects toggles across districts, and local overrides win', async () => {
     test.slow(); // long multi-district flow
 
-    const HOME = getDistrictName(); // Mercer County School District
-    const TARGET = 'Berkeley School District';
+    const HOME = PRIMARY_DISTRICT; // QA: Mercer County School District; UAT: Lee's Summit R-7
+    const TARGET = TARGET_DISTRICT; // QA: Berkeley School District; UAT: sabihLocal
     const stamp = `${Date.now()}`.slice(-6);
     const uniqueName = `AutoSync ${stamp}`;
     const PRICE_OFF = '7.77';   // set while Sync Price OFF -> must NOT propagate
     const PRICE_ON = '8.88';    // set while Sync Price ON  -> must propagate
-    const PRICE_LOCAL = '5.55'; // Berkeley local override
+    const PRICE_LOCAL = '5.55'; // target-district local override
+
+    // Opt in to launcher-revert district restoration for this long, district-
+    // switch-heavy flow: the PrimeroEdge launcher token-refresh reloads the app
+    // mid-test and snaps back to the persisted district, which would otherwise
+    // make the cross-district assertions run on the wrong district. The session
+    // is already on HOME here (set in beforeAll).
+    setIntendedDistrict(HOME);
 
     // Capture the first TheRealMenu item, and clear any leftover override from a
     // prior interrupted run (keeps this stateful test idempotent).
@@ -152,12 +205,9 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       // 12 — push sync.
       await runPushSyncNow(catering);
 
-      // 13 — on Berkeley, the Name synced but the Price did NOT.
+      // 13 — on the TARGET district, the Name synced but the Price did NOT.
       await switchDistrict(catering, TARGET);
-      await selectTheRealMenu(catering);
-      await expect(
-        catering.getByRole('button', { name: new RegExp(`Edit\\s+${escapeRegExp(uniqueName)}`, 'i') }).first(),
-      ).toBeVisible({ timeout: 20000 });
+      await expectItemOnTarget(uniqueName);
       expect(await readMenuItemPrice(catering, uniqueName)).not.toBe('7.77');
 
       // 14 — back on Mercer: Sync Price ON, change Price, push -> Berkeley Price updates.
@@ -169,30 +219,30 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       await goToDataSync(catering);
       await runPushSyncNow(catering);
       await switchDistrict(catering, TARGET);
-      await selectTheRealMenu(catering);
-      expect(await readMenuItemPrice(catering, uniqueName)).toBe('8.88');
+      await expectPriceOnTarget(uniqueName, '8.88');
 
-      // 15 — on Berkeley, locally edit the Price (creates a local override); back on
-      // Mercer, click the "Local Overrides" filter and confirm the item shows there.
+      // 15 — on the TARGET district, locally edit the Price (creates a local
+      // override); back on HOME, click the "Local Overrides" filter and confirm
+      // the item shows there.
+      await selectTheRealMenu(catering);
       await editMenuItem(catering, uniqueName, { newPrice: PRICE_LOCAL });
       await switchDistrict(catering, HOME);
       const filtered = await findItemUnderLocalOverridesFilter(catering, uniqueName);
       await expect(filtered.getByText(/^Overrides$/i).first()).toBeVisible({ timeout: 10000 });
 
-      // 16 — Sync Price ON globally but a local override present -> Berkeley keeps its Price.
+      // 16 — Sync Price ON globally but a local override present -> the target
+      // keeps its own Price.
       await runPushSyncNow(catering);
       await switchDistrict(catering, TARGET);
-      await selectTheRealMenu(catering);
-      expect(await readMenuItemPrice(catering, uniqueName)).toBe('5.55');
+      await expectPriceOnTarget(uniqueName, '5.55');
 
-      // 17 — reset the local override, push, Berkeley Price updates back to Mercer's.
+      // 17 — reset the local override, push, the target Price updates back to HOME's.
       await switchDistrict(catering, HOME);
       await goToDataSync(catering);
       expect(await resetLocalOverride(catering, uniqueName)).toBe(true);
       await runPushSyncNow(catering);
       await switchDistrict(catering, TARGET);
-      await selectTheRealMenu(catering);
-      expect(await readMenuItemPrice(catering, uniqueName)).toBe('8.88');
+      await expectPriceOnTarget(uniqueName, '8.88');
     } finally {
       // Self-clean so the next run starts from a known state.
       try {
@@ -204,6 +254,9 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
         await editMenuItem(catering, uniqueName, { newName: origName }).catch(() => undefined);
       } catch {
         /* best-effort cleanup */
+      } finally {
+        // Stop tracking so it can't affect later tests in this file.
+        setIntendedDistrict(null);
       }
     }
   });
