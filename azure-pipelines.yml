@@ -19,9 +19,6 @@ pool:
 variables:
   - name: NODE_VERSION
     value: 20.x
-  # Short label used in display names + webhook text (e.g. "QA" / "UAT").
-  - name: ENV_LABEL
-    value: ${{ parameters.targetEnv }}
   # BASE_URL + LOGIN_PATH are YAML-owned, so they flip safely with the parameter.
   # (The rest of the env-selection config is set on the test step further down.)
   - ${{ if eq(parameters.targetEnv, 'UAT') }}:
@@ -29,11 +26,16 @@ variables:
         value: https://uatk12catering.perseusedge.com
       - name: LOGIN_PATH
         value: /login
+      # Friendly label used in the webhook text (e.g. "K12Catering Release Testing started.").
+      - name: RUN_LABEL
+        value: Release Testing
   - ${{ else }}:
       - name: BASE_URL
         value: https://qa.primeroedge.co
       - name: LOGIN_PATH
         value: /login.aspx
+      - name: RUN_LABEL
+        value: QA Testing
 
 stages:
   - stage: Deploy_QA
@@ -76,7 +78,7 @@ stages:
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
-                -d "{\"text\":\"K12Catering $(ENV_LABEL) Automation started.\n\nMonitor: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)\"}" || true
+                -d "{\"text\":\"K12Catering $(RUN_LABEL) started.\n\nMonitor: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)\"}" || true
             displayName: Notify RingCentral - Started
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
@@ -249,16 +251,17 @@ stages:
                 + '/_build/results?buildId=' + process.env.BUILD_ID;
               const resultsUrl = pipelineUrl + '&view=ms.vss-test-web.build-test-results-tab';
 
-              // Env label (e.g. 'QA ' / 'UAT ') so the channel can tell runs apart.
-              const envLabel = process.env.ENV_LABEL ? process.env.ENV_LABEL + ' ' : '';
+              // Friendly run label (e.g. 'Release Testing' / 'QA Testing') so the
+              // channel can tell runs apart and the wording matches the start message.
+              const runLabel = process.env.RUN_LABEL || 'Automation';
 
               let text;
               if (runResult === 'canceled' || runResult === 'cancelled') {
-                text = 'K12Catering ' + envLabel + 'Automation was canceled before test results were published.\n\nPipeline: ' + pipelineUrl;
+                text = 'K12Catering ' + runLabel + ' was canceled before test results were published.\n\nPipeline: ' + pipelineUrl;
               } else if (total === 0) {
-                text = 'K12Catering ' + envLabel + 'Automation ended before test results were published.\n\nPipeline: ' + pipelineUrl;
+                text = 'K12Catering ' + runLabel + ' ended before test results were published.\n\nPipeline: ' + pipelineUrl;
               } else {
-                text = 'K12Catering ' + envLabel + 'Automation completed. See results below.\n\n'
+                text = 'K12Catering ' + runLabel + ' completed. See results below.\n\n'
                   + '✅ ' + 'Passed:'.padEnd(10) + passed + ' (' + pct(passed) + '%)\n'
                   + '❌ ' + 'Failed:'.padEnd(10) + failed + ' (' + pct(failed) + '%)\n'
                   + '📊 ' + 'Total:'.padEnd(10) + total + '\n'
@@ -305,4 +308,4 @@ stages:
               TEAM_PROJECT: $(System.TeamProject)
               BUILD_ID: $(Build.BuildId)
               RUN_PLAYWRIGHT_RESULT: $(RUN_PLAYWRIGHT_RESULT)
-              ENV_LABEL: $(ENV_LABEL)
+              RUN_LABEL: $(RUN_LABEL)
