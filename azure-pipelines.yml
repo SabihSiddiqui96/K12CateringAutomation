@@ -1,27 +1,53 @@
 # CI trigger disabled — builds are started manually (or by the schedule configured in Azure DevOps).
 trigger: none
 
+# Pick the target environment when you run the pipeline (Run pipeline -> Variables/Parameters).
+# QA is the default, so scheduled/nightly runs keep hitting QA unchanged. Choose UAT to run
+# the same suite against the Release/UAT environment.
+parameters:
+  - name: targetEnv
+    displayName: Target environment
+    type: string
+    default: QA
+    values:
+      - QA
+      - UAT
+
 pool:
   vmImage: ubuntu-latest
 
 variables:
-  NODE_VERSION: 20.x
-  BASE_URL: https://qa.primeroedge.co
-  LOGIN_PATH: /login.aspx
+  - name: NODE_VERSION
+    value: 20.x
+  # Short label used in display names + webhook text (e.g. "QA" / "UAT").
+  - name: ENV_LABEL
+    value: ${{ parameters.targetEnv }}
+  # BASE_URL + LOGIN_PATH are YAML-owned, so they flip safely with the parameter.
+  # (The rest of the env-selection config is set on the test step further down.)
+  - ${{ if eq(parameters.targetEnv, 'UAT') }}:
+      - name: BASE_URL
+        value: https://uatk12catering.perseusedge.com
+      - name: LOGIN_PATH
+        value: /login
+  - ${{ else }}:
+      - name: BASE_URL
+        value: https://qa.primeroedge.co
+      - name: LOGIN_PATH
+        value: /login.aspx
 
 stages:
   - stage: Deploy_QA
-    displayName: Deploy to QA
+    displayName: Deploy to ${{ parameters.targetEnv }}
     jobs:
       - job: Deploy
-        displayName: Deploy application to QA
+        displayName: Deploy application to ${{ parameters.targetEnv }}
         steps:
           - checkout: self
-          - script: echo "Deploying application to QA..."
-            displayName: Deploy app to QA
+          - script: echo "Deploying application to ${{ parameters.targetEnv }}..."
+            displayName: Deploy app to ${{ parameters.targetEnv }}
 
   - stage: Run_Playwright_QA
-    displayName: Run Playwright smoke tests on QA
+    displayName: Run Playwright smoke tests on ${{ parameters.targetEnv }}
     dependsOn: Deploy_QA
     condition: succeeded()
     jobs:
@@ -43,36 +69,55 @@ stages:
             displayName: Install Playwright browsers
 
           - script: |
-              echo "Checking QA login reachability..."
+              echo "Checking ${{ parameters.targetEnv }} login reachability..."
               curl -I --location --max-time 30 "$(BASE_URL)$(LOGIN_PATH)"
-            displayName: Check QA login reachability
+            displayName: Check ${{ parameters.targetEnv }} login reachability
 
           - script: |
               curl -X POST "$(RINGCENTRAL_WEBHOOK_URL)" \
                 -H "Content-Type: application/json" \
-                -d "{\"text\":\"K12Catering Automation started.\n\nMonitor: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)\"}" || true
+                -d "{\"text\":\"K12Catering $(ENV_LABEL) Automation started.\n\nMonitor: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)\"}" || true
             displayName: Notify RingCentral - Started
             env:
               RINGCENTRAL_WEBHOOK_URL: $(RINGCENTRAL_WEBHOOK_URL)
 
           - script: npx playwright test --workers=1
-            displayName: Run Playwright tests
+            displayName: Run Playwright tests (${{ parameters.targetEnv }})
             env:
               CI: true
               BASE_URL: $(BASE_URL)
-              PE_USERNAME: $(PE_USERNAME)
-              ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
+              LOGIN_PATH: $(LOGIN_PATH)
+              # --- Environment-selection config (compile-time by targetEnv) ---
+              # Set as literals for UAT so a stale QA pipeline variable can't override
+              # them; for QA, keep reading the existing pipeline/library variables.
+              ${{ if eq(parameters.targetEnv, 'UAT') }}:
+                # Main PrimeroEdge login (loginToPrimeroEdge) — UAT uses a DIFFERENT
+                # admin account than QA, so these must come from UAT-specific vars.
+                PE_USERNAME: $(PE_UAT_USERNAME)
+                ENCRYPTED_PASSWORD: $(PE_UAT_ENCRYPTED_PASSWORD)
+                K12_CATERING_URL: https://uatk12catering.perseusedge.com
+                DIRECT_K12_LOGIN: 'true'
+                DISTRICT_NAME: "Lee's Summit R-7"
+                SECONDARY_DISTRICT_NAME: Alief ISD
+                DATA_SYNC_PRIMARY_DISTRICT: "Lee's Summit R-7"
+                DATA_SYNC_TARGET_DISTRICT: sabihLocal
+                ENVIRONMENT_LABEL: UAT (PrimeroEdge)
+              ${{ else }}:
+                PE_USERNAME: $(PE_USERNAME)
+                ENCRYPTED_PASSWORD: $(ENCRYPTED_PASSWORD)
+                K12_CATERING_URL: $(K12_CATERING_URL)
+                DIRECT_K12_LOGIN: $(DIRECT_K12_LOGIN)
+                DISTRICT_NAME: $(DISTRICT_NAME)
+                SECONDARY_DISTRICT_NAME: $(SECONDARY_DISTRICT_NAME)
+                ENVIRONMENT_LABEL: $(ENVIRONMENT_LABEL)
+              # --- Secrets / shared (from the pipeline variable group, both envs) ---
+              # The suite picks QA-vs-UAT district/customer creds by DIRECT_K12_LOGIN.
+              # ENCRYPTION_KEY is the SAME for both envs (it decrypts all the stored passwords).
               ENCRYPTION_KEY: $(ENCRYPTION_KEY)
               PE_DISTRICT_EMAIL: $(PE_DISTRICT_EMAIL)
               PE_DISTRICT_ENCRYPTED_PASSWORD: $(PE_DISTRICT_ENCRYPTED_PASSWORD)
               K12_CUSTOMER_EMAIL: $(K12_CUSTOMER_EMAIL)
               K12_CUSTOMER_ENCRYPTED_PASSWORD: $(K12_CUSTOMER_ENCRYPTED_PASSWORD)
-              DIRECT_K12_LOGIN: $(DIRECT_K12_LOGIN)
-              LOGIN_PATH: $(LOGIN_PATH)
-              K12_CATERING_URL: $(K12_CATERING_URL)
-              DISTRICT_NAME: $(DISTRICT_NAME)
-              SECONDARY_DISTRICT_NAME: $(SECONDARY_DISTRICT_NAME)
-              ENVIRONMENT_LABEL: $(ENVIRONMENT_LABEL)
               PE_UAT_DISTRICT_EMAIL: $(PE_UAT_DISTRICT_EMAIL)
               PE_UAT_DISTRICT_ENCRYPTED_PASSWORD: $(PE_UAT_DISTRICT_ENCRYPTED_PASSWORD)
               K12_UATCUSTOMER_EMAIL: $(K12_UATCUSTOMER_EMAIL)
@@ -204,13 +249,16 @@ stages:
                 + '/_build/results?buildId=' + process.env.BUILD_ID;
               const resultsUrl = pipelineUrl + '&view=ms.vss-test-web.build-test-results-tab';
 
+              // Env label (e.g. 'QA ' / 'UAT ') so the channel can tell runs apart.
+              const envLabel = process.env.ENV_LABEL ? process.env.ENV_LABEL + ' ' : '';
+
               let text;
               if (runResult === 'canceled' || runResult === 'cancelled') {
-                text = 'K12Catering Automation was canceled before test results were published.\n\nPipeline: ' + pipelineUrl;
+                text = 'K12Catering ' + envLabel + 'Automation was canceled before test results were published.\n\nPipeline: ' + pipelineUrl;
               } else if (total === 0) {
-                text = 'K12Catering Automation ended before test results were published.\n\nPipeline: ' + pipelineUrl;
+                text = 'K12Catering ' + envLabel + 'Automation ended before test results were published.\n\nPipeline: ' + pipelineUrl;
               } else {
-                text = 'K12Catering Automation completed. See results below.\n\n'
+                text = 'K12Catering ' + envLabel + 'Automation completed. See results below.\n\n'
                   + '✅ ' + 'Passed:'.padEnd(10) + passed + ' (' + pct(passed) + '%)\n'
                   + '❌ ' + 'Failed:'.padEnd(10) + failed + ' (' + pct(failed) + '%)\n'
                   + '📊 ' + 'Total:'.padEnd(10) + total + '\n'
@@ -257,3 +305,4 @@ stages:
               TEAM_PROJECT: $(System.TeamProject)
               BUILD_ID: $(Build.BuildId)
               RUN_PLAYWRIGHT_RESULT: $(RUN_PLAYWRIGHT_RESULT)
+              ENV_LABEL: $(ENV_LABEL)

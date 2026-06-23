@@ -7,6 +7,7 @@
     "test:e2e": "npx playwright test",
     "test:e2e:qa": "npx playwright test",
     "test:release": "node scripts/test-release.js",
+    "test:qa": "node scripts/test-qa.js",
     "test:e2e:browserstack": "browserstack-node-sdk playwright test",
     "report:show": "npx playwright show-report",
     "report:build-site": "node scripts/build-report-site.js"
