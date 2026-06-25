@@ -4,11 +4,14 @@ import { Browser, expect, Locator, Page, test } from '@playwright/test';
 import {
   loginToK12Catering,
   navigateK12CateringMenu,
+  getCustomerAccountEmail,
+  registerReleaseNotificationHandler,
 } from '../../utils/helpers';
 import { decryptPassword } from '../../utils/crypto';
 import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl } from '../../utils/baseUrl';
 import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
+import { switchToCustomerDistrict } from '../../utils/dataSync';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -333,6 +336,8 @@ async function verifyMenuItemsAsCustomer(
     await customerPage.getByRole('button', { name: /Sign in/i }).click();
     await customerPage.waitForLoadState('networkidle');
     await expect(customerPage).not.toHaveURL(/login/, { timeout: 15000 });
+    // Dismiss the "Now Available" What's-New modal that blocks sidebar clicks.
+    await registerReleaseNotificationHandler(customerPage);
 
     await customerPage.getByRole('listitem', { name: /Navigate to Menu/i }).click();
     await customerPage.waitForLoadState('domcontentloaded');
@@ -496,6 +501,9 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
   test.setTimeout(6 * 60 * 1000);
 
   const catering = await loginToK12Catering(page);
+  // Build/assign the menu in the customer's district (Alief ISD on UAT) so the
+  // demo customer who lives there can actually see the items. No-op on QA.
+  await switchToCustomerDistrict(catering);
   await ensureMenuPage(catering);
 
   const menuNumber = randomThreeDigits();
@@ -529,7 +537,11 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
         (await checkboxes.nth(i).getAttribute('aria-label')) ??
         (await checkboxes.nth(i).getAttribute('name'));
       const cleaned = (name ?? '').trim();
-      if (cleaned && !itemNames.includes(cleaned)) itemNames.push(cleaned);
+      // Skip junk/ambiguous catalog entries: a numeric-only or 1-char name
+      // (e.g. "12") makes a brittle exact-text match downstream and may not
+      // even render on the customer menu. Prefer descriptive item names.
+      const isDescriptive = /[a-z]/i.test(cleaned) && cleaned.length >= 2;
+      if (isDescriptive && !itemNames.includes(cleaned)) itemNames.push(cleaned);
     }
     expect(
       itemNames.length,
@@ -560,8 +572,9 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
       timeout: 10000,
     });
 
-    // Use the dedicated QA test customer for the customer-side verification
-    const customerEmail = 'SabihQATesting@outlook.com';
+    // Demo customer for the customer-side verification (QA: SabihQATesting,
+    // UAT: SiddiquiUATTesting under Alief ISD).
+    const customerEmail = getCustomerAccountEmail();
     await resetCustomerPasswordFromAccounts(catering, customerEmail, customerPassword);
     await verifyMenuItemsAsCustomer(
       browser,

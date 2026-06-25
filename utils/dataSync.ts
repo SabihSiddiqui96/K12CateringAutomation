@@ -8,7 +8,7 @@
  * reuse them instead of duplicating. Locators are kept identical to those tests.
  */
 import { expect, Locator, Page } from '@playwright/test';
-import { navigateK12CateringMenu, scrollUntilVisible, setListPageSize } from './helpers';
+import { navigateK12CateringMenu, scrollUntilVisible, setListPageSize, getSecondaryDistrictName, isUatDirectLogin } from './helpers';
 
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -119,7 +119,14 @@ export async function closeOpenDialog(page: Page): Promise<void> {
 }
 
 export async function switchDistrict(page: Page, districtName: string): Promise<void> {
-  const switchBtn = page.getByRole('button', { name: /Switch district/i }).first();
+  let switchBtn = page.getByRole('button', { name: /Switch district/i }).first();
+  // The header switch control isn't rendered on every page; if it's not here,
+  // go to the Districts page where the "Switch district" button reliably lives.
+  if (!(await switchBtn.isVisible({ timeout: 3000 }).catch(() => false))) {
+    await navigateK12CateringMenu(page, 'Districts').catch(() => undefined);
+    await page.waitForLoadState('domcontentloaded');
+    switchBtn = page.getByRole('button', { name: /Switch district/i }).first();
+  }
   await expect(switchBtn).toBeVisible({ timeout: 10000 });
   await switchBtn.click();
   await page.waitForLoadState('domcontentloaded');
@@ -188,6 +195,36 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
   if (intendedDistrict !== null) intendedDistrict = districtName;
   await page.waitForTimeout(1500);
   await ensureInK12CateringApp(page);
+}
+
+// Make sure the admin is in the district where the demo customer account lives
+// before searching Accounts. On UAT that's the secondary district (Alief ISD);
+// on QA the customer is in the default district, so this is a no-op. The switch
+// is also skipped when that district is already active (e.g. it's the default),
+// so it's safe to call unconditionally before any customer-account lookup.
+export async function switchToCustomerDistrict(page: Page): Promise<void> {
+  if (!isUatDirectLogin()) return;
+  const target = getSecondaryDistrictName();
+  const targetRe = new RegExp(districtPattern(target), 'i');
+  // Already in the target district? Detect it two ways:
+  //  - a switch-capable (Cybersoft Admin) session shows the district inside the
+  //    "Switch district" button, OR
+  //  - a district-admin session (which has no switch button because it can't
+  //    switch) shows it in a read-only "Current district: <name>" label.
+  // The second case matters when the account already defaults to the customer's
+  // district (e.g. Alief ISD) — there's nothing to switch, so just proceed.
+  const onTargetViaButton = await headerShowsDistrict(page, target)
+    .waitFor({ state: 'visible', timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (onTargetViaButton) return;
+  const currentLabel = await page
+    .locator('[aria-label^="Current district" i]')
+    .first()
+    .getAttribute('aria-label')
+    .catch(() => '');
+  if (currentLabel && targetRe.test(currentLabel)) return;
+  await switchDistrict(page, target);
 }
 
 export async function goToDataSync(page: Page): Promise<void> {

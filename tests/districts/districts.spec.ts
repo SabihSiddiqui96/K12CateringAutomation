@@ -3,6 +3,7 @@ import {
   loginToK12Catering,
   navigateK12CateringMenu,
   getDistrictName,
+  getDistrictNameRegex,
 } from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -29,7 +30,7 @@ test.describe('Districts', () => {
   });
 
   test('Districts - District is listed with edit/delete actions', async () => {
-    await expect(catering.getByText(new RegExp(getDistrictName(), 'i')).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible({ timeout: 10000 });
 
     const editBtn = catering.getByRole('button', { name: /Edit district/i }).or(catering.getByRole('button', { name: /Edit/i }).first()).first();
     const deleteBtn = catering.getByRole('button', { name: /Delete district/i }).or(catering.getByRole('button', { name: /Delete/i }).first()).first();
@@ -40,25 +41,27 @@ test.describe('Districts', () => {
 
   test('Districts - Search filters and clearing search restores list', async () => {
     const searchInput = catering.getByRole('textbox', { name: /Search districts/i });
-    await searchInput.fill(getDistrictName().split(' ')[0]);
+    // Search by the first apostrophe-free token (e.g. "Lee" from "Lee's Summit
+    // R-7") so a straight-vs-curly apostrophe can't break the server-side match.
+    await searchInput.fill(getDistrictName().split(/[\s'‘’]/)[0]);
     await catering.waitForTimeout(600);
-    await expect(catering.getByText(new RegExp(getDistrictName(), 'i')).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible({ timeout: 10000 });
 
     await searchInput.fill('ZZZNoMatchXXX12345');
     await catering.waitForTimeout(600);
     const hasEmptyState = await catering.getByText(/no.*districts|no results|not found/i).first().isVisible({ timeout: 5000 }).catch(() => false);
-    const hasDistrict = await catering.getByText(new RegExp(getDistrictName(), 'i')).first().isVisible({ timeout: 2000 }).catch(() => false);
+    const hasDistrict = await catering.getByText(getDistrictNameRegex()).first().isVisible({ timeout: 2000 }).catch(() => false);
     expect(hasEmptyState || !hasDistrict).toBe(true);
 
     await searchInput.clear();
     await catering.waitForTimeout(600);
-    await expect(catering.getByText(new RegExp(getDistrictName(), 'i')).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('Districts - Switch District opens list showing current district', async () => {
     await catering.getByRole('button', { name: /Switch district/i }).click();
     await catering.waitForLoadState('domcontentloaded');
-    await expect(catering.getByText(new RegExp(getDistrictName(), 'i')).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible({ timeout: 10000 });
 
     const cancelBtn = catering.getByRole('button', { name: /Cancel|Back/i }).first();
     if (await cancelBtn.isVisible({ timeout: 2000 }).catch(() => false)) {

@@ -8,7 +8,10 @@ import {
   navigateK12CateringMenu,
   openK12CateringApp,
   getDistrictName,
+  getCustomerAccountEmail,
+  isUatDirectLogin,
 } from '../../utils/helpers';
+import { switchToCustomerDistrict, switchDistrict } from '../../utils/dataSync';
 import { decryptPassword } from '../../utils/crypto';
 import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl, getK12CateringUrl } from '../../utils/baseUrl';
@@ -177,7 +180,8 @@ const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
 const ORIGINAL_PASSWORD = decryptPassword(
   getRequiredEnvVar(isUAT ? 'K12_UATCUSTOMER_ENCRYPTED_PASSWORD' : 'K12_CUSTOMER_ENCRYPTED_PASSWORD'),
 );
-const CUSTOMER_EMAIL = 'SabihQATesting@outlook.com';
+// QA: SabihQATesting@outlook.com — UAT: SiddiquiUATTesting@outlook.com (under Alief ISD).
+const CUSTOMER_EMAIL = getCustomerAccountEmail();
 
 function getChangePasswordDialog(catering: Page) {
   return catering.getByRole('dialog', { name: /Change Password/i });
@@ -199,6 +203,8 @@ async function closeChangePasswordModal(catering: Page) {
 
 async function openChangePasswordModal(catering: Page) {
   await closeChangePasswordModal(catering);
+  // Ensure we're in the customer's district (Alief ISD on UAT) before searching.
+  await switchToCustomerDistrict(catering);
   await navigateK12CateringMenu(catering, 'Accounts');
   await catering.waitForLoadState('domcontentloaded');
 
@@ -207,19 +213,36 @@ async function openChangePasswordModal(catering: Page) {
   });
   await expect(searchBox).toBeVisible({ timeout: 10000 });
   await searchBox.fill(CUSTOMER_EMAIL);
-  await catering.waitForTimeout(600);
+  // Let the filtered account list settle before opening the kebab menu — the
+  // list re-renders after the search and can detach the menu mid-click.
+  await catering.waitForLoadState('networkidle').catch(() => undefined);
+  await catering.waitForTimeout(800);
 
   const actionsButton = catering.getByRole('button', {
     name: /Actions for/i,
   });
-  await expect(actionsButton).toBeVisible({ timeout: 10000 });
-  await actionsButton.first().click();
-
   const changePasswordMenuItem = catering.getByRole('menuitem', {
     name: /Change Password/i,
   });
-  await expect(changePasswordMenuItem).toBeVisible({ timeout: 5000 });
-  await changePasswordMenuItem.click();
+  // Open the kebab and click Change Password, retrying the whole open→click in
+  // case the account row/menu re-renders (a detached-element click) — happens
+  // most after a fresh re-login (the reset step).
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await expect(actionsButton.first()).toBeVisible({ timeout: 10000 });
+    await actionsButton.first().click();
+    const menuShown = await changePasswordMenuItem
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    if (menuShown) {
+      try {
+        await changePasswordMenuItem.click({ timeout: 5000 });
+        break;
+      } catch (err) {
+        if (attempt === 3) throw err;
+      }
+    }
+    await catering.waitForTimeout(600);
+  }
 
   const dialog = getChangePasswordDialog(catering);
   await expect(dialog).toBeVisible({ timeout: 10000 });
@@ -325,7 +348,16 @@ test.describe('Accounts Change Password', () => {
 
     const districtUserLogin = catering.locator('#UserNameTextBox, #email-input');
     if (await districtUserLogin.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await loginToK12CateringAsDistrictUser(catering);
+      // The reset must be done by an admin who can reach the customer's district.
+      // On UAT the customer lives in Alief ISD and the district user (Amanda) is
+      // stuck in Edge County with no switch control, so re-login as the Cybersoft
+      // Admin who can switch there. On QA the district user shares the customer's
+      // district, so keep using it.
+      if (isUatDirectLogin()) {
+        catering = await loginToK12Catering(catering);
+      } else {
+        await loginToK12CateringAsDistrictUser(catering);
+      }
       await catering.waitForLoadState('networkidle');
     }
 
@@ -706,6 +738,11 @@ test.describe('Minimum Order Amount', () => {
 
   test('Setting visible, admin bypasses restriction, non-admin blocked, set to $0 removes restriction', async ({ browser }) => {
 
+    // Minimum Order Amount is per-district, so set it in the customer's district
+    // (Alief ISD on UAT) — otherwise the non-admin customer who lives there isn't
+    // affected by it. No-op on QA, where the customer is in the default district.
+    await switchToCustomerDistrict(catering);
+
     // ── Step 1-3: Navigate to Settings, verify Minimum Order Amount ──
     await catering.getByRole('button', { name: 'Go to home page' }).click();
     await catering.waitForLoadState('domcontentloaded');
@@ -715,12 +752,12 @@ test.describe('Minimum Order Amount', () => {
     await expect(
       catering.getByRole('heading', { name: /Minimum Order Amount/i }),
     ).toBeVisible({ timeout: 10000 });
-    await expect(
-      catering.getByText(/\$[\d,.]+.*minimum|minimum.*\$[\d,.]+/i).first(),
-    ).toBeVisible({ timeout: 10000 });
+    // The heading + Edit button confirm the section. The displayed value varies
+    // ("$X minimum" when set, nothing/unset in a fresh district like Alief ISD on
+    // UAT), and the test sets the value next — so don't assert on it here.
     await expect(
       catering.getByRole('button', { name: /Edit minimum order amount/i }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
 
     // ── Step 4: Open edit modal and verify helper text ──
     await catering
@@ -1079,55 +1116,17 @@ test.describe('Districts - New District Visibility', () => {
       catering.getByText(/district.*created|created.*successfully|success/i).first(),
     ).toBeVisible({ timeout: 10000 });
 
-    // ── Click Switch District button (top left) ──
-    const switchDistrictBtn = catering.getByRole('button', { name: /Switch district/i });
-    await expect(switchDistrictBtn).toBeVisible({ timeout: 10000 });
-    await switchDistrictBtn.click();
-    await catering.waitForLoadState('domcontentloaded');
+    // ── Switch to the newly created district. switchDistrict opens the switch
+    //    dialog, searches (falling back to Browse-by-Letter when the district
+    //    isn't on the first page), clicks the matching card, confirms, and waits
+    //    for the header to reflect it — i.e. it verifies the new district shows
+    //    up in the switch list and that the switch succeeds. ──
+    await switchDistrict(catering, districtName);
 
-    // ── Verify new district name appears in the list ──
-    const newDistrictOption = catering.getByText(districtName).first();
-    await expect(newDistrictOption).toBeVisible({ timeout: 10000 });
-
-    // ── Click on the new district ──
-    await newDistrictOption.click();
-    await catering.waitForTimeout(500);
-
-    // ── Click Switch District confirm button ──
-    const switchConfirmBtn = catering
-      .getByRole('button', { name: /Switch District|Switch|Confirm/i })
-      .last();
-    await expect(switchConfirmBtn).toBeVisible({ timeout: 10000 });
-    await switchConfirmBtn.click();
-
-    // ── Verify district switched successfully via toast ──
-    await expect(
-      catering.getByText('District Switched')
-    ).toBeVisible({ timeout: 10000 });
-
-    // ── Refresh the page ──
+    // ── Refresh, then switch back to the home district. ──
     await catering.reload();
     await catering.waitForLoadState('domcontentloaded');
-
-    // ── Switch back to Mercer County School District ──
-    await switchDistrictBtn.click();
-    await catering.waitForLoadState('domcontentloaded');
-
-    const mercerOption = catering.getByText(new RegExp(getDistrictName(), 'i')).first();
-    await expect(mercerOption).toBeVisible({ timeout: 10000 });
-    await mercerOption.click();
-    await catering.waitForTimeout(500);
-
-    const switchBackConfirmBtn = catering
-      .getByRole('button', { name: /Switch District|Switch|Confirm/i })
-      .last();
-    await expect(switchBackConfirmBtn).toBeVisible({ timeout: 10000 });
-    await switchBackConfirmBtn.click();
-
-    await expect(
-      catering.getByText(/switched|district.*switched|switched.*successfully/i).first(),
-    ).toBeVisible({ timeout: 10000 });
-    await catering.waitForLoadState('domcontentloaded');
+    await switchDistrict(catering, getDistrictName());
 
     // ── Navigate to Districts ──
     await catering.getByRole('button', { name: 'Go to home page' }).click();

@@ -1,5 +1,6 @@
 import { expect, Locator, Page } from '@playwright/test';
 import { navigateK12CateringMenu } from './helpers';
+import { switchToCustomerDistrict } from './dataSync';
 
 function changePasswordDialog(page: Page) {
   return page.getByRole('dialog', { name: /Change Password/i });
@@ -26,6 +27,9 @@ async function openChangePasswordDialog(
   customerEmail: string,
 ): Promise<Locator> {
   await closeChangePasswordDialog(page);
+  // The demo customer lives under a specific district (Alief ISD on UAT); make
+  // sure we're on it before searching Accounts, or the account won't be found.
+  await switchToCustomerDistrict(page);
   await navigateK12CateringMenu(page, 'Accounts');
   await page.waitForLoadState('domcontentloaded');
 

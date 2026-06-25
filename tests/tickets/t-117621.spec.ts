@@ -1,12 +1,13 @@
 // Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/117621
 
 import { test, expect, Page } from '@playwright/test';
-import { loginToK12Catering } from '../../utils/helpers';
+import { loginToK12Catering, getCustomerAccountEmail } from '../../utils/helpers';
 import { ensureInK12CateringApp, clickSidebarItem } from '../../utils/dataSync';
 import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
 import { getK12CateringUrl, getK12CateringLoginUrl } from '../../utils/baseUrl';
 
-const CUSTOMER_EMAIL = 'SabihQATesting@outlook.com';
+// QA: SabihQATesting@outlook.com — UAT: SiddiquiUATTesting@outlook.com (under Alief ISD).
+const CUSTOMER_EMAIL = getCustomerAccountEmail();
 const CUSTOMER_PASSWORD = 'Password1!';
 
 test.use({ storageState: { cookies: [], origins: [] } });

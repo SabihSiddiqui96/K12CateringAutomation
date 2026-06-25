@@ -110,8 +110,10 @@ async function getFirstLocationName(page: Page): Promise<string | null> {
   return locationName;
 }
 
-async function deleteFirstLocation(page: Page): Promise<string> {
-  const locationName = await getFirstLocationName(page);
+async function deleteFirstLocation(page: Page, targetName?: string): Promise<string> {
+  // A specific non-primary location can be targeted by name; the app won't let
+  // you delete the only/Primary address, so callers pass a freshly-added one.
+  const locationName = targetName ?? (await getFirstLocationName(page));
 
   if (!locationName) {
     throw new Error(
@@ -167,12 +169,11 @@ test('Catering - Address Book - Delete saved location and add it back', async ({
     timeout: 15000,
   });
 
-  const hasSavedAddress = await getFirstLocationName(catering);
-  if (!hasSavedAddress) {
-    await addTestLocation(catering);
-  }
+  // Add a fresh, non-primary "office" location to delete — the existing saved
+  // address may be the Primary one, which the app blocks from deletion.
+  await addTestLocation(catering);
 
-  const deletedLocationName = await deleteFirstLocation(catering);
+  const deletedLocationName = await deleteFirstLocation(catering, 'office');
 
   await test.info().attach('deleted-address-location', {
     body: `Deleted location name: ${deletedLocationName}`,

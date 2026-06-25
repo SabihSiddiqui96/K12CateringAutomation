@@ -14,7 +14,6 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const ENV_LABEL =
   getEnvVar('ENVIRONMENT_LABEL', { required: false }) || 'QA (PrimeroEdge)';
-const GROUP_NAME = 'DBurksGroup1';
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -85,7 +84,14 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
     // The District Group select is disabled until Multi-Tenant is enabled.
     const groupSelect = catering.locator('#add-district-group');
     await expect(groupSelect).toBeEnabled({ timeout: 10000 });
-    await groupSelect.selectOption({ label: GROUP_NAME });
+    // Pick an existing group dynamically — group data on UAT changes, so a
+    // hardcoded name (e.g. "DBurksGroup1") goes stale. The specific group is
+    // incidental to what this test verifies.
+    const groupName = (await groupSelect.locator('option').allTextContents())
+      .map((o) => o.trim())
+      .find((o) => o && !/^select|^choose/i.test(o));
+    expect(groupName, 'Expected at least one District Group option').toBeTruthy();
+    await groupSelect.selectOption({ label: groupName as string });
 
     await catering
       .locator('#add-environment-select')
@@ -105,7 +111,7 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
     // ── Edit the District Group the district was added to ─────────────────
     const editGroupBtn = catering
       .getByRole('button', {
-        name: new RegExp(`Edit .*${escapeRegExp(GROUP_NAME)}`, 'i'),
+        name: new RegExp(`Edit .*${escapeRegExp(groupName as string)}`, 'i'),
       })
       .first();
     await scrollUntilVisible(catering, { target: editGroupBtn }).catch(() => {});
@@ -115,7 +121,7 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
     const dialog = catering.getByRole('dialog').first();
     await expect(dialog).toBeVisible({ timeout: 10000 });
     await expect(dialog.locator('#district-group-name-input')).toHaveValue(
-      GROUP_NAME,
+      groupName as string,
       { timeout: 10000 },
     );
 

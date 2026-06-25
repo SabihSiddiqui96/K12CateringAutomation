@@ -8,7 +8,12 @@
 //   • on SchoolCafé (Perseus) the module tooltip reads "Catering"
 
 import { test, expect, BrowserContext, Page } from '@playwright/test';
-import { loginToPrimeroEdge, loginToSchoolCafe } from '../../utils/helpers';
+import {
+  loginToPrimeroEdge,
+  loginToSchoolCafe,
+  loginToK12Catering,
+  isUatDirectLogin,
+} from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -33,6 +38,20 @@ test('Catering - Rename - "K12 Catering" shows as "Catering" in PrimeroEdge work
   context,
 }) => {
   test.setTimeout(3 * 60 * 1000);
+
+  // On UAT (direct K12 login) the PrimeroEdge Classic workspace tile, the .aspx
+  // interstitial, and SchoolCafé don't exist — but the rename is still verifiable
+  // from the app itself: the browser tab title reads "Catering" and "K12
+  // Catering" appears nowhere. Verify that and finish.
+  if (isUatDirectLogin()) {
+    const catering = await loginToK12Catering(page);
+    await expect(
+      catering.locator('aside[aria-label="Main navigation"]'),
+    ).toBeVisible({ timeout: 30000 });
+    await expect(catering).toHaveTitle(/^Catering$/i);
+    await expect(catering.getByText(/K12\s*Catering/i)).toHaveCount(0);
+    return;
+  }
 
   // ── PrimeroEdge Classic: Workspace tile renamed "K12 Catering" → "Catering" ──
   await loginToPrimeroEdge(page);

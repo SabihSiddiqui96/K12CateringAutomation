@@ -32,6 +32,14 @@ test.describe('Accounts', () => {
       has: catering.getByRole('button', { name: /View details for/i }),
     });
 
+  // Pending accounts show Approve/Reject instead of the Actions kebab, and a
+  // pending account can sort to the top of the list — so for Actions-kebab
+  // assertions target the first card that actually has an "Actions for" button.
+  const actionableCard = () =>
+    accountCards().filter({
+      has: catering.getByRole('button', { name: /Actions for/i }),
+    }).first();
+
   test('Accounts - Page heading, stat cards and list are visible', async () => {
     await expect(catering.locator('h1')).toContainText('Account Management', { timeout: 10000 });
     await expect(catering.getByText('Manage user accounts and permissions')).toBeVisible();
@@ -50,7 +58,7 @@ test.describe('Accounts', () => {
     await expect(firstCard.getByText('Role')).toBeVisible({ timeout: 10000 });
     await expect(firstCard.getByText('Email')).toBeVisible();
     await expect(firstCard.getByRole('button', { name: /View details for/i })).toBeVisible();
-    await expect(firstCard.getByRole('button', { name: /Actions for/i })).toBeVisible();
+    await expect(actionableCard().getByRole('button', { name: /Actions for/i })).toBeVisible();
 
     await expect(catering.getByRole('button', { name: 'Page 1' }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Next page' }).first()).toBeVisible();
@@ -73,8 +81,7 @@ test.describe('Accounts', () => {
   });
 
   test('Accounts - Actions kebab menu opens and can be dismissed', async () => {
-    await accountCards()
-      .first()
+    await actionableCard()
       .getByRole('button', { name: /Actions for/i })
       .click();
     await expect(catering.getByRole('menuitem', { name: 'Deactivate Account' })).toBeVisible({ timeout: 5000 });
@@ -84,8 +91,9 @@ test.describe('Accounts', () => {
   });
 
   test('Accounts - Account Details modal opens with all sections and closes correctly', async () => {
-    await accountCards()
-      .first()
+    // Use an active account (one with an Actions kebab); a pending account's
+    // details modal shows Approve/Reject instead of Deactivate/Update Details.
+    await actionableCard()
       .getByRole('button', { name: /View details for/i })
       .click();
     await expect(catering.getByRole('heading', { name: 'Account Details' })).toBeVisible({ timeout: 10000 });

@@ -8,6 +8,50 @@ export function getDistrictName(): string {
   return getEnvVar('DISTRICT_NAME', { required: false }) || 'Mercer County School District';
 }
 
+export function getSecondaryDistrictName(): string {
+  return getEnvVar('SECONDARY_DISTRICT_NAME', { required: false }) || 'Berkeley School District';
+}
+
+// Auto-dismiss the "Catering vX.Y.Z is Now Available" What's-New release
+// announcement modal. It pops up on login (notably right after a UAT release)
+// and its full-screen overlay intercepts sidebar/menu clicks until closed.
+// Register on any page that logs into K12 Catering (incl. direct customer/admin
+// logins that don't go through loginToK12Catering).
+export async function registerReleaseNotificationHandler(page: Page): Promise<void> {
+  await page.addLocatorHandler(
+    page.getByRole('button', { name: 'Close notification' }),
+    async (locator) => {
+      await locator.click().catch(() => {});
+    }
+  );
+}
+
+// Build a case-insensitive regex that matches a district name on screen even
+// when the app renders a curly apostrophe (’ U+2019) where the env value has a
+// straight one (') — e.g. "Lee's Summit R-7" stored vs "Lee’s Summit R-7"
+// displayed. Regex-escapes the name, then treats any apostrophe interchangeably.
+export function getDistrictNameRegex(name: string = getDistrictName()): RegExp {
+  const escaped = name
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/['‘’]/g, "['\\u2018\\u2019]");
+  return new RegExp(escaped, 'i');
+}
+
+// Whether we're running against the UAT/Release env (direct K12 login).
+export function isUatDirectLogin(): boolean {
+  return getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
+}
+
+// The demo customer ACCOUNT an admin manages in the Accounts list. QA and UAT
+// use different demo customers; on UAT that account lives under the secondary
+// district (Alief ISD), so callers switch there before searching Accounts (see
+// switchToCustomerDistrict in dataSync). Overridable via env if it ever changes.
+export function getCustomerAccountEmail(): string {
+  return isUatDirectLogin()
+    ? getEnvVar('UAT_ACCOUNT_CUSTOMER_EMAIL', { required: false }) || 'SiddiquiUATTesting@outlook.com'
+    : getEnvVar('QA_ACCOUNT_CUSTOMER_EMAIL', { required: false }) || 'SabihQATesting@outlook.com';
+}
+
 export const mercerCountySelector = '[value="MERCER COUNTY SCHOOLS"], [value="Mercer County School District"]';
 
 function positiveIntFromEnv(name: string, fallback: number): number {
@@ -289,6 +333,8 @@ export async function loginToK12Catering(
       }
     }
   );
+
+  await registerReleaseNotificationHandler(catering);
 
   if (navigateTo) {
     await navigateK12CateringMenu(catering, navigateTo);
