@@ -969,15 +969,29 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     }
   }
 
-  // Capture the title of the first menu item on the target district from the
-  // first card's Edit pencil aria-label (e.g. "Edit apple juice menu item").
-  const firstTargetEditBtn = catering
+  // Pick the target-district menu item to rename, from the cards' Edit-pencil
+  // aria-labels (e.g. "Edit apple juice menu item"). IMPORTANT: skip any item
+  // whose name is itself a leftover from a prior run — a rename that a failed
+  // run never restored (e.g. "AutoRenamed 8144", "AutoSync 144264"). Those are
+  // target-LOCAL names with no matching item in the home district's shared
+  // catalog, so the home Data Sync view can never show an Overrides row for
+  // them. Choosing a genuine shared item (Cereal, Spaghetti, …) is what makes
+  // the override appear; a successful run then restores it, breaking the
+  // rename-leftover accumulation cycle.
+  const targetEditBtns = catering
     .locator('#main-content')
-    .getByRole('button', { name: /^Edit\s+\S/i })
-    .first();
-  await expect(firstTargetEditBtn).toBeVisible({ timeout: 15000 });
-  const firstTargetLabel =
-    (await firstTargetEditBtn.getAttribute('aria-label')) ?? '';
+    .getByRole('button', { name: /^Edit\s+\S/i });
+  await expect(targetEditBtns.first()).toBeVisible({ timeout: 15000 });
+  const targetEditLabels = await targetEditBtns.evaluateAll((els) =>
+    els.map((e) => e.getAttribute('aria-label') || ''),
+  );
+  const LEFTOVER_ITEM_RE = /^Edit\s+(?:AutoRenamed|AutoSync)\b/i;
+  let chosenIdx = targetEditLabels.findIndex(
+    (l) => /^Edit\s+\S/i.test(l) && !LEFTOVER_ITEM_RE.test(l),
+  );
+  if (chosenIdx < 0) chosenIdx = 0; // all items are leftovers — use the first
+  const firstTargetEditBtn = targetEditBtns.nth(chosenIdx);
+  const firstTargetLabel = targetEditLabels[chosenIdx] ?? '';
   const firstTargetMatch = firstTargetLabel.match(
     /^Edit\s+(.+?)(?:\s+menu item)?$/i,
   );

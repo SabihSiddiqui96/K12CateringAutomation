@@ -14,10 +14,17 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const EMAIL_RE = /[\w.+-]+@[\w.-]+\.\w+/g;
 
-// The inbox shows one user email per item, so the email count is a reliable
-// "visible items" proxy (cards/charts contain no emails).
+// The inbox paginates at 25 items/page and prints a summary like "1–25 of 35".
+// That trailing total is the inbox's own declared item count for the current
+// filter, so it — not the rendered-row count — is what AC6 compares to the
+// "All (N)"/chip counts (otherwise any dataset >25 rows can never match).
+// Falls back to the rendered email-per-row count for small single-page sets
+// that render no pagination summary.
+const INBOX_TOTAL_RE = /\d+\s*[–-]\s*\d+\s+of\s+(\d+)/i;
 async function inboxItemCount(page: Page): Promise<number> {
   const txt = (await page.locator('main').first().innerText().catch(() => '')) ?? '';
+  const paged = txt.match(INBOX_TOTAL_RE);
+  if (paged) return Number(paged[1]);
   return (txt.match(EMAIL_RE) || []).length;
 }
 
