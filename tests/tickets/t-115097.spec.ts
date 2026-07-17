@@ -228,28 +228,34 @@ async function openChangePasswordModal(catering: Page) {
   const changePasswordMenuItem = catering.getByRole('menuitem', {
     name: /Change Password/i,
   });
-  // Open the kebab and click Change Password, retrying the whole open→click in
-  // case the account row/menu re-renders (a detached-element click) — happens
-  // most after a fresh re-login (the reset step).
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  const dialog = getChangePasswordDialog(catering);
+  // Retry the whole open→click→dialog. The account row/menu can re-render mid-click
+  // (detached element — happens most after a fresh re-login), and clicking "Change
+  // Password" can itself trigger a PrimeroEdge SSO relaunch (the interstitial pops
+  // instead of the dialog). Only stop once the dialog is actually open, dismissing
+  // any interstitial between attempts.
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
     await dismissReauthInterstitial(catering);
-    await expect(actionsButton.first()).toBeVisible({ timeout: 10000 });
-    await actionsButton.first().click();
+    if (!(await actionsButton.first().isVisible({ timeout: 10000 }).catch(() => false))) {
+      await navigateK12CateringMenu(catering, 'Accounts').catch(() => undefined);
+      await dismissReauthInterstitial(catering);
+      continue;
+    }
+    await actionsButton.first().click().catch(() => undefined);
     const menuShown = await changePasswordMenuItem
       .isVisible({ timeout: 3000 })
       .catch(() => false);
     if (menuShown) {
-      try {
-        await changePasswordMenuItem.click({ timeout: 5000 });
-        break;
-      } catch (err) {
-        if (attempt === 3) throw err;
-      }
+      await changePasswordMenuItem.click({ timeout: 5000 }).catch(() => undefined);
+    }
+    // The click may have bounced us to the SSO interstitial instead of the dialog.
+    await dismissReauthInterstitial(catering);
+    if (await dialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+      break;
     }
     await catering.waitForTimeout(600);
   }
 
-  const dialog = getChangePasswordDialog(catering);
   await expect(dialog).toBeVisible({ timeout: 10000 });
   return dialog;
 }
