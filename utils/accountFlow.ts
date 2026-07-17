@@ -1,5 +1,5 @@
 import { expect, Locator, Page } from '@playwright/test';
-import { navigateK12CateringMenu } from './helpers';
+import { navigateK12CateringMenu, dismissReauthInterstitial } from './helpers';
 import { switchToCustomerDistrict } from './dataSync';
 
 function changePasswordDialog(page: Page) {
@@ -32,12 +32,16 @@ async function openChangePasswordDialog(
   await switchToCustomerDistrict(page);
   await navigateK12CateringMenu(page, 'Accounts');
   await page.waitForLoadState('domcontentloaded');
+  // A mid-session PrimeroEdge token refresh can bounce us onto the SSO relaunch
+  // interstitial; wait it out before interacting with Accounts.
+  await dismissReauthInterstitial(page);
 
   const searchBox = page.getByRole('textbox', {
     name: /Search accounts by name, username, or email/i,
   });
   await expect(searchBox).toBeVisible({ timeout: 10000 });
   await searchBox.fill(customerEmail);
+  await page.waitForLoadState('networkidle').catch(() => undefined);
   await page.waitForTimeout(600);
 
   const accountCard = page.getByRole('listitem').filter({
@@ -46,16 +50,37 @@ async function openChangePasswordDialog(
   await expect(accountCard).toBeVisible({ timeout: 10000 });
 
   const actionsButton = accountCard.getByRole('button', { name: /Actions for/i });
-  await expect(actionsButton).toBeVisible({ timeout: 10000 });
-  await actionsButton.click();
-
   const changePasswordMenuItem = page.getByRole('menuitem', {
     name: /Change Password/i,
   });
-  await expect(changePasswordMenuItem).toBeVisible({ timeout: 5000 });
-  await changePasswordMenuItem.click();
-
   const dialog = changePasswordDialog(page);
+  // Retry the whole open→click→dialog. Clicking "Change Password" can itself trigger
+  // a PrimeroEdge SSO relaunch (the interstitial pops instead of the dialog), and the
+  // account row/menu can re-render mid-click (detached element). Only stop once the
+  // dialog is actually open — dismissing any interstitial between attempts.
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    await dismissReauthInterstitial(page);
+    if (!(await actionsButton.isVisible({ timeout: 10000 }).catch(() => false))) {
+      // A relaunch may have navigated us away from Accounts; go back and retry.
+      await navigateK12CateringMenu(page, 'Accounts').catch(() => undefined);
+      await dismissReauthInterstitial(page);
+      continue;
+    }
+    await actionsButton.click().catch(() => undefined);
+    const menuShown = await changePasswordMenuItem
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    if (menuShown) {
+      await changePasswordMenuItem.click({ timeout: 5000 }).catch(() => undefined);
+    }
+    // The click may have bounced us to the SSO interstitial instead of the dialog.
+    await dismissReauthInterstitial(page);
+    if (await dialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+      break;
+    }
+    await page.waitForTimeout(600);
+  }
+
   await expect(dialog).toBeVisible({ timeout: 10000 });
   return dialog;
 }

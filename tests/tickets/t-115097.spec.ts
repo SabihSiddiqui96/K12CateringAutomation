@@ -10,6 +10,7 @@ import {
   getDistrictName,
   getCustomerAccountEmail,
   isUatDirectLogin,
+  dismissReauthInterstitial,
 } from '../../utils/helpers';
 import { switchToCustomerDistrict, switchDistrict } from '../../utils/dataSync';
 import { decryptPassword } from '../../utils/crypto';
@@ -207,6 +208,9 @@ async function openChangePasswordModal(catering: Page) {
   await switchToCustomerDistrict(catering);
   await navigateK12CateringMenu(catering, 'Accounts');
   await catering.waitForLoadState('domcontentloaded');
+  // A mid-session PrimeroEdge token refresh can bounce us onto the SSO relaunch
+  // interstitial; wait it out before interacting with Accounts.
+  await dismissReauthInterstitial(catering);
 
   const searchBox = catering.getByRole('textbox', {
     name: /Search accounts by name, username, or email/i,
@@ -228,6 +232,7 @@ async function openChangePasswordModal(catering: Page) {
   // case the account row/menu re-renders (a detached-element click) — happens
   // most after a fresh re-login (the reset step).
   for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await dismissReauthInterstitial(catering);
     await expect(actionsButton.first()).toBeVisible({ timeout: 10000 });
     await actionsButton.first().click();
     const menuShown = await changePasswordMenuItem

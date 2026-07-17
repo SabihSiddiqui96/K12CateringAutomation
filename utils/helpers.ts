@@ -357,6 +357,36 @@ export async function navigateK12CateringMenu(
   await menuButton.click();
 }
 
+/**
+ * Wait out the PrimeroEdge SSO re-launch interstitial ("You will be automatically
+ * authenticated and redirected to Catering in N seconds…"). A mid-session token
+ * refresh can bounce a long-running test onto this page; it auto-redirects in ~5s.
+ * We click the "please select this link" link to skip the wait, then wait for the
+ * banner to clear. Best-effort — never throws, so callers can call it defensively
+ * before interacting with the app.
+ */
+export async function dismissReauthInterstitial(page: Page): Promise<void> {
+  // The relaunch can re-trigger (e.g. it pops again right after a redirect), so try
+  // a few times until the banner stays gone.
+  for (let i = 0; i < 3; i += 1) {
+    const banner = page.getByText(
+      /automatically authenticated and redirected to Catering/i
+    );
+    if (!(await banner.isVisible({ timeout: 1000 }).catch(() => false))) {
+      return;
+    }
+    // The interstitial link's accessible name is exactly "link"; click it to redirect
+    // immediately instead of waiting out the ~5s auto-redirect.
+    await page
+      .getByRole('link', { name: 'link', exact: true })
+      .first()
+      .click()
+      .catch(() => undefined);
+    await page.waitForLoadState('networkidle').catch(() => undefined);
+    await banner.waitFor({ state: 'hidden', timeout: 12000 }).catch(() => undefined);
+  }
+}
+
 export async function scrollUntilVisible(
   page: Page,
   options: ScrollUntilVisibleOptions = {}
