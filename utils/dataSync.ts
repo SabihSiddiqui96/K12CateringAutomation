@@ -304,11 +304,42 @@ async function openItemEdit(page: Page, name: string): Promise<void> {
   await expect(page.getByRole('dialog', { name: /Edit Menu Item/i })).toBeVisible({ timeout: 10000 });
 }
 
-/** Edit a menu item's name and/or price (TheRealMenu) and save. */
+/**
+ * Chip-tag fields (Ingredients, Allergens) in the Edit Menu Item dialog: a free-text
+ * input (`#allergens-input` / `#ingredients-input`) where typing a value + Enter adds
+ * a chip, and each chip has a "Remove <value> allergen|ingredient" button. Replace ALL
+ * existing chips with `values` (empty array clears the field).
+ */
+async function setChips(page: Page, inputId: string, kind: 'allergen' | 'ingredient', values: string[]): Promise<void> {
+  const removeRe = new RegExp(`^Remove .+ ${kind}$`, 'i');
+  let removeBtn = page.getByRole('button', { name: removeRe }).first();
+  while (await removeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await removeBtn.click();
+    await page.waitForTimeout(250);
+    removeBtn = page.getByRole('button', { name: removeRe }).first();
+  }
+  const input = page.locator(`#${inputId}`);
+  for (const value of values) {
+    await input.click();
+    await input.fill(value);
+    await input.press('Enter');
+    await page.waitForTimeout(250);
+  }
+}
+
+async function readChips(page: Page, kind: 'allergen' | 'ingredient'): Promise<string[]> {
+  const btns = page.getByRole('button', { name: new RegExp(`^Remove .+ ${kind}$`, 'i') });
+  const ariaLabels = await btns.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  const re = new RegExp(`^Remove (.+) ${kind}$`, 'i');
+  return ariaLabels.map((l) => l?.match(re)?.[1]).filter((v): v is string => Boolean(v));
+}
+
+/** Edit a menu item's name, price, allergens, and/or ingredients (TheRealMenu) and save.
+ *  `newAllergens`/`newIngredients` REPLACE the item's existing chips with the given list. */
 export async function editMenuItem(
   page: Page,
   name: string,
-  changes: { newName?: string; newPrice?: string },
+  changes: { newName?: string; newPrice?: string; newAllergens?: string[]; newIngredients?: string[] },
 ): Promise<void> {
   await openItemEdit(page, name);
   if (changes.newName !== undefined) {
@@ -318,6 +349,12 @@ export async function editMenuItem(
   if (changes.newPrice !== undefined) {
     await page.locator('#price-per-item').clear();
     await page.locator('#price-per-item').fill(changes.newPrice);
+  }
+  if (changes.newAllergens !== undefined) {
+    await setChips(page, 'allergens-input', 'allergen', changes.newAllergens);
+  }
+  if (changes.newIngredients !== undefined) {
+    await setChips(page, 'ingredients-input', 'ingredient', changes.newIngredients);
   }
   // Description is a required field; an item without one (e.g. a leftover synced
   // item) leaves the Update button blocked ("Description is required"). Fill a
@@ -459,4 +496,24 @@ export async function readMenuItemPrice(page: Page, name: string): Promise<strin
   // Normalise "$7.70", "7.7", "7.70" -> "7.7" for stable comparison.
   const num = Number(String(raw).replace(/[^0-9.]/g, ''));
   return Number.isFinite(num) ? String(num) : String(raw).trim();
+}
+
+/** Read a menu item's Allergens chips via the Edit dialog, then cancel (no override created). */
+export async function readMenuItemAllergens(page: Page, name: string): Promise<string[]> {
+  await openItemEdit(page, name);
+  const values = await readChips(page, 'allergen');
+  await page.getByRole('button', { name: /Cancel and close modal|^Cancel$/i }).first().click().catch(() => undefined);
+  await page.keyboard.press('Escape').catch(() => undefined);
+  await page.getByRole('dialog', { name: /Edit Menu Item/i }).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => undefined);
+  return values;
+}
+
+/** Read a menu item's Ingredients chips via the Edit dialog, then cancel (no override created). */
+export async function readMenuItemIngredients(page: Page, name: string): Promise<string[]> {
+  await openItemEdit(page, name);
+  const values = await readChips(page, 'ingredient');
+  await page.getByRole('button', { name: /Cancel and close modal|^Cancel$/i }).first().click().catch(() => undefined);
+  await page.keyboard.press('Escape').catch(() => undefined);
+  await page.getByRole('dialog', { name: /Edit Menu Item/i }).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => undefined);
+  return values;
 }
