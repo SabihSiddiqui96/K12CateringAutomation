@@ -169,17 +169,41 @@ export async function loginToK12CateringAsDistrictUser(page: Page): Promise<void
 }
 
 export async function openK12CateringApp(page: Page): Promise<Page> {
-  const newTabPromise = page
-    .context()
-    .waitForEvent('page', { timeout: 15_000 })
-    .catch(() => undefined);
-
   // The page has TWO links to /K12Catering/K12Catering.aspx — one in the
   // hidden left-nav module list (off-screen) and the visible Workspace
   // tile. Use Playwright's `:visible` pseudo to pick the visible one.
   const cateringLink = page
     .locator('a[href*="K12Catering.aspx" i]:visible')
     .first();
+
+  // The Workspace tile has been observed to disappear entirely from the
+  // PrimeroEdge dashboard (module toggled off / permission change) while the
+  // Catering module itself stays reachable at its own URL. When there is no
+  // link at all, don't burn the click timeout — navigate straight to the module
+  // (same destination the tile points at) and log it, so a genuinely missing
+  // tile is visible in the run output instead of silently swallowed.
+  if (await cateringLink.count() === 0) {
+    const target = new URL('/K12Catering/K12Catering.aspx', page.url()).toString();
+    console.log(
+      `[login] no K12 Catering tile on the PrimeroEdge workspace; navigating directly to ${target}`
+    );
+    // That page is the same launch interstitial the tile leads to: it
+    // auto-authenticates and pops the catering UI in a NEW tab after ~5s, so
+    // wait for that tab rather than returning the (now idle) workspace tab.
+    const redirectedTab = page
+      .context()
+      .waitForEvent('page', { timeout: 20_000 })
+      .catch(() => undefined);
+    await page.goto(target, { waitUntil: 'domcontentloaded' });
+    const openedPage = await redirectedTab;
+    return openedPage ?? page;
+  }
+
+  const newTabPromise = page
+    .context()
+    .waitForEvent('page', { timeout: 15_000 })
+    .catch(() => undefined);
+
   await cateringLink.scrollIntoViewIfNeeded().catch(() => undefined);
   await cateringLink.click();
 
