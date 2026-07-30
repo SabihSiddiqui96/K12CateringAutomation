@@ -985,7 +985,13 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
   const targetEditLabels = await targetEditBtns.evaluateAll((els) =>
     els.map((e) => e.getAttribute('aria-label') || ''),
   );
-  const LEFTOVER_ITEM_RE = /^Edit\s+(?:AutoRenamed|AutoSync)\b/i;
+  // No \b after the prefixes: t-117617 names its items "AutoSyncAI <stamp>", and
+  // "AutoSync\b" does NOT match that (the next char, "A", is a word char). Such an
+  // item was therefore treated as a genuine shared item, and since it is really a
+  // target-local leftover the home Data Sync view can never show an Overrides row
+  // for it — the whole 90s override lookup below timed out. Match any AutoRenamed*
+  // / AutoSync* prefix so every generated leftover is skipped.
+  const LEFTOVER_ITEM_RE = /^Edit\s+(?:AutoRenamed|AutoSync)/i;
   let chosenIdx = targetEditLabels.findIndex(
     (l) => /^Edit\s+\S/i.test(l) && !LEFTOVER_ITEM_RE.test(l),
   );

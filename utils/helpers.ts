@@ -221,9 +221,17 @@ async function finishK12CateringLaunch(page: Page): Promise<void> {
     .locator(`a[href*="${getK12CateringUrl()}/login?token="]`)
     .first();
 
+  // Navigate rather than click: the launcher link is target="_blank", so a click
+  // lands the app in a new tab and leaves this page on the interstitial (see
+  // ensureInK12CateringApp for the same trap).
   if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await launcherLink.click();
-    await page.waitForLoadState('domcontentloaded');
+    const href = await launcherLink.getAttribute('href');
+    if (href) {
+      await page.goto(href, { waitUntil: 'domcontentloaded' });
+    } else {
+      await launcherLink.click();
+      await page.waitForLoadState('domcontentloaded');
+    }
     await page.waitForLoadState('networkidle').catch(() => { });
   }
 

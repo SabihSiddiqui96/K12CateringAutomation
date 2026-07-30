@@ -47,8 +47,18 @@ export async function ensureInK12CateringApp(page: Page): Promise<void> {
   if (!(await sidebar.isVisible({ timeout: 2000 }).catch(() => false))) {
     const launcherLink = page.locator('a[href*="/login?token="]').first();
     if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await launcherLink.click();
-      await page.waitForLoadState('domcontentloaded');
+      // The interstitial's launcher link opens the app in a NEW tab (and the page
+      // self-redirects into one too), so clicking it leaves THIS page parked on the
+      // interstitial forever — the test holds this page object, so it would never
+      // see the sidebar and every retry would re-strand on the same screen. Navigate
+      // this tab to the token URL instead, which keeps the test's page valid.
+      const href = await launcherLink.getAttribute('href');
+      if (href) {
+        await page.goto(href, { waitUntil: 'domcontentloaded' });
+      } else {
+        await launcherLink.click();
+        await page.waitForLoadState('domcontentloaded');
+      }
     }
     await expect(sidebar).toBeVisible({ timeout: 30000 });
   }

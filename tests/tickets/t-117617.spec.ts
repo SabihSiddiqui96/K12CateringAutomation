@@ -318,6 +318,14 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
         newAllergens: [ALLERGEN_SYNCED],
         newIngredients: [INGREDIENT_SYNCED],
       });
+      // Pin HOME's own values BEFORE pushing. setChips clears existing chips then
+      // adds the new ones, so HOME must read back exactly the two test values — if a
+      // stale chip survived here, the mismatch is this edit, not the sync. Asserting
+      // it separates "the edit didn't replace" from "the sync didn't replace" instead
+      // of blaming the target for state that was already wrong on the source.
+      expect(await readMenuItemAllergens(catering, uniqueName)).toEqual([ALLERGEN_SYNCED]);
+      expect(await readMenuItemIngredients(catering, uniqueName)).toEqual([INGREDIENT_SYNCED]);
+
       await goToDataSync(catering);
       await runPushSyncNow(catering);
 
