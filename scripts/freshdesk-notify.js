@@ -21,7 +21,11 @@
  * Why membership and not created_at: a ticket can be raised in another queue and moved
  * into this one later, which is normal for dev escalations. Watching "tickets in the
  * group we haven't seen" catches those; watching creation dates would miss them
- * silently. It also means a reopened ticket announces again, which is intended.
+ * silently.
+ *
+ * A ticket is announced at most ONCE, ever. Announced ids are kept permanently and
+ * never pruned, so a ticket that is closed and later reopened does not announce a
+ * second time. At a handful of tickets a week the list stays tiny.
  *
  * Secrets / config are read from the repo .env (never the shell env):
  *   - FRESHDESK_API_KEY           agent API key (Profile Settings -> Your API Key)
@@ -49,10 +53,12 @@ const DEFAULT_GROUP_ID = '22000158621';
 const SEARCH_PAGE_SIZE = 30;
 const MAX_PAGES = 10;
 
-// Statuses that mean "no longer open". Everything else — In Progress, Development,
-// Researching, Escalated and the rest of the custom set — counts as open, which is what
-// the "Front Office (development) Open tickets" view shows.
-const CLOSED_STATUSES = new Set([4, 5]); // 4 = Resolved, 5 = Closed
+// Statuses the "Front Office (development) Open tickets" view does NOT show. Resolved
+// and Closed are obvious; Development is excluded too — that work has been handed to
+// engineering and is tracked as a PBI, so it isn't awaiting front-office action.
+// Verified against the view: with Development excluded the queue matches exactly.
+// Everything else (In Progress, Researching, Escalated, ...) counts as open.
+const EXCLUDED_STATUSES = new Set([4, 5, 17]); // Resolved, Closed, Development
 
 // Above this many new tickets at once, post a count + link instead of the full list.
 const DIGEST_THRESHOLD = 5;
@@ -132,7 +138,7 @@ function postWebhook(webhookUrl, text) {
   });
 }
 
-/** Every non-closed ticket currently sitting in the watched group. */
+/** Every ticket the watched view would show: in the group, and not in an excluded status. */
 async function fetchOpenGroupTickets(domain, apiKey, groupId) {
   const collected = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -145,7 +151,7 @@ async function fetchOpenGroupTickets(domain, apiKey, groupId) {
     collected.push(...results);
     if (results.length < SEARCH_PAGE_SIZE) break;
   }
-  return collected.filter((t) => !CLOSED_STATUSES.has(Number(t.status)));
+  return collected.filter((t) => !EXCLUDED_STATUSES.has(Number(t.status)));
 }
 
 /**
