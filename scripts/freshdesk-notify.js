@@ -1,34 +1,33 @@
 #!/usr/bin/env node
 /**
- * Freshdesk -> RingCentral new-ticket notifier.
+ * Freshdesk -> RingCentral ticket notifier for the Front Office (development) queue.
  *
- * Polls Freshdesk for tickets created since the last check and posts one message
- * per new ticket to a RingCentral channel. Freshdesk's own webhook automation would
- * be instant, but it lives under Admin -> Workflows, which this account can't reach,
- * so we poll instead.
+ * Watches one group's open tickets and posts a message when tickets appear that we
+ * haven't announced before. Freshdesk's own webhook automation would be instant, but it
+ * lives under Admin -> Workflows which this account can't reach, so this polls instead
+ * (run it from Task Scheduler).
  *
  * Usage:
- *   node scripts/freshdesk-notify.js              # normal run (post anything new)
+ *   node scripts/freshdesk-notify.js              # normal run
  *   node scripts/freshdesk-notify.js --dry-run    # print, don't post
- *   node scripts/freshdesk-notify.js --ticket 324921 [--dry-run]
- *                                                 # render one specific ticket (demo)
- *   node scripts/freshdesk-notify.js --reset      # re-baseline to "now", post nothing
- *   node scripts/freshdesk-notify.js --min-priority 1 --dry-run
- *                                                 # preview including Low tickets
+ *   node scripts/freshdesk-notify.js --reset      # mark everything current as seen
+ *   node scripts/freshdesk-notify.js --ticket 324921 [--dry-run]   # render one ticket
  *
  * What gets posted:
  *   1-5 new tickets  -> ONE message listing them all, separated by dividers
- *   6+ new tickets   -> a single "N new tickets came in" notice with a link to the queue
- *                       (this is the catch-up case, e.g. first run after a weekend)
+ *   6+ new tickets   -> a single "N new tickets came in" notice linking to the queue
  * Never one message per ticket: a batch is one event and should read as one message.
  *
- * Secrets are read from the repo .env (never the shell env):
- *   - FRESHDESK_API_KEY           the agent API key (Profile Settings -> Your API Key)
+ * Why membership and not created_at: a ticket can be raised in another queue and moved
+ * into this one later, which is normal for dev escalations. Watching "tickets in the
+ * group we haven't seen" catches those; watching creation dates would miss them
+ * silently. It also means a reopened ticket announces again, which is intended.
+ *
+ * Secrets / config are read from the repo .env (never the shell env):
+ *   - FRESHDESK_API_KEY           agent API key (Profile Settings -> Your API Key)
  *   - FRESHDESK_RC_WEBHOOK_URL    RingCentral incoming webhook to post into
  *   - FRESHDESK_DOMAIN            optional, defaults to primeroedge.freshdesk.com
- *   - FRESHDESK_MIN_PRIORITY      optional, defaults to 3 (High). The desk takes ~150
- *                                 tickets/day, almost all Low, so alerting on every one
- *                                 would be noise. Set to 1 to announce everything.
+ *   - FRESHDESK_GROUP_ID          optional, defaults to Front Office (development)
  *
  * State lives in .freshdesk-notify.json (gitignored) so a ticket is never announced
  * twice, even if the schedule double-fires or a run is interrupted.
@@ -42,15 +41,23 @@ const ROOT = path.resolve(__dirname, '..');
 const STATE_FILE = path.join(ROOT, '.freshdesk-notify.json');
 const DEFAULT_DOMAIN = 'primeroedge.freshdesk.com';
 
-const PAGE_SIZE = 50;
+// Front Office (development). This is the group the API key's own agent belongs to.
+const DEFAULT_GROUP_ID = '22000158621';
 
-// Safety stop for the catch-up paging, so a corrupt/absent watermark can't walk the
-// entire ticket history. 20 pages = 1000 tickets, far beyond any realistic gap.
-const MAX_PAGES = 20;
+// Freshdesk's search endpoint pages at 30 and caps at 10 pages. The queue holds ~145
+// tickets in total, so this comfortably covers it.
+const SEARCH_PAGE_SIZE = 30;
+const MAX_PAGES = 10;
 
-// Above this many new tickets in one run, post just a count + link instead of one message
-// each. Stops a Monday morning after a weekend offline from flooding the channel.
+// Statuses that mean "no longer open". Everything else — In Progress, Development,
+// Researching, Escalated and the rest of the custom set — counts as open, which is what
+// the "Front Office (development) Open tickets" view shows.
+const CLOSED_STATUSES = new Set([4, 5]); // 4 = Resolved, 5 = Closed
+
+// Above this many new tickets at once, post a count + link instead of the full list.
 const DIGEST_THRESHOLD = 5;
+
+const DIVIDER = '────────────────────────────';
 
 function fail(msg) {
   console.error('ERROR: ' + msg);
@@ -71,16 +78,14 @@ function readEnvValue(key) {
 
 function readState() {
   try {
-    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    return { announced: Array.isArray(s.announced) ? s.announced : [] };
   } catch {
-    return { lastCreatedAt: null, announced: [] };
+    return { announced: [] };
   }
 }
 
 function writeState(state) {
-  // Keep the announced list bounded — it only exists to dedupe against the page of
-  // recent tickets we actually look at.
-  state.announced = state.announced.slice(-500);
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
@@ -127,59 +132,25 @@ function postWebhook(webhookUrl, text) {
   });
 }
 
-/**
- * Every ticket created after `sinceIso`, walking pages until we reach older ones.
- *
- * Paged rather than a single fixed window: after a weekend (or any stretch with the
- * machine off) the backlog can exceed one page, and a fixed window would drop the
- * oldest tickets silently — the one failure mode nobody would ever notice.
- *
- * With no baseline yet, one page is enough: the caller only wants the newest ticket
- * to mark a starting point.
- */
-async function fetchTicketsSince(domain, apiKey, sinceIso) {
-  const since = sinceIso ? new Date(sinceIso).getTime() : null;
+/** Every non-closed ticket currently sitting in the watched group. */
+async function fetchOpenGroupTickets(domain, apiKey, groupId) {
   const collected = [];
-
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const res = await apiGet(
-      domain,
-      apiKey,
-      `/tickets?order_by=created_at&order_type=desc&per_page=${PAGE_SIZE}&page=${page}`,
-    );
+    const query = encodeURIComponent(`"group_id:${groupId}"`);
+    const res = await apiGet(domain, apiKey, `/search/tickets?query=${query}&page=${page}`);
     if (res.status !== 200) {
-      fail(`HTTP ${res.status} listing tickets: ${res.body.slice(0, 300)}`);
+      fail(`HTTP ${res.status} searching tickets: ${res.body.slice(0, 300)}`);
     }
-    const batch = JSON.parse(res.body);
-    if (!Array.isArray(batch)) fail('Unexpected ticket list response.');
-    collected.push(...batch);
-
-    if (since === null) break;                 // baseline run — newest page is enough
-    if (batch.length < PAGE_SIZE) break;       // no more tickets to read
-    // Once a page ends older than the watermark, everything beyond it is older too.
-    const oldest = batch[batch.length - 1];
-    if (oldest && new Date(oldest.created_at).getTime() <= since) break;
-
-    if (page === MAX_PAGES) {
-      console.warn(
-        `WARNING: stopped after ${MAX_PAGES} pages (${collected.length} tickets). ` +
-        'Older tickets in this backlog were not checked.',
-      );
-    }
+    const results = JSON.parse(res.body).results || [];
+    collected.push(...results);
+    if (results.length < SEARCH_PAGE_SIZE) break;
   }
-
-  // Dedupe by id: tickets created while we're paging shift the window, so the same
-  // ticket can appear on two consecutive pages and would otherwise be announced twice.
-  const seen = new Set();
-  return collected.filter((t) => !seen.has(t.id) && seen.add(t.id));
+  return collected.filter((t) => !CLOSED_STATUSES.has(Number(t.status)));
 }
 
-const DIVIDER = '────────────────────────────';
-
 /**
- * Big catch-up (e.g. first run after a weekend): just say how many arrived and link to
- * the queue. Listing them would be an unreadable wall — and at this desk's volume could
- * be hundreds of entries in a single message.
+ * Big catch-up: say how many arrived and link to the queue. Listing them would be an
+ * unreadable wall of text in a single chat message.
  */
 function buildCountOnly(tickets, domain) {
   return (
@@ -191,9 +162,8 @@ function buildCountOnly(tickets, domain) {
 }
 
 /**
- * The one message a normal run posts: every new ticket listed in a single message,
- * separated by dividers. One message per ticket was rejected as too noisy — even a
- * batch of three meant three pings for what is really one event.
+ * The one message a normal run posts: every new ticket in a single message, separated
+ * by dividers. One message per ticket was rejected as too noisy — a batch is one event.
  */
 function buildSummary(tickets, domain) {
   const entries = tickets.map((t) => {
@@ -229,6 +199,7 @@ function buildSummary(tickets, domain) {
   if (!apiKey) fail('FRESHDESK_API_KEY not found in .env.');
   const webhookUrl = readEnvValue('FRESHDESK_RC_WEBHOOK_URL');
   const domain = readEnvValue('FRESHDESK_DOMAIN') || DEFAULT_DOMAIN;
+  const groupId = readEnvValue('FRESHDESK_GROUP_ID') || DEFAULT_GROUP_ID;
 
   // --- demo mode: render one known ticket -------------------------------------
   if (singleTicket) {
@@ -245,87 +216,48 @@ function buildSummary(tickets, domain) {
   }
 
   const state = readState();
+  const open = await fetchOpenGroupTickets(domain, apiKey, groupId);
+  console.log(`${open.length} open ticket(s) in group ${groupId}.`);
 
   if (reset) {
-    state.lastCreatedAt = new Date().toISOString();
-    state.announced = [];
+    state.announced = open.map((t) => t.id);
     writeState(state);
-    console.log('Baseline reset to now — only tickets created after this will be announced.');
+    console.log(`Marked ${state.announced.length} current ticket(s) as seen. Nothing posted.`);
     return;
   }
 
-  const tickets = await fetchTicketsSince(domain, apiKey, state.lastCreatedAt);
-
-  // First ever run: record where we are and stay quiet. Announcing the existing backlog
-  // would dump 50 messages into the channel the moment this is switched on.
-  if (!state.lastCreatedAt) {
-    state.lastCreatedAt = tickets.length ? tickets[0].created_at : new Date().toISOString();
-    state.announced = tickets.map((t) => t.id);
+  // First run: adopt the current queue as the baseline rather than announcing a backlog
+  // that the team has already been working for weeks.
+  if (!state.announced.length) {
+    state.announced = open.map((t) => t.id);
     writeState(state);
-    console.log(`First run — baseline set at ${state.lastCreatedAt}. Nothing posted.`);
-    console.log('Run with --ticket <id> --dry-run to preview the message format.');
+    console.log(`First run — baselined ${state.announced.length} existing ticket(s). Nothing posted.`);
     return;
   }
 
-  // This desk takes ~150 tickets a day, the overwhelming majority of them Low. Alerting
-  // on all of them would be noise the team mutes, so only tickets at or above
-  // FRESHDESK_MIN_PRIORITY are announced (default High, i.e. High + Urgent, ~6/day).
-  // Set FRESHDESK_MIN_PRIORITY=1 to get everything.
-  const minPriorityArg = args.indexOf('--min-priority');
-  const minPriority = Number(
-    minPriorityArg >= 0 ? args[minPriorityArg + 1] : readEnvValue('FRESHDESK_MIN_PRIORITY') || 3,
-  );
-
-  const since = new Date(state.lastCreatedAt).getTime();
-  const created = tickets
-    .filter((t) => new Date(t.created_at).getTime() > since)
-    .filter((t) => !state.announced.includes(t.id));
-  const fresh = created
-    .filter((t) => Number(t.priority) >= minPriority)
-    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); // oldest first
-
-  // Below-threshold tickets are still marked seen, so raising the threshold later
-  // doesn't suddenly replay everything that was skipped.
-  const skipped = created.filter((t) => Number(t.priority) < minPriority);
-  if (skipped.length) console.log(`${skipped.length} ticket(s) below priority ${minPriority} — not announced.`);
+  const seen = new Set(state.announced);
+  const fresh = open
+    .filter((t) => !seen.has(t.id))
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
   if (!fresh.length) {
     console.log('No new tickets.');
     return;
   }
 
-  console.log(`${fresh.length} new ticket(s).`);
+  const text = fresh.length > DIGEST_THRESHOLD
+    ? buildCountOnly(fresh, domain)
+    : buildSummary(fresh, domain);
 
-  const markSeen = (list) => {
-    if (dryRun) return;
-    for (const t of list) state.announced.push(t.id);
-    state.lastCreatedAt = list[list.length - 1].created_at;
-    writeState(state);
-  };
-  // Below-threshold tickets count as handled either way, so they never replay later.
-  if (skipped.length) markSeen(skipped.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
-
-  // A large batch means we're catching up after downtime, not reacting live: post the
-  // count and a link rather than flooding the channel.
-  if (fresh.length > DIGEST_THRESHOLD) {
-    const text = buildCountOnly(fresh, domain);
-    if (dryRun) {
-      console.log('\n--- preview (not sent) ---\n' + text + '\n');
-      return;
-    }
-    console.log(`Posting a count-only notice for ${fresh.length} tickets...`);
-    await postWebhook(webhookUrl, text);
-    markSeen(fresh);
-    return;
-  }
-
-  // One message listing the whole batch — never one per ticket.
-  const text = buildSummary(fresh, domain);
   if (dryRun) {
     console.log('\n--- preview (not sent) ---\n' + text + '\n');
     return;
   }
+
   console.log(`Posting ${fresh.length} ticket(s) in one message...`);
   await postWebhook(webhookUrl, text);
-  markSeen(fresh);
+  // Only record after a successful post, so a webhook failure retries next run rather
+  // than losing the notification entirely.
+  state.announced.push(...fresh.map((t) => t.id));
+  writeState(state);
 })();
