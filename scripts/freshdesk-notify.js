@@ -17,9 +17,10 @@
  *                                                 # preview including Low tickets
  *
  * What gets posted:
- *   1-5 new tickets  -> one message each, then a divided summary of the whole batch
+ *   1-5 new tickets  -> ONE message listing them all, separated by dividers
  *   6+ new tickets   -> a single "N new tickets came in" notice with a link to the queue
  *                       (this is the catch-up case, e.g. first run after a weekend)
+ * Never one message per ticket: a batch is one event and should read as one message.
  *
  * Secrets are read from the repo .env (never the shell env):
  *   - FRESHDESK_API_KEY           the agent API key (Profile Settings -> Your API Key)
@@ -127,41 +128,6 @@ function postWebhook(webhookUrl, text) {
 }
 
 /**
- * Build the RingCentral message for a ticket: heading, four detail lines, ticket link.
- *
- * Deliberately four fields only — the point is a glanceable "there's a new ticket"
- * ping, and everything else is one click away on the ticket itself.
- *
- * No ``` code fence: RingCentral renders the backticks literally rather than as a
- * block (bold does work). A fenced version collapses into one unreadable line.
- *
- * Empty fields are dropped rather than printed as blanks, since a ticket logged
- * without a district or module still deserves a usable notification.
- */
-function buildMessage(ticket, domain) {
-  const cf = ticket.custom_fields || {};
-  const link = `https://${domain}/a/tickets/${ticket.id}`;
-
-  // "Point of Service > Daily Reports > Activity" from whichever parts are filled in.
-  const modulePath = [cf.cf_module_selection, cf.module_subsection, cf.module_subsection_item]
-    .filter(Boolean)
-    .join(' > ');
-
-  const rows = [
-    ['Subject', ticket.subject],
-    ['District', cf.districtcounty || cf.sodexo_district],
-    ['Product', cf.cf_primerotype],
-    ['Module', modulePath],
-  ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== '');
-
-  // Labels bold, values plain — bold is the one bit of markdown RingCentral honours,
-  // so it's what gives the block any visual structure at all.
-  const body = rows.map(([label, v]) => `**${label}:** ${v}`).join('\n');
-
-  return `**New Support Ticket - #${ticket.id}**\n\n${body}\n\n${link}`;
-}
-
-/**
  * Every ticket created after `sinceIso`, walking pages until we reach older ones.
  *
  * Paged rather than a single fixed window: after a weekend (or any stretch with the
@@ -224,7 +190,11 @@ function buildCountOnly(tickets, domain) {
   );
 }
 
-/** Recap posted after a small batch, so the whole set is visible in one place. */
+/**
+ * The one message a normal run posts: every new ticket listed in a single message,
+ * separated by dividers. One message per ticket was rejected as too noisy — even a
+ * batch of three meant three pings for what is really one event.
+ */
 function buildSummary(tickets, domain) {
   const entries = tickets.map((t) => {
     const cf = t.custom_fields || {};
@@ -233,18 +203,19 @@ function buildSummary(tickets, domain) {
       .join(' > ');
     return [
       `**#${t.id}** ${t.subject}`,
-      cf.districtcounty ? `**District:** ${cf.districtcounty}` : null,
+      cf.districtcounty || cf.sodexo_district
+        ? `**District:** ${cf.districtcounty || cf.sodexo_district}` : null,
+      cf.cf_primerotype ? `**Product:** ${cf.cf_primerotype}` : null,
       modulePath ? `**Module:** ${modulePath}` : null,
       `https://${domain}/a/tickets/${t.id}`,
     ].filter(Boolean).join('\n');
   });
 
-  return (
-    `**All ${tickets.length} Tickets**\n\n` +
-    `${DIVIDER}\n` +
-    entries.join(`\n${DIVIDER}\n`) +
-    `\n${DIVIDER}`
-  );
+  const heading = tickets.length === 1
+    ? '**1 New Support Ticket**'
+    : `**All ${tickets.length} Tickets**`;
+
+  return `${heading}\n\n${DIVIDER}\n` + entries.join(`\n${DIVIDER}\n`) + `\n${DIVIDER}`;
 }
 
 (async () => {
@@ -263,7 +234,7 @@ function buildSummary(tickets, domain) {
   if (singleTicket) {
     const res = await apiGet(domain, apiKey, `/tickets/${singleTicket}`);
     if (res.status !== 200) fail(`HTTP ${res.status} fetching ticket ${singleTicket}: ${res.body.slice(0, 200)}`);
-    const text = buildMessage(JSON.parse(res.body), domain);
+    const text = buildSummary([JSON.parse(res.body)], domain);
     if (dryRun) {
       console.log('\n--- preview (not sent) ---\n' + text + '\n');
     } else {
@@ -348,31 +319,13 @@ function buildSummary(tickets, domain) {
     return;
   }
 
-  for (const ticket of fresh) {
-    const text = buildMessage(ticket, domain);
-    if (dryRun) {
-      console.log('\n--- preview (not sent) ---\n' + text + '\n');
-    } else {
-      console.log(`#${ticket.id} ${String(ticket.subject).slice(0, 60)}`);
-      await postWebhook(webhookUrl, text);
-    }
-    // Record as we go: a crash midway through must not re-announce what already posted.
-    if (!dryRun) {
-      state.announced.push(ticket.id);
-      state.lastCreatedAt = ticket.created_at;
-      writeState(state);
-    }
+  // One message listing the whole batch — never one per ticket.
+  const text = buildSummary(fresh, domain);
+  if (dryRun) {
+    console.log('\n--- preview (not sent) ---\n' + text + '\n');
+    return;
   }
-
-  // Recap at the end so the batch is readable in one place. Pointless for a single
-  // ticket, which the message above already showed in full.
-  if (fresh.length > 1) {
-    const text = buildSummary(fresh, domain);
-    if (dryRun) {
-      console.log('\n--- summary preview (not sent) ---\n' + text + '\n');
-    } else {
-      console.log(`Posting summary of ${fresh.length} tickets...`);
-      await postWebhook(webhookUrl, text);
-    }
-  }
+  console.log(`Posting ${fresh.length} ticket(s) in one message...`);
+  await postWebhook(webhookUrl, text);
+  markSeen(fresh);
 })();
