@@ -2,8 +2,9 @@
 /**
  * Freshdesk -> RingCentral ticket notifier for the Front Office (development) queue.
  *
- * Watches one group's open tickets and posts a message when tickets appear that we
- * haven't announced before. Freshdesk's own webhook automation would be instant, but it
+ * Mirrors Freshdesk filter 201806 (Groups: Development Team - Front Office; Status
+ * Include: the 8 statuses in FILTER_STATUSES below) and posts a message when tickets
+ * appear in it that we haven't announced before. Freshdesk's own webhook automation would be instant, but it
  * lives under Admin -> Workflows which this account can't reach, so this polls instead
  * (run it from Task Scheduler).
  *
@@ -52,12 +53,27 @@ const DEFAULT_GROUP_ID = '22000158621';
 const SEARCH_PAGE_SIZE = 30;
 const MAX_PAGES = 10;
 
-// Statuses the "Front Office (development) Open tickets" view does NOT show. Resolved
-// and Closed are obvious; Development is excluded too — that work has been handed to
-// engineering and is tracked as a PBI, so it isn't awaiting front-office action.
-// Verified against the view: with Development excluded the queue matches exactly.
-// Everything else (In Progress, Researching, Escalated, ...) counts as open.
-const EXCLUDED_STATUSES = new Set([4, 5, 17]); // Resolved, Closed, Development
+// The exact "Status Include" list of Freshdesk filter 201806, which is the queue the
+// team actually watches. Copied from the filter's own sidebar — keep the two in sync;
+// if someone edits the filter, edit this.
+//
+// This is an ALLOWLIST, not an exclusion list. It used to exclude {Resolved, Closed,
+// Development} and admit everything else, which drifted from the filter in both
+// directions: it dropped Resolved (the filter includes it, so those tickets would
+// never have been announced) and admitted statuses the filter has no interest in
+// (Pending Release, On Hold, the ExpressPoint/Sodexo workflow states, Assigned to AI
+// Agent, ...). Matching the filter literally is the only version that can't silently
+// diverge from what the team sees.
+const FILTER_STATUSES = new Set([
+  2,  // Open
+  3,  // Pending
+  4,  // Resolved
+  8,  // In Progress
+  9,  // Researching
+  12, // Escalated
+  14, // Request
+  18, // Tracker Linked
+]);
 
 // Above this many new tickets at once, post a count + link instead of the full list.
 const DIGEST_THRESHOLD = 5;
@@ -140,7 +156,7 @@ function postWebhook(webhookUrl, text) {
   });
 }
 
-/** Every ticket the watched view would show: in the group, and not in an excluded status. */
+/** Every ticket filter 201806 would show: in the group, and in one of its statuses. */
 async function fetchOpenGroupTickets(domain, apiKey, groupId) {
   const collected = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -153,7 +169,7 @@ async function fetchOpenGroupTickets(domain, apiKey, groupId) {
     collected.push(...results);
     if (results.length < SEARCH_PAGE_SIZE) break;
   }
-  return collected.filter((t) => !EXCLUDED_STATUSES.has(Number(t.status)));
+  return collected.filter((t) => FILTER_STATUSES.has(Number(t.status)));
 }
 
 /**
