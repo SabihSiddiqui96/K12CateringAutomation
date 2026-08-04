@@ -126,11 +126,21 @@ function apiGet(domain, apiKey, urlPath) {
   });
 }
 
+/**
+ * Returns true only if RingCentral actually accepted the message (2xx). Anything else
+ * — no webhook configured, a non-2xx reply, a network error — returns false so the
+ * caller leaves the tickets unannounced and retries them on the next run.
+ *
+ * This used to resolve unconditionally while the caller recorded the tickets anyway,
+ * so a failed post marked them announced and they were never seen again. The common
+ * trigger is the machine waking from sleep: the task fires before the network is up,
+ * the request errors, and the ticket is silently lost.
+ */
 function postWebhook(webhookUrl, text) {
   return new Promise((resolve) => {
     if (!webhookUrl) {
       console.log('\n[no FRESHDESK_RC_WEBHOOK_URL in .env — message not sent]\n' + text + '\n');
-      return resolve();
+      return resolve(false);
     }
     const parsed = url.parse(webhookUrl);
     const body = JSON.stringify({ text });
@@ -141,15 +151,22 @@ function postWebhook(webhookUrl, text) {
         path: parsed.path,
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        timeout: 30000,
       },
       (res) => {
-        console.log('  posted, status:', res.statusCode);
-        resolve();
+        res.resume(); // drain, otherwise the socket can hang the process
+        const ok = res.statusCode >= 200 && res.statusCode < 300;
+        console.log(`  posted, status: ${res.statusCode}${ok ? '' : ' — NOT recorded, will retry'}`);
+        resolve(ok);
       },
     );
+    req.on('timeout', () => {
+      console.error('  webhook timed out — will retry next run');
+      req.destroy();
+    });
     req.on('error', (e) => {
-      console.error('  webhook error:', e.message);
-      resolve();
+      console.error('  webhook error:', e.message, '— will retry next run');
+      resolve(false);
     });
     req.write(body);
     req.end();
@@ -268,9 +285,16 @@ function buildSummary(tickets, domain) {
   }
 
   console.log(`Posting ${fresh.length} ticket(s) in one message...`);
-  await postWebhook(webhookUrl, text);
-  // Only record after a successful post, so a webhook failure retries next run rather
-  // than losing the notification entirely.
+  const posted = await postWebhook(webhookUrl, text);
+  // Only record after a genuinely successful post, so a webhook failure retries next
+  // run rather than losing the notification entirely. Exit non-zero on failure so a
+  // dead webhook shows up as a failed task in Task Scheduler instead of looking fine.
+  if (!posted) {
+    console.error(`Post failed — ${fresh.length} ticket(s) left unannounced for the next run.`);
+    process.exitCode = 1;
+    return;
+  }
   state.announced.push(...fresh.map((t) => t.id));
   writeState(state);
+  console.log(`Recorded ${fresh.length} ticket(s) as announced.`);
 })();
