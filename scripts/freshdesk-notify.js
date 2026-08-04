@@ -11,7 +11,6 @@
  *   node scripts/freshdesk-notify.js              # normal run
  *   node scripts/freshdesk-notify.js --dry-run    # print, don't post
  *   node scripts/freshdesk-notify.js --reset      # mark everything current as seen
- *   node scripts/freshdesk-notify.js --ticket 324921 [--dry-run]   # render one ticket
  *
  * What gets posted:
  *   1-5 new tickets  -> ONE message listing them all, separated by dividers
@@ -85,9 +84,12 @@ function readEnvValue(key) {
 function readState() {
   try {
     const s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-    return { announced: Array.isArray(s.announced) ? s.announced : [] };
+    return {
+      announced: Array.isArray(s.announced) ? s.announced : [],
+      baselined: s.baselined === true,
+    };
   } catch {
-    return { announced: [] };
+    return { announced: [], baselined: false };
   }
 }
 
@@ -198,8 +200,6 @@ function buildSummary(tickets, domain) {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
   const reset = args.includes('--reset');
-  const ticketArgIdx = args.indexOf('--ticket');
-  const singleTicket = ticketArgIdx >= 0 ? args[ticketArgIdx + 1] : null;
 
   const apiKey = readEnvValue('FRESHDESK_API_KEY');
   if (!apiKey) fail('FRESHDESK_API_KEY not found in .env.');
@@ -207,35 +207,26 @@ function buildSummary(tickets, domain) {
   const domain = readEnvValue('FRESHDESK_DOMAIN') || DEFAULT_DOMAIN;
   const groupId = readEnvValue('FRESHDESK_GROUP_ID') || DEFAULT_GROUP_ID;
 
-  // --- demo mode: render one known ticket -------------------------------------
-  if (singleTicket) {
-    const res = await apiGet(domain, apiKey, `/tickets/${singleTicket}`);
-    if (res.status !== 200) fail(`HTTP ${res.status} fetching ticket ${singleTicket}: ${res.body.slice(0, 200)}`);
-    const text = buildSummary([JSON.parse(res.body)], domain);
-    if (dryRun) {
-      console.log('\n--- preview (not sent) ---\n' + text + '\n');
-    } else {
-      console.log(`Posting ticket #${singleTicket}...`);
-      await postWebhook(webhookUrl, text);
-    }
-    return;
-  }
-
   const state = readState();
   const open = await fetchOpenGroupTickets(domain, apiKey, groupId);
   console.log(`${open.length} open ticket(s) in group ${groupId}.`);
 
   if (reset) {
     state.announced = open.map((t) => t.id);
+    state.baselined = true;
     writeState(state);
     console.log(`Marked ${state.announced.length} current ticket(s) as seen. Nothing posted.`);
     return;
   }
 
   // First run: adopt the current queue as the baseline rather than announcing a backlog
-  // that the team has already been working for weeks.
-  if (!state.announced.length) {
+  // that the team has already been working for weeks. Gated on an explicit `baselined`
+  // flag, NOT on the list being empty — with an empty queue the baseline list is itself
+  // empty, and keying off that would re-baseline on every run and silently swallow the
+  // first real ticket instead of announcing it.
+  if (!state.baselined) {
     state.announced = open.map((t) => t.id);
+    state.baselined = true;
     writeState(state);
     console.log(`First run — baselined ${state.announced.length} existing ticket(s). Nothing posted.`);
     return;
