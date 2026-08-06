@@ -75,6 +75,10 @@ const FILTER_STATUSES = new Set([
   18, // Tracker Linked
 ]);
 
+// Freshdesk's built-in priority ids. These four are fixed platform values, not a
+// per-account custom field, so they don't drift the way FILTER_STATUSES can.
+const PRIORITY_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Urgent' };
+
 // Above this many new tickets at once, post a count + link instead of the full list.
 const DIGEST_THRESHOLD = 5;
 
@@ -254,8 +258,12 @@ function buildSummary(tickets, domain) {
     const modulePath = [cf.cf_module_selection, cf.module_subsection, cf.module_subsection_item]
       .filter(Boolean)
       .join(' > ');
+    // Priority leads the detail lines — it's the one field that decides whether
+    // someone picks the ticket up now or after lunch.
+    const priority = PRIORITY_LABELS[Number(t.priority)];
     return [
       `**#${t.id}** ${t.subject}`,
+      priority ? `**Priority:** ${priority}` : null,
       cf.districtcounty || cf.sodexo_district
         ? `**District:** ${cf.districtcounty || cf.sodexo_district}` : null,
       cf.cf_primerotype ? `**Product:** ${cf.cf_primerotype}` : null,
