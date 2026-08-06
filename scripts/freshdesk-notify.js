@@ -80,6 +80,48 @@ const DIGEST_THRESHOLD = 5;
 
 const DIVIDER = '────────────────────────────';
 
+// Task Scheduler throws away stdout/stderr, so an unattended failure shows up as a bare
+// exit code with no way to tell a network blip from a bad API key. Mirror every line to
+// a log file, trimmed to the last MAX_LOG_LINES so it can't grow without bound.
+const LOG_FILE = path.join(ROOT, '.freshdesk-notify.log');
+const MAX_LOG_LINES = 2000;
+
+function logLine(level, msg) {
+  const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  try {
+    fs.appendFileSync(LOG_FILE, `${stamp} ${level} ${msg}\n`);
+  } catch {
+    // Logging must never be the reason a run dies.
+  }
+}
+
+function trimLog() {
+  try {
+    const lines = fs.readFileSync(LOG_FILE, 'utf8').split('\n');
+    if (lines.length > MAX_LOG_LINES) {
+      fs.writeFileSync(LOG_FILE, lines.slice(-MAX_LOG_LINES).join('\n'));
+    }
+  } catch {
+    // No log yet, or it's unreadable — nothing to trim.
+  }
+}
+
+// Route console output through the log as well, so existing call sites need no changes.
+const rawLog = console.log.bind(console);
+const rawErr = console.error.bind(console);
+console.log = (...a) => { const m = a.join(' '); rawLog(m); logLine('INFO ', m); };
+console.error = (...a) => { const m = a.join(' '); rawErr(m); logLine('ERROR', m); };
+
+// An unhandled throw would otherwise vanish entirely under Task Scheduler.
+process.on('uncaughtException', (e) => {
+  console.error('uncaught exception: ' + (e && e.stack ? e.stack : e));
+  process.exit(1);
+});
+process.on('unhandledRejection', (e) => {
+  console.error('unhandled rejection: ' + (e && e.stack ? e.stack : e));
+  process.exit(1);
+});
+
 function fail(msg) {
   console.error('ERROR: ' + msg);
   process.exit(1);
@@ -233,6 +275,8 @@ function buildSummary(tickets, domain) {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
   const reset = args.includes('--reset');
+
+  trimLog();
 
   const apiKey = readEnvValue('FRESHDESK_API_KEY');
   if (!apiKey) fail('FRESHDESK_API_KEY not found in .env.');

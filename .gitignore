@@ -53,3 +53,4 @@ scripts/create-ticket-testcase.js
 # Local-only test tooling / scratch
 tests/cleanup-sabihtesting.spec.ts
 rerun-fails.txt
+.freshdesk-notify.log
