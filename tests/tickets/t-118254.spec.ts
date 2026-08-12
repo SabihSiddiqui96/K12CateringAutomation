@@ -53,15 +53,28 @@ const COMP_HEADING = /^Complimentary Items$/i;
 // The district's own baseline, restored after each test that changes it.
 const BASELINE_MIN_UNLOCK = '30';
 
+// Every item this spec creates uses this note, so a human scanning Settings can
+// tell instantly that it is automation data.
+const ITEM_NOTE = 'Testing...';
+
 /**
  * The checkout test selects its complimentary item on a real order, and the app
- * refuses to delete an item that is in use. A fresh per-run name would therefore
- * leave a new undeletable row in the district's settings every night, so this one
- * stable item is created once and reused. Items that never reach an order keep
- * using per-run names and are deleted normally.
+ * refuses to delete an item that is in use ("Failed to delete complimentary item.
+ * It may already be used on an order. Try deactivating it instead."). A fresh
+ * per-run name would therefore leave a new undeletable row in the district's
+ * settings every night, so this ONE item is created once and reused forever.
+ * Every other item this spec makes never reaches an order, so it is deleted.
  */
-const SHARED_CHECKOUT_ITEM = 'QA Automation Complimentary Item';
-const SHARED_CHECKOUT_ITEM_NOTE = 'Assorted, serves 12';
+const SHARED_CHECKOUT_ITEM = 'SabihAutomation';
+
+/**
+ * The gate has to sit above the cart subtotal (~$85) for the locked state to
+ * happen at all, but it should still read like a plausible district setting on
+ * the card, so pick a normal three-digit amount rather than a silly 9999.
+ */
+function realisticGateAmount(): string {
+  return String(120 + Math.floor(Math.random() * 60));
+}
 
 // ─── Waiting ─────────────────────────────────────────────────────────────────
 
@@ -428,11 +441,11 @@ test.describe('T-118254', () => {
     page,
   }) => {
     const stamp = Date.now();
-    const itemA = `AutoWater ${stamp}`;
-    const noteA = 'Chilled, 16 oz';
-    const itemB = `AutoNapkins ${stamp}`;
-    const noteB = '100 count';
-    const noteBEdited = '250 count';
+    const itemA = `SabihAutomation A ${stamp}`;
+    const noteA = ITEM_NOTE;
+    const itemB = `SabihAutomation B ${stamp}`;
+    const noteB = ITEM_NOTE;
+    const noteBEdited = 'Testing... edited';
     const overallNote = `Subject to availability ${stamp}`;
 
     const c = await loginToK12Catering(page);
@@ -450,10 +463,10 @@ test.describe('T-118254', () => {
       await addComplimentaryItem(c, itemA, noteA);
       await addComplimentaryItem(c, itemB, noteB);
 
-      // Each item keeps its OWN note — the note must not bleed across items.
+      // Each item keeps its OWN note. Both start on the shared note, so the
+      // no-bleed check is done after the edit below, where the values differ.
       await expect(itemCard(c, itemA)).toContainText(noteA);
       await expect(itemCard(c, itemB)).toContainText(noteB);
-      await expect(itemCard(c, itemA)).not.toContainText(noteB);
 
       // The item grid tops out at 3 columns in Settings.
       const grid = c.locator(`button[aria-label="Edit ${itemA}"]`).locator('xpath=ancestor::div[3]');
@@ -479,6 +492,8 @@ test.describe('T-118254', () => {
       await editComplimentaryItemNote(c, itemB, noteBEdited);
       await expect(itemCard(c, itemB)).toContainText(noteBEdited);
       await expect(itemCard(c, itemA)).toContainText(noteA);
+      // The edit must not have leaked onto the other item.
+      await expect(itemCard(c, itemA)).not.toContainText(noteBEdited);
 
       // Deleting one item leaves the other intact.
       await deleteComplimentaryItem(c, itemB);
@@ -497,7 +512,7 @@ test.describe('T-118254', () => {
   }) => {
     const stamp = Date.now();
     const item = SHARED_CHECKOUT_ITEM;
-    const itemNote = SHARED_CHECKOUT_ITEM_NOTE;
+    const itemNote = ITEM_NOTE;
     const instructions = `AutoInstruction ${stamp}`;
     const adminNote = `AutoAdminNote ${stamp}`;
 
@@ -611,17 +626,18 @@ test.describe('T-118254', () => {
     page,
   }) => {
     const stamp = Date.now();
-    const item = `AutoUtensil ${stamp}`;
+    const item = `SabihAutomation Gate ${stamp}`;
 
     const c = await loginToK12Catering(page);
     await autoDismissReauth(c);
     await goToSettings(c);
 
     try {
-      await addComplimentaryItem(c, item, 'Fork, knife, spoon');
-      // Put the gate far above anything the cart can reach.
-      await setMinimumToUnlock(c, '9999');
-      await expect(settingValue(c, MIN_UNLOCK_HEADING)).toContainText('$9999');
+      await addComplimentaryItem(c, item, ITEM_NOTE);
+      // A normal-looking amount that still sits above the cart subtotal.
+      const gate = realisticGateAmount();
+      await setMinimumToUnlock(c, gate);
+      await expect(settingValue(c, MIN_UNLOCK_HEADING)).toContainText(`$${gate}`);
 
       await driveToReview(c, `AutoGate ${stamp}`, `AutoGateNote ${stamp}`);
 
