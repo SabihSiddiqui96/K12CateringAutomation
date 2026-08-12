@@ -66,6 +66,59 @@ export async function selectAvailableEventDate(page: Page): Promise<string> {
   throw new Error('Could not find an available event date');
 }
 
+/**
+ * "Download Invoice" on the Order Detail page opens a "Download Invoice Options"
+ * modal (T-118254) before the file is produced. It offers three checkboxes —
+ * Instructions, Order Notes and Complimentary Items — all checked by default.
+ * Pass only the ones you want to change; anything omitted keeps its default.
+ * Returns the downloaded invoice's PDF text.
+ *
+ * The checkboxes carry no id, so they are addressed via the stable
+ * `aria-describedby` that links each one to its description paragraph.
+ */
+export async function downloadInvoiceWithOptions(
+  page: Page,
+  overrides: {
+    instructions?: boolean;
+    orderNotes?: boolean;
+    complimentaryItems?: boolean;
+  } = {},
+): Promise<string> {
+  const fs = await import('fs');
+  const { PDFParse } = await import('pdf-parse');
+
+  await page.getByRole('button', { name: /Download Invoice/i }).click();
+  const dialog = page.locator('[role="dialog"]').first();
+  await expect(
+    dialog.getByRole('heading', { name: /Download Invoice Options/i }),
+  ).toBeVisible({ timeout: 10000 });
+
+  const optionBox = (key: string) =>
+    page.locator(`input[aria-describedby="export-option-desc-include${key}"]`);
+
+  const wanted: Array<[string, boolean | undefined]> = [
+    ['Instructions', overrides.instructions],
+    ['OrderNotes', overrides.orderNotes],
+    ['ComplimentaryItems', overrides.complimentaryItems],
+  ];
+  for (const [key, want] of wanted) {
+    if (want === undefined) continue;
+    const box = optionBox(key);
+    await expect(box).toBeVisible({ timeout: 5000 });
+    if (want) await box.check(); else await box.uncheck();
+  }
+
+  const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+  await dialog.getByRole('button', { name: /^Download$/ }).click();
+  const download = await downloadPromise;
+  const downloadPath = await download.path();
+  if (!downloadPath) throw new Error('Invoice download path is null');
+  const parser = new PDFParse({ data: fs.readFileSync(downloadPath) });
+  const pdfData = await parser.getText();
+  await parser.destroy();
+  return pdfData.text;
+}
+
 export async function downloadAndReadPdfText(page: Page, downloadButtonName: RegExp | string): Promise<string> {
   const fs = await import('fs');
   const { PDFParse } = await import('pdf-parse');
