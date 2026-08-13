@@ -79,6 +79,11 @@ const FILTER_STATUSES = new Set([
 // per-account custom field, so they don't drift the way FILTER_STATUSES can.
 const PRIORITY_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Urgent' };
 
+// RingCentral renders markdown but has no way to colour text, so the priority
+// colour is carried by a dot emoji. These match the swatches Freshdesk shows in
+// its own ticket list: Low green, Medium blue, High orange, Urgent red.
+const PRIORITY_DOTS = { 1: '🟢', 2: '🔵', 3: '🟠', 4: '🔴' };
+
 // Above this many new tickets at once, post a count + link instead of the full list.
 const DIGEST_THRESHOLD = 5;
 
@@ -261,9 +266,10 @@ function buildSummary(tickets, domain) {
     // Priority leads the detail lines — it's the one field that decides whether
     // someone picks the ticket up now or after lunch.
     const priority = PRIORITY_LABELS[Number(t.priority)];
+    const dot = PRIORITY_DOTS[Number(t.priority)];
     return [
       `**#${t.id}** ${t.subject}`,
-      priority ? `**Priority:** ${priority}` : null,
+      priority ? `**Priority:** ${dot ? `${dot} ` : ''}${priority}` : null,
       cf.districtcounty || cf.sodexo_district
         ? `**District:** ${cf.districtcounty || cf.sodexo_district}` : null,
       cf.cf_primerotype ? `**Product:** ${cf.cf_primerotype}` : null,
