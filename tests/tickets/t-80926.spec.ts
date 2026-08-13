@@ -1,8 +1,6 @@
 // Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/80926
 
 import { test, expect, Page } from '@playwright/test';
-import fs from 'fs';
-import { PDFParse } from 'pdf-parse';
 import {
   loginToK12Catering,
   loginToK12CateringAsDistrictUser,
@@ -11,6 +9,7 @@ import {
   getTextFromLocator,
   getInputValueFromLocator,
 } from '../../utils/helpers';
+import { downloadInvoiceWithOptions } from '../../utils/orders';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -99,13 +98,14 @@ const formatRuleOptionsToVerify = [
   },
   {
     optionName: 'Letters and numbers only',
-    expectedDescription: 'No spaces or symbols—A–Z, a–z, 0–9 only.',
+    // The app replaced the em dash with a comma in this description (08/2026).
+    expectedDescription: 'No spaces or symbols, A–Z, a–z, 0–9 only.',
     expectedStoredPattern: '^[A-Za-z0-9]+$',
   },
   {
     optionName: 'Letters, numbers, and spaces',
     expectedDescription:
-      'Letters, digits, and spaces only—no other symbols (e.g. ACCT 12345, Dept 7A).',
+      'Letters, digits, and spaces only, no other symbols (e.g. ACCT 12345, Dept 7A).',
     expectedStoredPattern: '^[A-Za-z0-9 ]+$',
   },
   {
@@ -194,25 +194,6 @@ async function pickTimeAndConfirm(page: Page, inputSelector: string) {
   await page.getByRole('button', { name: okBtn }).click();
 }
 
-async function downloadAndReadPdfText(
-  page: Page,
-  downloadButtonName: RegExp | string,
-): Promise<string> {
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: downloadButtonName }).click();
-
-  const download = await downloadPromise;
-  const downloadPath = await download.path();
-
-  if (!downloadPath) throw new Error('Download path is null');
-
-  const pdfBuffer = fs.readFileSync(downloadPath);
-  const parser = new PDFParse({ data: pdfBuffer });
-  const pdfData = await parser.getText();
-  await parser.destroy();
-
-  return pdfData.text;
-}
 
 async function saveAccountingStringRequirementsRule(
   page: Page,
@@ -727,10 +708,11 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await expect(viewDetailsButton).toBeVisible();
   await viewDetailsButton.click();
 
-  const invoiceText = await downloadAndReadPdfText(
-    catering,
-    downloadInvoiceBtn,
-  );
+  // "Download Invoice" now opens a "Download Invoice Options" modal (T-118254)
+  // before the file is produced, so a bare click-and-wait-for-download never
+  // fires. downloadInvoiceWithOptions keeps every section checked, which is what
+  // this assertion expects.
+  const invoiceText = await downloadInvoiceWithOptions(catering);
   expect(invoiceText).toContain(newAccountingStringDescriptionValue);
 
   // ── Logout & Login as District User ───────────────────────────────────────
