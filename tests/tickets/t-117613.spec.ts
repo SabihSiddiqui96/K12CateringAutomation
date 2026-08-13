@@ -7,6 +7,7 @@ import {
   loginToK12Catering,
   navigateK12CateringMenu,
   scrollUntilVisible,
+  dismissReauthInterstitial,
 } from '../../utils/helpers';
 import { getEnvVar } from '../../utils/env';
 
@@ -20,10 +21,12 @@ function escapeRegExp(value: string): string {
 }
 
 async function goToDistricts(page: Page): Promise<void> {
+  await dismissReauthInterstitial(page);
   await page.getByRole('button', { name: 'Go to home page' }).click();
   await page.waitForLoadState('domcontentloaded');
   await navigateK12CateringMenu(page, 'Districts');
   await page.waitForLoadState('domcontentloaded');
+  await dismissReauthInterstitial(page);
   await expect(
     page.getByRole('heading', { name: /District Management/i }).first(),
   ).toBeVisible({ timeout: 15000 });
@@ -67,6 +70,10 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
 
   const catering = await loginToK12Catering(page, { navigateTo: 'Districts' });
   await catering.waitForLoadState('domcontentloaded');
+  // A mid-session SSO token refresh can bounce us onto the "you will be
+  // automatically authenticated and redirected to Catering" interstitial, which
+  // replaces the page and makes every District Management locator vanish.
+  await dismissReauthInterstitial(catering);
   await expect(
     catering.getByRole('heading', { name: /District Management/i }).first(),
   ).toBeVisible({ timeout: 15000 });
@@ -101,6 +108,10 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
     await catering.locator('#add-timezone-select').selectOption({ index: 1 });
 
     await catering.getByRole('button', { name: /Add District/i }).last().click();
+    // The save round-trip is the most likely moment for the token refresh to
+    // fire; clear the interstitial before asserting on the success toast so we
+    // don't report "toast missing" when the page simply navigated away.
+    await dismissReauthInterstitial(catering);
     await expect(
       catering
         .getByText(/district.*created|created.*successfully|success/i)

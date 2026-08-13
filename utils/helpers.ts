@@ -320,6 +320,19 @@ export async function loginToK12Catering(
         const backoffMs = positiveIntFromEnv('K12_LOGIN_RETRY_BACKOFF_MS', 5000) * (attempt - 1);
         await page.waitForTimeout(backoffMs);
         await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
+
+        // A backend blip can land us on the PrimeroEdge "Internal Server Error /
+        // Error Code: 500" page. Reloading that URL just re-serves the 500, so
+        // every remaining attempt would burn against a page that can never
+        // recover. Re-authenticate from the login page instead.
+        const on500 = await page
+          .getByText(/Internal Server Error|Error Code:\s*500/i)
+          .first()
+          .isVisible({ timeout: 2000 })
+          .catch(() => false);
+        if (on500) {
+          await loginToPrimeroEdge(page).catch(() => { });
+        }
       }
 
       if (directLogin) {
