@@ -5,7 +5,7 @@
 //
 // Settings > Order Settings "Complimentary Items" changed from a single large text
 // field to a list of individual items (each with its own note), plus an overall
-// note and a "Minimum to Unlock Complimentary Items" amount. At the checkout Review
+// note and a "Minimum Order Amount for Complimentary Items" amount. At the checkout Review
 // step the items render as a selectable card above the Order Disclaimer, unchecked
 // by default; whatever the customer checks shows on the Order Details page and on
 // the invoice, and the invoice download offers per-section include/exclude options.
@@ -17,7 +17,7 @@
 //
 // Two district settings are involved and they are easy to confuse:
 //   * "Minimum Order Amount"                     — blocks checkout entirely
-//   * "Minimum to Unlock Complimentary Items"    — only gates the free items
+//   * "Minimum Order Amount for Complimentary Items" — only gates the free items
 // The checkout tests drop the first to $1 so a single menu item is enough to check
 // out, then drive the second to whichever side of the cart total they are testing.
 // Both are put back at the end of the run.
@@ -59,9 +59,18 @@ const ITEM_NOTE_TEXTAREA = '#complimentary-item-note-textarea';
 const UNLOCK_INPUT = '#complimentary-items-minimum-order-amount-input';
 const OVERALL_NOTE_TEXTAREA = '#complimentary-items-note-textarea';
 const SPECIAL_INSTRUCTIONS = '#special-instructions-textarea';
+const ITEMS_SEARCH = '#complimentary-items-search';
+const ITEMS_PAGE_SIZE = '#complimentary-items-pagination';
+
+// Round 2 (Daimien, 08/17): the section blurb, the renamed item-note label, and
+// the helper line that was removed as redundant.
+const SECTION_BLURB =
+  'List any items that customers can individually opt into receiving at no extra charge, such as plates or napkins, during checkout';
+const SHORT_DESCRIPTION_LABEL = 'Short Description (optional)';
+const REMOVED_HELPER_LINE = 'Shown to customers under this item at checkout';
 
 const MIN_ORDER_HEADING = 'Minimum Order Amount';
-const UNLOCK_HEADING = 'Minimum to Unlock Complimentary Items';
+const UNLOCK_HEADING = 'Minimum Order Amount for Complimentary Items';
 const OVERALL_NOTE_HEADING = 'Complimentary Items Note';
 const COMP_HEADING = /^Complimentary Items$/i;
 
@@ -134,6 +143,34 @@ function itemCard(c: Page, name: string) {
   return c.locator(`button[aria-label="Edit ${name}"]`).locator('xpath=ancestor::div[2]');
 }
 
+/** The whole Complimentary Items block in Settings. */
+const compBlock = (c: Page) =>
+  c.getByRole('heading', { name: COMP_HEADING }).first().locator('xpath=ancestor::div[4]');
+
+/** One of the Active / Inactive / All filter tabs, matched without its count. */
+const itemsFilter = (c: Page, name: 'Active' | 'Inactive' | 'All') =>
+  compBlock(c).locator('button').filter({ hasText: new RegExp('^' + name + ' \\(') }).first();
+
+/**
+ * Deactivate an item. Wait for the Deactivate control to go away rather than for
+ * an Activate control to appear: under the "Active" filter the row leaves the
+ * list entirely, so the flipped button is never rendered in place.
+ */
+async function deactivateComplimentaryItem(c: Page, name: string): Promise<void> {
+  await c.locator(`button[aria-label="Deactivate ${name}"]`).click();
+  const confirm = c.locator('[role="dialog"]').getByRole('button', { name: /^Deactivate$/ });
+  if (await appears(confirm, 4000)) await confirm.click();
+  await expect(c.locator(`button[aria-label="Deactivate ${name}"]`)).toBeHidden({ timeout: 15000 });
+}
+
+/** Reactivate an item; same reasoning in reverse under the "Inactive" filter. */
+async function activateComplimentaryItem(c: Page, name: string): Promise<void> {
+  await c.locator(`button[aria-label="Activate ${name}"]`).click();
+  const confirm = c.locator('[role="dialog"]').getByRole('button', { name: /^Activate$/ });
+  if (await appears(confirm, 4000)) await confirm.click();
+  await expect(c.locator(`button[aria-label="Activate ${name}"]`)).toBeHidden({ timeout: 15000 });
+}
+
 /**
  * Every complimentary item this spec creates, so the sweep at the end removes
  * exactly those and nothing else. Names carry a run timestamp, so an item added by
@@ -189,7 +226,7 @@ const setUnlockAmount = (c: Page, value: string) =>
   setAmountSetting(c, {
     editLabel: EDIT_UNLOCK_BTN,
     input: UNLOCK_INPUT,
-    dialogTitle: /Edit Minimum to Unlock/i,
+    dialogTitle: /^Edit Minimum Order Amount for Complimentary Items$/i,
     heading: UNLOCK_HEADING,
     value,
   });
@@ -199,7 +236,7 @@ const setMinimumOrderAmount = (c: Page, value: string) =>
   setAmountSetting(c, {
     editLabel: EDIT_MIN_ORDER_BTN,
     input: '[role="dialog"] input[type="number"]',
-    dialogTitle: /Edit Minimum Order Amount/i,
+    dialogTitle: /^Edit Minimum Order Amount$/i,
     heading: MIN_ORDER_HEADING,
     value,
   });
@@ -596,6 +633,20 @@ test.describe('T-118254', () => {
       // large text field.
       await expect(c.getByLabel(ADD_ITEM_BTN)).toBeVisible({ timeout: 10000 });
 
+      // ── Round 2 (Daimien, 08/17) ──────────────────────────────────────────
+      // The reworded section blurb.
+      await expect(compBlock(c)).toContainText(SECTION_BLURB);
+
+      // "Item Note" became "Short Description", and the helper line underneath it
+      // was dropped as redundant with the blurb above.
+      await c.getByLabel(ADD_ITEM_BTN).click();
+      const addDialog = c.locator('[role="dialog"]');
+      await expect(addDialog.getByText(SHORT_DESCRIPTION_LABEL)).toBeVisible({ timeout: 10000 });
+      await expect(addDialog).not.toContainText('Item Note');
+      await expect(addDialog).not.toContainText(REMOVED_HELPER_LINE);
+      await addDialog.getByRole('button', { name: /^Cancel$/ }).click();
+      await expect(addDialog.getByText(SHORT_DESCRIPTION_LABEL)).toBeHidden({ timeout: 10000 });
+
       await addComplimentaryItem(c, itemA, ITEM_NOTE);
       await addComplimentaryItem(c, itemB, ITEM_NOTE);
       await expect(itemCard(c, itemA)).toContainText(ITEM_NOTE);
@@ -604,6 +655,56 @@ test.describe('T-118254', () => {
       // The item grid tops out at 3 columns in Settings.
       const grid = c.locator(`button[aria-label="Edit ${itemA}"]`).locator('xpath=ancestor::div[3]');
       await expect(grid).toHaveClass(/lg:grid-cols-3/);
+
+      // Search finds an item by name and by its short description.
+      const search = c.locator(ITEMS_SEARCH);
+      await expect(search).toBeVisible({ timeout: 10000 });
+      await search.fill(itemA);
+      await expect(itemCard(c, itemA)).toBeVisible({ timeout: 10000 });
+      await expect(c.locator(`button[aria-label="Edit ${itemB}"]`)).toBeHidden({ timeout: 10000 });
+      await search.fill(ITEM_NOTE);
+      await expect(itemCard(c, itemA)).toBeVisible({ timeout: 10000 });
+      await expect(itemCard(c, itemB)).toBeVisible({ timeout: 10000 });
+      await search.fill('');
+
+      // Deactivating moves an item out of Active and into Inactive, and the eye
+      // icon flips to its Activate state. The counts move with it.
+      await itemsFilter(c, 'Active').click();
+      const activeBefore = await itemsFilter(c, 'Active').innerText();
+      await deactivateComplimentaryItem(c, itemB);
+      await expect(itemsFilter(c, 'Active')).not.toHaveText(activeBefore, { timeout: 10000 });
+      await itemsFilter(c, 'Inactive').click();
+      // The Inactive list is long enough to paginate, so a freshly deactivated item
+      // is not necessarily on page 1 — search for it rather than assuming.
+      await search.fill(itemB);
+      await expect(c.locator(`button[aria-label="Activate ${itemB}"]`)).toBeVisible({ timeout: 10000 });
+      await expect(itemCard(c, itemB)).toContainText(/Inactive/i);
+      await activateComplimentaryItem(c, itemB);
+      await search.fill('');
+
+      // Pagination, which only renders once the selected filter holds more items
+      // than the page size.
+      await itemsFilter(c, 'All').click();
+      const pageSize = c.locator(ITEMS_PAGE_SIZE);
+      await expect(pageSize).toBeVisible({ timeout: 10000 });
+      await expect(compBlock(c)).toContainText(/\d+-\d+ of \d+/);
+      const total = Number((await itemsFilter(c, 'All').innerText()).match(/\((\d+)\)/)?.[1] ?? 0);
+      const perPage = Number(await pageSize.inputValue());
+      if (total > perPage) {
+        for (const label of ['First page', 'Previous page', 'Next page', 'Last page']) {
+          await expect(compBlock(c).getByRole('button', { name: label })).toBeVisible({ timeout: 10000 });
+        }
+        const firstPageItems = await compBlock(c).locator('button[aria-label^="Edit "]').count();
+        await compBlock(c).getByRole('button', { name: 'Next page' }).click();
+        await c.waitForTimeout(1200);
+        await expect(compBlock(c)).toContainText(/\d+-\d+ of \d+/);
+        expect(firstPageItems, 'page 1 filled to the page size').toBeGreaterThan(0);
+        await compBlock(c).getByRole('button', { name: 'First page' }).click();
+        await c.waitForTimeout(1000);
+      } else {
+        console.log(`[T-118254] pagination controls not asserted: All holds ${total} items, page size ${perPage}`);
+      }
+      await itemsFilter(c, 'Active').click();
 
       await setUnlockAmount(c, '25');
       await setOverallNote(c, overallNote);
