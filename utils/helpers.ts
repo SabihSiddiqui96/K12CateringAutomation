@@ -267,6 +267,7 @@ type K12CateringNavItem =
   | 'Settings'
   | 'Notifications'
   | 'Manage Notifications'
+  | 'User Feedback'
   | 'My Profile'
   | 'Contact Us'
   | "What's New?";
