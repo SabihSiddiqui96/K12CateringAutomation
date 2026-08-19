@@ -15,7 +15,11 @@
 // case needs no large file checked into the repo.
 
 import { test, expect, Locator, Page } from '@playwright/test';
-import { loginToK12Catering, navigateK12CateringMenu } from '../../utils/helpers';
+import {
+  loginToK12Catering,
+  navigateK12CateringMenu,
+  dismissReauthInterstitial,
+} from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -29,7 +33,8 @@ const OPT_ISSUE = /Report an issue/i;
 const OPT_IDEA = /Share an idea/i;
 
 // Retired by this ticket — these must not appear anywhere in the feedback UI.
-const OLD_LABELS = [/Something's Off/i, /Report a bug/i];
+// Both spellings: the option said "Report a bug", the submit button said "Report bug".
+const OLD_LABELS = [/Something's Off/i, /Report a bug/i, /Report bug/i];
 
 const FB_COMMENT = '#fb-comment';
 const FB_ATTACHMENT = '#fb-attachment';
@@ -118,8 +123,11 @@ async function submitFeedback(c: Page, text: string): Promise<void> {
   await closeFeedbackWidget(c);
 }
 
+// The form's button is worded slightly shorter than the menu option: the option
+// is "Report an issue", the button "Report issue". Both are accepted — what this
+// ticket actually requires is that neither says "bug" any more.
 const submitButton = (c: Page) =>
-  c.getByRole('button', { name: /^(Report an issue|Report bug|Send|Submit)$/i }).last();
+  c.getByRole('button', { name: /^(Report (an )?issue|Send|Submit)$/i }).last();
 
 // ─── Feedback Inbox ──────────────────────────────────────────────────────────
 
@@ -143,15 +151,21 @@ const statusFilter = (c: Page, name: string) =>
     .first();
 
 async function goToUserFeedback(c: Page): Promise<void> {
-  await navigateK12CateringMenu(c, 'User Feedback');
-  await c.waitForLoadState('domcontentloaded');
-  await expect(c.locator('h1')).toContainText('User Feedback', { timeout: 25000 });
-  await expect(c.getByRole('heading', { name: INBOX_HEADING }).first()).toBeVisible({
-    timeout: 25000,
-  });
-  // The inbox renders its controls a beat after the heading; "In Progress" is the
-  // only status pill whose text cannot collide with a per-item badge.
-  await expect(statusPill(c, 'In Progress').first()).toBeVisible({ timeout: 25000 });
+  // A token refresh can bounce the tab onto the PrimeroEdge re-auth interstitial
+  // mid-test, which replaces the page and loses the nav; clear it and retry.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await dismissReauthInterstitial(c);
+    await navigateK12CateringMenu(c, 'User Feedback').catch(() => undefined);
+    await c.waitForLoadState('domcontentloaded').catch(() => undefined);
+    if (await appears(c.getByRole('heading', { name: INBOX_HEADING }).first(), 20000)) {
+      await expect(c.locator('h1')).toContainText('User Feedback', { timeout: 15000 });
+      // The inbox renders its controls a beat after the heading; "In Progress" is
+      // the only status pill whose text cannot collide with a per-item badge.
+      await expect(statusPill(c, 'In Progress').first()).toBeVisible({ timeout: 25000 });
+      return;
+    }
+  }
+  throw new Error('User Feedback page never rendered after 3 attempts');
 }
 
 /** The inbox card carrying a given piece of feedback text. */
@@ -202,11 +216,12 @@ test.describe('T-119591', () => {
       expect(accept, `attachment accepts ${ext}`).toContain(ext);
     }
 
-    // The submit button still reads "Report bug" while the option is "Report an
-    // issue". Reported to Daimien on 08/18; not asserted either way until he says
-    // whether the button copy was meant to change too, since asserting the wrong
-    // one would either bake in the defect or redden the suite over undecided copy.
-    console.log(`[T-119591] "Report an issue" submit button reads: "${(await submitButton(c).innerText()).trim()}"`);
+    // The submit button carried the old "Report bug" wording when this was first
+    // tested; fixed 08/18, so it is asserted rather than logged now.
+    await expect(
+      submitButton(c),
+      'the submit button dropped the old "bug" wording',
+    ).toHaveText(/^Report (an )?issue$/i);
 
     await closeFeedbackWidget(c);
   });
