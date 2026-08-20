@@ -66,6 +66,31 @@ const oversizePng = () => ({
   buffer: Buffer.concat([PNG_1x1, Buffer.alloc((MAX_ATTACHMENT_MB + 1) * 1024 * 1024, 0)]),
 });
 
+// Minimal but structurally real files for the other supported types, so the check
+// still holds if the server sniffs content rather than trusting the extension.
+// docx/xlsx are ZIP containers, hence the empty-archive header.
+const EMPTY_ZIP = Buffer.from('504b0506000000000000000000000000000000000000', 'hex');
+const TINY_PDF = Buffer.from(
+  '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\n' +
+    'trailer<</Root 1 0 R>>\n%%EOF\n',
+  'utf-8',
+);
+
+const SUPPORTED_FILES = [
+  { name: 'qa-attachment.png', mimeType: 'image/png', buffer: PNG_1x1 },
+  { name: 'qa-attachment.pdf', mimeType: 'application/pdf', buffer: TINY_PDF },
+  {
+    name: 'qa-attachment.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    buffer: EMPTY_ZIP,
+  },
+  {
+    name: 'qa-attachment.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: EMPTY_ZIP,
+  },
+];
+
 // ─── Waiting ─────────────────────────────────────────────────────────────────
 
 /** isVisible() never retries, so use an explicit wait when we mean "wait for it". */
@@ -262,16 +287,43 @@ test.describe('T-119591', () => {
     await expect(c.locator(FB_COMMENT)).toBeHidden({ timeout: 20000 });
     await closeFeedbackWidget(c);
 
+    // ── the other supported types go through too ──────────────────────────────
+    for (const file of SUPPORTED_FILES.filter((f) => !f.name.endsWith('.png'))) {
+      await openFeedbackForm(c, OPT_ISSUE);
+      await c.locator(FB_COMMENT).fill(`T-119591 ${file.name} ${stamp}`);
+      await c.locator(FB_ATTACHMENT).setInputFiles(file);
+      await expect(
+        c.getByText(UNSUPPORTED_TYPE_ERROR),
+        `${file.name} is an accepted type`,
+      ).toHaveCount(0);
+      await submitButton(c).click();
+      await expect(c.locator(FB_COMMENT)).toBeHidden({ timeout: 20000 });
+      await closeFeedbackWidget(c);
+    }
+
+    // ── the attachment is optional ────────────────────────────────────────────
+    await submitFeedback(c, `T-119591 no attachment ${stamp}`);
+
     // ── it lands in the inbox, attachment and all ─────────────────────────────
     await goToUserFeedback(c);
     await statusFilter(c, 'New').click();
     await c.waitForTimeout(1500);
     const card = feedbackCard(c, feedbackText);
     await expect(card, 'the submitted feedback reaches the inbox').toBeVisible({ timeout: 25000 });
+    const attachment = card.getByText(/\.png$/i).first();
+    await expect(attachment, 'the attachment is listed by file name').toBeVisible({
+      timeout: 15000,
+    });
+
+    // ── and it opens ──────────────────────────────────────────────────────────
+    // The app previews the file in an in-page overlay rather than opening a tab or
+    // starting a download, so assert the overlay rather than a navigation.
+    await attachment.click();
     await expect(
-      card.getByText(/\.png$/i).first(),
-      'the attachment is listed by file name',
+      c.locator('[role="dialog"], div.fixed').filter({ hasText: /qa-attachment\.png/i }).last(),
+      'clicking the attachment opens its preview',
     ).toBeVisible({ timeout: 15000 });
+    await c.keyboard.press('Escape').catch(() => undefined);
   });
 
   test('Feedback Inbox defaults to New and resolving records who resolved it', async ({ page }) => {
@@ -332,5 +384,107 @@ test.describe('T-119591', () => {
       inbox(c).getByText(/Resolved by/i).first(),
       'the resolver username is recorded',
     ).toBeVisible({ timeout: 15000 });
+
+    // The ticket says an Unresolve is "not needed", but the control is a plain
+    // status picker: a Resolved item still lists New and In Progress, both
+    // enabled, so an admin can move it back. Recorded as built and raised with
+    // Daimien on 08/18 — asserted here so a later change to one-way is noticed.
+    const resolvedControl = c.getByRole('button', { name: /Change status, currently Resolved/i }).first();
+    if (await appears(resolvedControl, 8000)) {
+      await resolvedControl.click();
+      await c.waitForTimeout(1200);
+      const options = resolvedControl.locator('xpath=..').locator('button');
+      await expect(
+        options.filter({ hasText: /^New$/ }),
+        'a resolved item still offers New (un-resolve is possible)',
+      ).toHaveCount(1);
+      await c.keyboard.press('Escape').catch(() => undefined);
+      await c.waitForTimeout(800);
+    }
+
+    // The statuses and the resolver survive a reload.
+    await c.reload({ waitUntil: 'domcontentloaded' });
+    await expect(statusPill(c, 'In Progress').first()).toBeVisible({ timeout: 25000 });
+    await statusFilter(c, 'Resolved').click();
+    await c.waitForTimeout(2500);
+    await expect(
+      inbox(c).getByText(marker, { exact: false }).first(),
+      'the resolved status persisted across a reload',
+    ).toBeVisible({ timeout: 25000 });
+    await expect(inbox(c).getByText(/Resolved by/i).first()).toBeVisible({ timeout: 15000 });
+  });
+
+  test('In Progress moves an item out of New, and the type filters and export still work', async ({
+    page,
+  }) => {
+    const marker = `T-119591 in-progress check ${Date.now()}`;
+    const c = await loginToK12Catering(page);
+    await submitFeedback(c, marker);
+    await goToUserFeedback(c);
+
+    // Totals are a filter-independent summary — capture them before touching status.
+    const totalsBefore = await inbox(c)
+      .locator('xpath=ancestor::div[2]')
+      .innerText()
+      .catch(() => '');
+
+    // ── In Progress behaves like Resolved: it moves the item out of New ───────
+    await statusFilter(c, 'New').click();
+    await c.waitForTimeout(1500);
+    const card = feedbackCard(c, marker);
+    await expect(card, 'the submitted feedback is in New').toBeVisible({ timeout: 25000 });
+    const control = card.locator('button[aria-label^="Change status"]').first();
+    await control.click();
+    await control
+      .locator('xpath=..')
+      .locator('button')
+      .filter({ hasText: /^In Progress$/ })
+      .first()
+      .click({ timeout: 15000 });
+    await c.waitForTimeout(2500);
+
+    await statusFilter(c, 'New').click();
+    await c.waitForTimeout(2000);
+    await expect(
+      inbox(c).getByText(marker, { exact: false }),
+      'the item drops out of New',
+    ).toHaveCount(0);
+
+    await statusFilter(c, 'In Progress').click();
+    await c.waitForTimeout(2500);
+    await expect(
+      inbox(c).getByText(marker, { exact: false }).first(),
+      'the item is listed under In Progress',
+    ).toBeVisible({ timeout: 25000 });
+
+    // ── the headline totals are untouched by a status change ─────────────────
+    const totalsAfter = await inbox(c).locator('xpath=ancestor::div[2]').innerText().catch(() => '');
+    for (const label of ['Total Responses', 'Issues Reported', 'Ideas Submitted']) {
+      const before = totalsBefore.match(new RegExp('(\d[\d,]*)\s*' + label));
+      const after = totalsAfter.match(new RegExp('(\d[\d,]*)\s*' + label));
+      if (before && after) {
+        expect(after[1], `${label} is unchanged by a status change`).toBe(before[1]);
+      }
+    }
+
+    // ── the type filters still work alongside the status filters ─────────────
+    // Matched on plain substrings: the pills carry emoji and a count
+    // ("⭐ Ratings (50)"), so an anchored pattern is more trouble than it is worth.
+    await statusFilter(c, 'All').click();
+    await c.waitForTimeout(1500);
+    for (const type of ['Ratings', 'Positive', 'Questions', 'Issues', 'Ideas']) {
+      const pill = inbox(c).locator('button').filter({ hasText: type }).first();
+      await expect(pill, `the ${type} type filter is present`).toBeVisible({ timeout: 15000 });
+      await pill.click();
+      await c.waitForTimeout(1200);
+    }
+    await inbox(c).locator('button').filter({ hasText: 'All (' }).first().click();
+    await c.waitForTimeout(1200);
+
+    // ── Export CSV still produces a file ─────────────────────────────────────
+    const downloadPromise = c.waitForEvent('download', { timeout: 30000 });
+    await c.getByRole('button', { name: /Export CSV/i }).first().click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename(), 'Export CSV produces a csv').toMatch(/\.csv$/i);
   });
 });
