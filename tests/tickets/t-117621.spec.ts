@@ -28,7 +28,9 @@ async function inboxItemCount(page: Page): Promise<number> {
   return (txt.match(EMAIL_RE) || []).length;
 }
 
-// Parse the count a chip declares, e.g. "All (4)" -> 4, "🐛 Bugs (1)" -> 1.
+// Parse the count a chip declares, e.g. "All (4)" -> 4, "🐛 Issues (1)" -> 1.
+// T-119591 renamed the "Bugs" chip to "Issues" and the "Bug Reports" card to
+// "Issues Reported".
 async function chipCount(page: Page, name: RegExp): Promise<number> {
   const label = (await page.getByRole('button', { name }).first().innerText().catch(() => '')) ?? '';
   const m = label.match(/\((\d+)\)/);
@@ -61,7 +63,7 @@ test('Catering - User Feedback - Cybersoft Admin dashboard: cards, charts, inbox
   await expect(c.getByText(/Cybersoft Admin Only/i).first()).toBeVisible({ timeout: 10000 });
 
   // AC3: four summary metric cards.
-  for (const card of [/Total Responses/i, /Positive Sentiment/i, /Bug Reports/i, /Ideas Submitted/i]) {
+  for (const card of [/Total Responses/i, /Positive Sentiment/i, /Issues Reported/i, /Ideas Submitted/i]) {
     await expect(c.getByRole('button', { name: card }).first()).toBeVisible({ timeout: 10000 });
   }
 
@@ -82,22 +84,38 @@ test('Catering - User Feedback - Cybersoft Admin dashboard: cards, charts, inbox
   await expect(c.getByRole('combobox', { name: /Select page limit/i })).toBeVisible();
 
   // AC6: inbox shows the same number of items as the "All (N)" chip declares.
+  // T-119591 added a New / In Progress / Resolved / All STATUS filter that
+  // defaults to New, so the type chips (which count every status) only match the
+  // rendered list once the status filter is set to All.
+  const statusAll = c
+    .locator('button')
+    .filter({ hasText: /^In Progress$/ })
+    .first()
+    .locator('xpath=..')
+    .locator('button')
+    .filter({ hasText: /^All$/ })
+    .first();
+  if (await statusAll.waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false)) {
+    await statusAll.click();
+    await c.waitForTimeout(1500);
+  }
+
   const allCount = await chipCount(c, /^All \(\d+\)/i);
   expect(allCount).toBeGreaterThan(0);
   await expect.poll(() => inboxItemCount(c), { timeout: 10000 }).toBe(allCount);
 
   // AC6: a chip filters the list to its declared count, and "All" restores it.
-  const bugsCount = await chipCount(c, /Bugs \(\d+\)/i);
-  await c.getByRole('button', { name: /Bugs \(\d+\)/i }).first().click();
+  const bugsCount = await chipCount(c, /Issues \(\d+\)/i);
+  await c.getByRole('button', { name: /Issues \(\d+\)/i }).first().click();
   await expect.poll(() => inboxItemCount(c), { timeout: 10000 }).toBe(bugsCount);
   await c.getByRole('button', { name: /^All \(\d+\)/i }).first().click();
   await expect.poll(() => inboxItemCount(c), { timeout: 10000 }).toBe(allCount);
 
-  // AC3: clicking the "Bug Reports" CARD filters the inbox like the Bugs chip AND
+  // AC3: clicking the "Issues Reported" CARD filters the inbox like the Issues chip AND
   // syncs the chip (its style changes to active). Clicking the card again clears it.
-  const bugsChip = c.getByRole('button', { name: /Bugs \(\d+\)/i }).first();
+  const bugsChip = c.getByRole('button', { name: /Issues \(\d+\)/i }).first();
   const chipClassBefore = await bugsChip.getAttribute('class');
-  await c.getByRole('button', { name: /Bug Reports/i }).first().click();
+  await c.getByRole('button', { name: /Issues Reported/i }).first().click();
   await expect.poll(() => inboxItemCount(c), { timeout: 10000 }).toBe(bugsCount);
   await expect.poll(async () => (await bugsChip.getAttribute('class')) !== chipClassBefore).toBe(true);
   // Clear the filter via the All chip. (Per AC3 the card filters the inbox and

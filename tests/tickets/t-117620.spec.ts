@@ -6,7 +6,9 @@ import { ensureInK12CateringApp } from '../../utils/dataSync';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const ACTIONS = ['This is helpful', "Something's off", 'Report a bug', 'Share an idea'];
+// T-119591 relabelled two of these: "Something's off / Confusing" became
+// "I have questions", and "Report a bug" became "Report an issue".
+const ACTIONS = ['This is helpful', 'I have questions', 'Report an issue', 'Share an idea'];
 
 async function openMenu(page: Page): Promise<void> {
   const fab = page.getByRole('button', { name: /Open feedback menu/i });
@@ -61,16 +63,17 @@ test('Catering - User Feedback - feedback widget: expand, flyouts, validation, s
   await c.getByRole('button', { name: /Helpful/i }).first().click();
   await closeForm(c);
 
-  // AC3: "Report a bug" -> bug flyout with the required textarea + "Report bug".
+  // AC3: "Report an issue" -> flyout with the required textarea + its submit
+  // button. T-119591 renamed both the option and the button away from "bug".
   await openMenu(c);
-  await c.getByText('Report a bug').first().click();
-  await expect(c.getByRole('button', { name: /^Report bug$/i })).toBeVisible({ timeout: 8000 });
+  await c.getByText('Report an issue').first().click();
+  await expect(c.getByRole('button', { name: /^Report issue$/i })).toBeVisible({ timeout: 8000 });
   await expect(c.locator('textarea:visible').first()).toHaveAttribute('placeholder', /What happened/i);
   // only one flyout at a time: the rate flyout's "Send feedback" is gone.
   await expect(c.getByRole('button', { name: /^Send feedback$/i })).toHaveCount(0);
-  // AC3: submitting the bug with an empty textarea shows a validation error and
-  // does NOT submit (no toast).
-  await c.getByRole('button', { name: /^Report bug$/i }).click();
+  // AC3: submitting with an empty textarea shows a validation error and does NOT
+  // submit (no toast).
+  await c.getByRole('button', { name: /^Report issue$/i }).click();
   await expect(
     c.getByText(/required|please|can.?t be (blank|empty)|enter|provide/i).first(),
   ).toBeVisible({ timeout: 8000 });

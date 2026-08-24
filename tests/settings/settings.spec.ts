@@ -16,6 +16,18 @@ test.describe('Settings', () => {
   });
 
   test.beforeEach(async () => {
+    // A modal left open by a previous test puts a full-screen backdrop over the
+    // sidebar, so the nav click is intercepted. Cancel does not always dismiss it
+    // (an unsaved-changes confirm can sit on top), so reload — that clears any
+    // dialog outright and costs a second.
+    const backdrop = catering.locator('div[aria-label="Close dialog"]').first();
+    if (await backdrop.waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false)) {
+      await catering.reload({ waitUntil: 'domcontentloaded' }).catch(() => undefined);
+      await catering
+        .locator('aside[aria-label="Main navigation"]')
+        .waitFor({ state: 'visible', timeout: 30000 })
+        .catch(() => undefined);
+    }
     await navigateK12CateringMenu(catering, 'Settings');
     await catering.waitForLoadState('domcontentloaded');
   });
@@ -35,6 +47,7 @@ test.describe('Settings', () => {
     await catering.waitForTimeout(300);
   }
 
+
   test('Settings - Page heading and all major sections are visible', async () => {
     await expect(catering.locator('h1')).toContainText('Settings', { timeout: 10000 });
     await expect(catering.getByRole('region', { name: /Business settings/i })).toBeVisible();
@@ -45,7 +58,11 @@ test.describe('Settings', () => {
     await expect(catering.getByRole('heading', { name: /Order Settings/i })).toBeVisible();
     await expect(catering.getByRole('heading', { name: /Sales Tax Rate/i })).toBeVisible();
     await expect(catering.getByRole('heading', { name: /Delivery Fee/i })).toBeVisible();
-    await expect(catering.getByRole('heading', { name: /Minimum Order Amount/i })).toBeVisible();
+    // T-118254 added "Minimum Order Amount for Complimentary Items", so the old
+    // loose match now resolves to two headings. Pin the general setting exactly.
+    await expect(
+      catering.getByRole('heading', { name: 'Minimum Order Amount', exact: true }),
+    ).toBeVisible();
     await expect(catering.getByRole('region', { name: /Short URL settings/i })).toBeVisible();
     await expect(catering.getByRole('region', { name: /Holiday schedule settings/i })).toBeVisible();
   });
