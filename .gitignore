@@ -54,3 +54,4 @@ scripts/create-ticket-testcase.js
 tests/cleanup-sabihtesting.spec.ts
 rerun-fails.txt
 .freshdesk-notify.log
+.freshdesk-notify.paused

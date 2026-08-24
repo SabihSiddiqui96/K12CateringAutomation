@@ -93,6 +93,8 @@ const DIVIDER = '─────────────────────
 // exit code with no way to tell a network blip from a bad API key. Mirror every line to
 // a log file, trimmed to the last MAX_LOG_LINES so it can't grow without bound.
 const LOG_FILE = path.join(ROOT, '.freshdesk-notify.log');
+// Presence of this file pauses the notifier entirely — see the kill switch below.
+const PAUSE_FILE = path.join(ROOT, '.freshdesk-notify.paused');
 const MAX_LOG_LINES = 2000;
 
 function logLine(level, msg) {
@@ -291,6 +293,15 @@ function buildSummary(tickets, domain) {
   const reset = args.includes('--reset');
 
   trimLog();
+
+  // Kill switch. The Task Scheduler entry lives in the root folder and its ACL refuses
+  // a non-elevated Disable, so the scheduled run cannot be turned off from outside the
+  // script. Bail here instead: the task still fires every 15 minutes, does nothing, and
+  // exits clean. Delete PAUSE_FILE to resume; --force runs once regardless.
+  if (fs.existsSync(PAUSE_FILE) && !args.includes('--force')) {
+    console.log('Paused (' + path.basename(PAUSE_FILE) + ' present) — no polling, no posting.');
+    return;
+  }
 
   const apiKey = readEnvValue('FRESHDESK_API_KEY');
   if (!apiKey) fail('FRESHDESK_API_KEY not found in .env.');
