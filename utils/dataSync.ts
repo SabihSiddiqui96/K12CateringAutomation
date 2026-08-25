@@ -268,8 +268,59 @@ export async function setGlobalSyncToggle(page: Page, attrLabel: string, on: boo
   await closeOpenDialog(page);
 }
 
+/**
+ * Make sure a target district is opted in before a sync runs.
+ *
+ * A district left opted out makes "Push sync now" finish with 0 synced / 0
+ * skipped and NO "Sync complete" toast at all, which reads exactly like a broken
+ * sync when it is really just configuration. Berkeley in particular gets opted out
+ * by other runs, so check and put it back rather than failing on it.
+ *
+ * Returns true if it had to opt the district back in.
+ */
+export async function ensureTargetDistrictOptedIn(page: Page, districtName: string): Promise<boolean> {
+  const manageBtn = page
+    .getByRole('button', { name: /^Manage$/i })
+    .or(page.getByRole('link', { name: /^Manage$/i }))
+    .first();
+  await scrollUntilVisible(page, { target: manageBtn }).catch(() => undefined);
+  await expect(manageBtn).toBeVisible({ timeout: 10000 });
+  await manageBtn.click();
+
+  const dialog = page.getByRole('dialog').first();
+  await expect(dialog).toBeVisible({ timeout: 10000 });
+
+  // Each target district is a row carrying its name and its own opt-in switch.
+  const row = dialog
+    .locator('div')
+    .filter({ hasText: new RegExp(escapeRegExp(districtName)) })
+    .filter({ has: page.getByRole('switch') })
+    .last();
+
+  let changed = false;
+  if (await row.waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false)) {
+    const toggle = row.getByRole('switch').first();
+    const optedIn = (await toggle.getAttribute('aria-checked').catch(() => null)) === 'true';
+    if (!optedIn) {
+      await toggle.click();
+      await page.waitForTimeout(600);
+      await expect(toggle).toHaveAttribute('aria-checked', 'true', { timeout: 8000 });
+      changed = true;
+      console.log(`[dataSync] "${districtName}" was opted OUT - opted it back in before syncing.`);
+    }
+  } else {
+    console.log(`[dataSync] could not find a target-district row for "${districtName}".`);
+  }
+
+  await closeOpenDialog(page);
+  return changed;
+}
+
 /** Click "Push sync now", confirm, and wait for the "Sync complete" toast. */
 export async function runPushSyncNow(page: Page): Promise<void> {
+  // A target district that is opted out makes the sync a silent no-op, so make
+  // sure the one we sync to is opted in first.
+  await ensureTargetDistrictOptedIn(page, getSecondaryDistrictName()).catch(() => undefined);
   await scrollUntilVisible(page, { target: page.getByRole('button', { name: /Push sync now/i }).first() }).catch(() => undefined);
   await page.getByRole('button', { name: /Push sync now/i }).first().click();
   await expect(page.locator('div').filter({ hasText: /^Push sync now\?$/ }).first()).toBeVisible({ timeout: 10000 });

@@ -761,7 +761,7 @@ test.describe('Minimum Order Amount', () => {
     await catering.waitForLoadState('domcontentloaded');
 
     await expect(
-      catering.getByRole('heading', { name: /Minimum Order Amount/i }),
+      catering.getByRole('heading', { name: 'Minimum Order Amount', exact: true }),
     ).toBeVisible({ timeout: 10000 });
     // The heading + Edit button confirm the section. The displayed value varies
     // ("$X minimum" when set, nothing/unset in a fresh district like Alief ISD on

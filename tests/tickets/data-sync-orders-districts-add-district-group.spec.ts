@@ -88,10 +88,12 @@ test('Data Sync - Orders - Districts - Add district group', async ({
     .getByRole('textbox', { name: GROUP_NAME_FIELD, exact: true })
     .fill('test');
   await catering.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(
-    catering.getByRole('alert').filter({ hasText: DUPLICATE_GROUP_ALERT }),
-  ).toBeVisible();
-  await expect(
-    catering.getByRole('alert').filter({ hasText: DUPLICATE_GROUP_ALERT }),
-  ).toHaveText(DUPLICATE_GROUP_ALERT);
+  // Scope to the dialog's inline error: a "Failed to save district" toast also
+  // carries this text, so an unscoped role=alert matches two elements.
+  const duplicateGroupAlert = catering
+    .getByLabel(DISTRICT_GROUP_DIALOG, { exact: true })
+    .getByRole('alert')
+    .filter({ hasText: DUPLICATE_GROUP_ALERT });
+  await expect(duplicateGroupAlert).toBeVisible();
+  await expect(duplicateGroupAlert).toHaveText(DUPLICATE_GROUP_ALERT);
 });
