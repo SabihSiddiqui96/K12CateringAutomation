@@ -265,19 +265,24 @@ function buildSummary(tickets, domain) {
     const modulePath = [cf.cf_module_selection, cf.module_subsection, cf.module_subsection_item]
       .filter(Boolean)
       .join(' > ');
-    // Priority leads the detail lines — it's the one field that decides whether
+    // Priority sits directly under Subject — it's the one field that decides whether
     // someone picks the ticket up now or after lunch.
     const priority = PRIORITY_LABELS[Number(t.priority)];
     const dot = PRIORITY_DOTS[Number(t.priority)];
-    return [
-      `**#${t.id}** ${t.subject}`,
-      priority ? `**Priority:** ${dot ? `${dot} ` : ''}${priority}` : null,
-      cf.districtcounty || cf.sodexo_district
-        ? `**District:** ${cf.districtcounty || cf.sodexo_district}` : null,
-      cf.cf_primerotype ? `**Product:** ${cf.cf_primerotype}` : null,
-      modulePath ? `**Module:** ${modulePath}` : null,
-      `https://${domain}/a/tickets/${t.id}`,
-    ].filter(Boolean).join('\n');
+
+    // Labelled rows, one per line. Empty fields are dropped rather than printed as
+    // blanks, since a ticket logged without a district or module still deserves a
+    // usable notification.
+    const rows = [
+      ['Subject', t.subject],
+      ['Priority', priority ? `${dot ? `${dot} ` : ''}${priority}` : ''],
+      ['District', cf.districtcounty || cf.sodexo_district],
+      ['Product', cf.cf_primerotype],
+      ['Module', modulePath],
+    ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== '');
+
+    const body = rows.map(([label, v]) => `**${label}:** ${v}`).join('\n');
+    return `**#${t.id}**\n\n${body}\n\n**Link:** https://${domain}/a/tickets/${t.id}`;
   });
 
   const heading = tickets.length === 1
