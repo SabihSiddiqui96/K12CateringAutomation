@@ -130,9 +130,15 @@ test.describe('Orders', () => {
       /No actions available for this order status/i,
     );
 
-    await expect(catering.getByRole('heading', { name: /Order #/i })).toBeVisible({
-      timeout: 10000,
-    });
+    // Matched on "(Order #" rather than "Order #": the detail title parenthesises the
+    // order number ("CustOrder 1787747947017 (Order #6A85AD1337)") while the list rows
+    // do not, so the parenthesis is what separates one from twenty. An unscoped
+    // "Order #" hits every row's h3 and trips strict mode — and Playwright counts
+    // matched elements regardless of visibility, so the list being off-screen does not
+    // help.
+    await expect(
+      catering.getByRole('heading', { name: /\(Order #/i }).first(),
+    ).toBeVisible({ timeout: 10000 });
     await expect(
       catering.locator('h2').filter({ hasText: /^\$\d/ }).first(),
     ).toBeVisible();
@@ -140,8 +146,30 @@ test.describe('Orders', () => {
     await expect(detailPage.getByText('Event Date')).toBeVisible();
     await expect(detailPage.getByRole('heading', { name: 'Admin Actions' })).toBeVisible();
 
+    // Admin Actions depend on the order's status, and the pair on offer differs: a
+    // Submitted order gets Approve/Reject, an accepted one gets Mark delivered/Cancel,
+    // and a terminal one gets the empty-state message. The original branch knew only
+    // the second and third of those, so any Submitted order — which is what the newest
+    // order usually is, and this test opens the newest — fell through to the empty-state
+    // assertion and failed against a panel that was working correctly.
+    // "Approve this order" / "Reject this order", not "Approve Order" — the accessible
+    // names are aria-labels following the same "…this order" phrasing as the delivered
+    // and cancel controls, while the visible text is the shorter "Approve Order".
+    const approveOrderButton = detailPage.getByRole('button', { name: 'Approve this order' });
+    const rejectOrderButton = detailPage.getByRole('button', { name: 'Reject this order' });
+
+    // Let the panel settle before branching. isVisible() resolves immediately without
+    // waiting, so a panel that has not finished rendering reads as "no actions at all"
+    // and sends an order that does have actions down the empty-state path — which then
+    // burns its whole timeout and fails.
+    await expect(
+      markDeliveredButton.or(approveOrderButton).or(noActionsMessage).first(),
+    ).toBeVisible({ timeout: 15000 });
+
     if (await markDeliveredButton.isVisible().catch(() => false)) {
       await expect(cancelOrderButton).toBeVisible();
+    } else if (await approveOrderButton.isVisible().catch(() => false)) {
+      await expect(rejectOrderButton).toBeVisible();
     } else {
       await expect(noActionsMessage).toBeVisible();
     }

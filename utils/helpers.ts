@@ -380,6 +380,23 @@ export async function loginToK12Catering(
     }
   );
 
+  // Auto-handle the PrimeroEdge SSO re-launch interstitial ("You will be automatically
+  // authenticated and redirected to Catering in N seconds"). A mid-session token refresh
+  // can bounce any long-running test onto that page, at which point every locator on it
+  // "isn't found" and the test fails for a reason unrelated to what it was asserting —
+  // the failure reads as a stale selector when it is really a lost session.
+  //
+  // Registered here rather than per-spec: dismissReauthInterstitial already existed, but
+  // only 5 of the spec files ever called it, so the rest were left exposed. Hanging it
+  // off the shared login means every spec that enters through this helper is covered,
+  // including ones written later that would not know to ask.
+  await catering.addLocatorHandler(
+    catering.getByText(/automatically authenticated and redirected to Catering/i),
+    async () => {
+      await dismissReauthInterstitial(catering);
+    }
+  );
+
   await registerReleaseNotificationHandler(catering);
 
   if (navigateTo) {

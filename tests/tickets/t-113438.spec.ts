@@ -488,7 +488,7 @@ async function runPushSyncNow(page: Page): Promise<boolean> {
   await expect(
     page
       .getByText(
-        /Sync complete\s*[—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i,
+        /Sync complete\s*[.,;:—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i,
       )
       .first(),
   ).toBeVisible({ timeout: 90000 });
@@ -1177,7 +1177,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     .click();
 
   const syncCompleteText = await catering
-    .getByText(/Sync complete\s*[—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i)
+    .getByText(/Sync complete\s*[.,;:—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i)
     .first()
     .textContent({ timeout: 60000 });
   expect(syncCompleteText, 'Sync complete message').toBeTruthy();

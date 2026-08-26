@@ -324,17 +324,17 @@ test.describe('Check Availability', () => {
     expect(mainText).toMatch(/Time:/i);
   });
 
-  test('Check Availability - Result step shows Browse Menu and Proceed to Checkout buttons', async ({
+  test('Check Availability - Result step shows Browse Menu', async ({
     browser,
   }) => {
     // A mid-test token refresh forces a full re-login (~20s) before the wizard
     // can be re-driven, which does not fit the default budget.
     test.setTimeout(180_000);
+    // Browse Menu is the only action offered here on an empty cart. "Proceed to
+    // Checkout" used to be asserted alongside it, but the result step only renders
+    // that button once the cart has items — covered by the "with cart" test below.
     await expect(
       await resultStep(browser, /Browse available menu items/i),
-    ).toBeVisible({ timeout: 10000 });
-    await expect(
-      await resultStep(browser, /Proceed to checkout with selected date and time/i),
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -354,14 +354,17 @@ test.describe('Check Availability', () => {
     await expect(catering).toHaveURL(/\/menu/i, { timeout: 10000 });
   });
 
-  test('Check Availability - Proceed to Checkout without cart navigates to menu page', async ({
-    browser,
-  }) => {
-    // A mid-test token refresh forces a full re-login (~20s) before the wizard
-    // can be re-driven, which does not fit the default budget.
-    test.setTimeout(180_000);
-    await (await resultStep(browser, /Proceed to checkout with selected date and time/i)).click();
-    await expect(catering).toHaveURL(/\/menu/i, { timeout: 10000 });
+  test('Check Availability - Proceed to Checkout is not offered without a cart', async () => {
+    // Inverted from "clicking it goes to /menu": the result step no longer renders a
+    // Proceed to Checkout button on an empty cart, so the behaviour worth pinning is
+    // that it stays absent. resultStep() is deliberately not used here — it retries on
+    // the assumption the control exists, which is the opposite of what we assert.
+    await proceedToResultStep(catering);
+    await expect(
+      catering.getByRole('button', {
+        name: /Proceed to checkout with selected date and time/i,
+      }),
+    ).toBeHidden({ timeout: 10000 });
   });
 
   // ── Flow: Cart + Checkout ──

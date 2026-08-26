@@ -326,7 +326,7 @@ export async function runPushSyncNow(page: Page): Promise<void> {
   await expect(page.locator('div').filter({ hasText: /^Push sync now\?$/ }).first()).toBeVisible({ timeout: 10000 });
   await page.getByRole('button', { name: /Yes,?\s*Push Now/i }).first().click();
   await expect(
-    page.getByText(/Sync complete\s*[—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i).first(),
+    page.getByText(/Sync complete\s*[.,;:—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i).first(),
   ).toBeVisible({ timeout: 90000 });
 }
 
