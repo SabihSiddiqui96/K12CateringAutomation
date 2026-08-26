@@ -124,7 +124,7 @@ if (currentBranch !== BRANCH) {
 // Read the index with modes so gitlinks (mode 160000, i.e. submodules) can be
 // dropped — they are directories on disk, so copying them byte-for-byte throws
 // EISDIR, and a submodule pointer means nothing in a plain-folder mirror anyway.
-const sourceFiles = [];
+let sourceFiles = [];
 const submodules = [];
 for (const line of git(SOURCE, ['ls-files', '--stage']).split('\n')) {
   if (!line.trim()) continue;
@@ -137,10 +137,29 @@ if (submodules.length) {
   console.log(`Skipping ${submodules.length} submodule(s): ${submodules.join(', ')}`);
 }
 
+// Files that live in this repo but have no business in the shared monorepo. The
+// mirror is meant to carry the K12 automation suite; freshdesk-notify.js is a
+// RingCentral notifier whose real home is the FO-SprintBurnDown repo, and the copy
+// here is dead — it is paused and nothing runs it. Syncing edits to a dead file into
+// a repo other teams read is noise.
+//
+// Excluded paths are left ALONE at the target: not copied over, and not treated as
+// stale either. Dropping them from the source set without also dropping them from the
+// removal candidates would silently delete them from the shared repo on the next sync,
+// which is a much bigger action than "stop mirroring this file".
+const EXCLUDE = new Set(['scripts/freshdesk-notify.js']);
+
+if (EXCLUDE.size) {
+  const dropped = sourceFiles.filter((f) => EXCLUDE.has(f));
+  if (dropped.length) console.log(`Not mirrored (excluded): ${dropped.join(', ')}`);
+}
+sourceFiles = sourceFiles.filter((f) => !EXCLUDE.has(f));
+
 const targetFiles = git(TARGET_REPO, ['ls-files', PREFIX])
   .split('\n')
   .filter(Boolean)
-  .map((f) => f.slice(PREFIX.length + 1));
+  .map((f) => f.slice(PREFIX.length + 1))
+  .filter((f) => !EXCLUDE.has(f));
 
 const sourceSet = new Set(sourceFiles);
 const stale = targetFiles.filter((f) => !sourceSet.has(f));
