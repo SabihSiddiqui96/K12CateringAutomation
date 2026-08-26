@@ -147,7 +147,16 @@ if (submodules.length) {
 // stale either. Dropping them from the source set without also dropping them from the
 // removal candidates would silently delete them from the shared repo on the next sync,
 // which is a much bigger action than "stop mirroring this file".
-const EXCLUDE = new Set(['scripts/freshdesk-notify.js']);
+const EXCLUDE = new Set([
+  // Real home is the FO-SprintBurnDown repo; the copy here is paused and dead.
+  'scripts/freshdesk-notify.js',
+  // Local Task Scheduler tooling for this machine, not shared test automation. The
+  // .vbs hardcodes an absolute path under this user profile, and auto-rerun-latest.js
+  // shells out to scripts/rerun-failed.js, which is gitignored and therefore absent
+  // from the mirror - so both are broken by construction anywhere but here.
+  'scripts/auto-rerun-latest.js',
+  'scripts/auto-rerun-hidden.vbs',
+]);
 
 if (EXCLUDE.size) {
   const dropped = sourceFiles.filter((f) => EXCLUDE.has(f));
