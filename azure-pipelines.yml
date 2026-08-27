@@ -270,6 +270,22 @@ stages:
                   + '\n\nResults: ' + resultsUrl;
               }
 
+              // When the build has failures, stay SILENT here. The local 9 AM
+              // re-run (scripts/auto-rerun-latest.js) re-runs just those failures
+              // and posts ONE message carrying the true, flake-filtered numbers —
+              // so the channel sees a real count instead of a scary one that
+              // quietly shrinks an hour later. A clean build is announced here as
+              // usual, because there is nothing to re-run.
+              // If that machine is offline, auto-rerun-latest.js posts these raw
+              // numbers itself, marked "NOT re-run" — failures are never silent.
+              if (failed > 0) {
+                console.log(
+                  'Build has ' + failed + ' failure(s) — not posting here. '
+                  + 'The local re-run owns the message. Would have sent:\n' + text
+                );
+                process.exit(0);
+              }
+
               console.log('Sending webhook:', text);
 
               const webhookUrl = process.env.RINGCENTRAL_WEBHOOK_URL;

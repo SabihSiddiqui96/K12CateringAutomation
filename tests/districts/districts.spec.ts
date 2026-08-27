@@ -34,9 +34,15 @@ test.describe('Districts', () => {
 
     const editBtn = catering.getByRole('button', { name: /Edit district/i }).or(catering.getByRole('button', { name: /Edit/i }).first()).first();
     const deleteBtn = catering.getByRole('button', { name: /Delete district/i }).or(catering.getByRole('button', { name: /Delete/i }).first()).first();
-    const hasEdit = await editBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    const hasDelete = await deleteBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    expect(hasEdit || hasDelete).toBe(true);
+    // A web-first assertion rather than isVisible() probes: isVisible() is an
+    // immediate, non-retrying check, so it triggers neither Playwright's
+    // auto-waiting nor the shared re-auth interstitial handler registered in
+    // loginToK12Catering. When a mid-test SSO token refresh bounced the page onto
+    // the "you will be automatically authenticated and redirected" screen, both
+    // probes silently returned false and this reported "no edit/delete actions"
+    // — a lost session dressed up as a missing feature. toBeVisible() retries,
+    // which lets the handler dismiss the interstitial and the assertion recover.
+    await expect(editBtn.or(deleteBtn).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('Districts - Search filters and clearing search restores list', async () => {

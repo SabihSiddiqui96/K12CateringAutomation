@@ -55,3 +55,4 @@ tests/cleanup-sabihtesting.spec.ts
 rerun-fails.txt
 .freshdesk-notify.log
 .freshdesk-notify.paused
+.auto-rerun-notified.json
