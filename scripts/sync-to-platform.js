@@ -13,11 +13,15 @@
  * gitignored, so they can never reach the shared repo. Files deleted here are
  * deleted there too, so the folder is a true mirror rather than an append.
  *
+ * The mirror never lands on AutomationProjects itself. That branch is shared
+ * company code, so each sync cuts its own camelCase branch off it, pushes there,
+ * and prints a link to raise the PR by hand.
+ *
  * Usage:
- *   node scripts/sync-to-platform.js --dry-run       # show what would change
- *   node scripts/sync-to-platform.js                 # sync + commit + push
- *   node scripts/sync-to-platform.js -m "message"    # custom commit message
- *   node scripts/sync-to-platform.js --no-push       # commit locally, don't push
+ *   node scripts/sync-to-platform.js --dry-run              # show what would change
+ *   node scripts/sync-to-platform.js --branch paginationFix # sync + commit + push
+ *   node scripts/sync-to-platform.js -b addMethodFix -m "message"
+ *   node scripts/sync-to-platform.js -b someFix --no-push   # commit locally only
  *
  * Auth: AZURE_DEVOPS_CODE_PAT in .env (needs Code Read & Write; the older
  * AZURE_DEVOPS_PAT is Work Items only and will not work here).
@@ -41,6 +45,12 @@ const commitMessage =
   msgIndex !== -1 && args[msgIndex + 1]
     ? args[msgIndex + 1]
     : 'Update K12Catering automation';
+
+// The mirror never lands on BRANCH itself. BRANCH is shared company code that
+// other people build from, so every sync cuts its own branch off it and stops
+// there — the PR is raised by hand after review.
+const branchIndex = args.findIndex((a) => a === '--branch' || a === '-b');
+const featureBranch = branchIndex !== -1 ? args[branchIndex + 1] : '';
 
 function git(repo, gitArgs, allowFail = false) {
   try {
@@ -110,12 +120,34 @@ if (sourceDirty.length && !args.includes('--allow-dirty')) {
   );
 }
 
-const currentBranch = git(TARGET_REPO, ['branch', '--show-current']);
-if (currentBranch !== BRANCH) {
-  fail(
-    `platform repo is on "${currentBranch}", expected "${BRANCH}". ` +
-      `Switch it with: git -C "${TARGET_REPO}" checkout ${BRANCH}`,
-  );
+// A branch name is required, and must be camelCase — no dashes, underscores or
+// slashes — so the PR list stays readable: dashboardFix, addMethodFix.
+if (!dryRun) {
+  if (!featureBranch) {
+    fail(
+      'a branch name is required: --branch <camelCaseName> (e.g. paginationFix).\n' +
+        `The mirror is never pushed to ${BRANCH} directly — it goes to a new branch off it, ` +
+        'and you raise the PR.',
+    );
+  }
+  if (!/^[a-z][A-Za-z0-9]*$/.test(featureBranch)) {
+    fail(
+      `branch "${featureBranch}" is not camelCase. Use letters and digits only, ` +
+        'starting lowercase — e.g. paginationFix, addMethodFix. No dashes or underscores.',
+    );
+  }
+  if (featureBranch === BRANCH) {
+    fail(`refusing to push to ${BRANCH} directly — pick a new branch name.`);
+  }
+}
+
+// Start from an up-to-date BRANCH so the new branch carries only this sync's work.
+if (!dryRun) {
+  const authFetch = `https://anything:${pat}@${REMOTE_PATH}`;
+  git(TARGET_REPO, ['fetch', authFetch, BRANCH], true);
+  const base = git(TARGET_REPO, ['rev-parse', 'FETCH_HEAD'], true) || BRANCH;
+  git(TARGET_REPO, ['checkout', '-B', featureBranch, base]);
+  console.log(`Branched ${featureBranch} off ${BRANCH} (${base.slice(0, 7)}).`);
 }
 
 // --- work out the file set -------------------------------------------------
@@ -241,7 +273,7 @@ if (!staged) {
 }
 
 git(TARGET_REPO, ['commit', '-m', commitMessage]);
-console.log(`\nCommitted to ${BRANCH}: ${commitMessage}`);
+console.log(`\nCommitted to ${featureBranch}: ${commitMessage}`);
 
 if (noPush) {
   console.log('--no-push given; stopping before push.');
@@ -252,7 +284,7 @@ if (noPush) {
 // into .git/config where it would sit on disk in the shared checkout.
 const authUrl = `https://anything:${pat}@${REMOTE_PATH}`;
 try {
-  execFileSync('git', ['-C', TARGET_REPO, 'push', authUrl, `HEAD:${BRANCH}`], {
+  execFileSync('git', ['-C', TARGET_REPO, 'push', authUrl, `HEAD:${featureBranch}`], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -261,4 +293,13 @@ try {
   fail(`push failed:\n${detail}`);
 }
 
-console.log(`Pushed to ${REMOTE_PATH} (${BRANCH}).`);
+console.log(`\nPushed branch: ${featureBranch}`);
+console.log('Open the PR here:');
+console.log(
+  `  https://dev.azure.com/Cybersoft-Technologies-Inc/Platform/_git/Cybersoft.Platform/` +
+    `pullrequestcreate?sourceRef=${featureBranch}&targetRef=${BRANCH}`,
+);
+
+// Leave the shared checkout back on BRANCH so the next sync starts clean and
+// nobody finds it parked on a one-off branch.
+git(TARGET_REPO, ['checkout', BRANCH], true);
