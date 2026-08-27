@@ -191,7 +191,15 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     const TARGET = TARGET_DISTRICT; // QA: Berkeley School District; UAT: sabihLocal
     const stamp = `${Date.now()}`.slice(-6);
     const uniqueName = `AutoSync ${stamp}`;
-    const PRICE_OFF = '7.77';   // set while Sync Price OFF -> must NOT propagate
+    // Varied per run, and deliberately so. A fixed probe price is a trap here:
+    // this test reuses the same menu item every run, and if step 13 fails, steps
+    // 14-17 never execute, leaving TARGET holding exactly that price. The next
+    // run then fails on the leftover value rather than on anything the sync did
+    // — so a single bad day turns into a permanent red that no re-run can clear,
+    // and the failure looks like an app bug when the app is behaving correctly.
+    // (That is exactly what happened from 2026-08-18 onward.) Varying it means
+    // stale data can never satisfy the assertion.
+    const PRICE_OFF = `7.${stamp.slice(-2)}`; // set while Sync Price OFF -> must NOT propagate
     const PRICE_ON = '8.88';    // set while Sync Price ON  -> must propagate
     const PRICE_LOCAL = '5.55'; // target-district local override
 
@@ -225,7 +233,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       // 13 — on the TARGET district, the Name synced but the Price did NOT.
       await switchDistrict(catering, TARGET);
       await expectItemOnTarget(uniqueName);
-      expect(await readMenuItemPrice(catering, uniqueName)).not.toBe('7.77');
+      expect(await readMenuItemPrice(catering, uniqueName)).not.toBe(PRICE_OFF);
 
       // 14 — back on Mercer: Sync Price ON, change Price, push -> Berkeley Price updates.
       await switchDistrict(catering, HOME);
