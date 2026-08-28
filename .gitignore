@@ -38,7 +38,7 @@ Thumbs.db
 /tests/placeholder/
 /tests/placeholder/placeholder.ts
 
-# Local Claude permissions (volatile, machine-specific — rewritten each session)
+# Local tool permissions - machine-specific, rewritten each session
 .claude/settings.local.json
 
 # Personal / local-only files. Ones already committed stay tracked until you run

@@ -51,8 +51,7 @@ async function resetToStep1(page: Page): Promise<void> {
     const backBtn = page.getByRole('button', { name: /Go back to previous step/i });
     if (await backBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
       await backBtn.click();
-      // The wizard has stepped back once either the date button reappears or the
-      // step behind this one renders; the loop re-checks, so just wait for either.
+      // Stepped back once either control shows; the loop re-checks anyway.
       await page
         .getByRole('button', { name: /Select Event Date|Continue to time selection/i })
         .first()
@@ -69,7 +68,6 @@ async function pickFirstAvailableDate(page: Page): Promise<void> {
   const datePickerBtn = page.getByRole('button', { name: /Select Event Date/i });
   await expect(datePickerBtn).toBeVisible({ timeout: 10000 });
   await datePickerBtn.click();
-  // No sleep: the calendar assertion below is the wait for it to open.
   await expect(page.getByRole('button', { name: /Previous month/i })).toBeVisible({ timeout: 5000 });
 
   const nextBtn = page.getByRole('button', { name: /Next month/i });
@@ -90,7 +88,7 @@ async function pickFirstAvailableDate(page: Page): Promise<void> {
         const confirmBtn = page.getByRole('button', { name: /Confirm date selection/i });
         if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
           await confirmBtn.click();
-          // The calendar closing is the signal the date was taken.
+          // The calendar closing means the date was taken.
           await confirmBtn.waitFor({ state: 'hidden', timeout: 8000 }).catch(() => undefined);
         }
         return;
@@ -103,8 +101,7 @@ async function pickFirstAvailableDate(page: Page): Promise<void> {
 async function proceedToTimeStep(page: Page): Promise<void> {
   await pickFirstAvailableDate(page);
   await page.getByRole('button', { name: /Continue to time selection/i }).click();
-  // Landing on the time step is the observable outcome — wait for it rather than
-  // guessing a second. Best-effort: callers assert on what they actually need.
+  // Wait for the time step rather than guessing a second; callers assert the rest.
   await page
     .getByRole('heading', { name: /Select Event Setup Time/i })
     .waitFor({ state: 'visible', timeout: 15000 })
@@ -245,8 +242,7 @@ test.describe('Check Availability', () => {
   });
 
   test('Check Availability - Page loads without errors', async () => {
-    // The absence of an error string alone would also pass on a blank page, so
-    // assert the wizard actually rendered first.
+    // The absence of an error string alone would also pass on a blank page.
     await expect(catering.locator('h1')).toContainText('Check Availability', { timeout: 10000 });
     await expect(
       catering.getByRole('button', { name: /Select Event Date/i }),

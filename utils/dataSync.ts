@@ -19,8 +19,7 @@ import {
   LIST_ROW_SELECTOR,
 } from './helpers';
 
-// Lives in ./helpers now (it was declared in nine files); re-exported so the
-// specs that import it from here keep working.
+// Lives in ./helpers now; re-exported so existing imports keep working.
 export { escapeRegExp } from './helpers';
 
 // District names can render with a typographic apostrophe (U+2019), e.g.
@@ -30,20 +29,14 @@ function districtPattern(name: string): string {
   return escapeRegExp(name).replace(/['’]/g, "['’]");
 }
 
-/**
- * District-restoration state, scoped to the page it belongs to.
- *
- * The PrimeroEdge launcher periodically token-refreshes and reloads the app,
- * which reverts the active district back to the persisted one. Long, district-
- * switch-heavy flows (e.g. 117617 Test B) therefore lose the district they
- * switched to mid-test. A test opts in by calling setIntendedDistrict(page, name);
- * ensureInK12CateringApp() then re-switches back to it after any relaunch.
- *
- * Keyed by Page rather than held at module scope: module state is shared by every
- * test a worker runs, so one spec's opt-in used to leak into the next test in the
- * same file, and a parallel run had two tests writing the same variable. A WeakMap
- * also means the entry disappears with the page, so nothing has to reset it.
- */
+// The launcher token-refreshes and reloads the app, which snaps the active
+// district back to the persisted one, so a long district-switching flow loses the
+// district it switched to. A test opts in with setIntendedDistrict(page, name) and
+// ensureInK12CateringApp switches back after a relaunch.
+//
+// Keyed by Page, not module scope: module state is shared by every test a worker
+// runs, so one spec's opt-in leaked into the next test in the same file. The
+// WeakMap entry also goes away with the page, so nothing has to reset it.
 type DistrictState = { intended: string | null; restoring: boolean };
 const districtState = new WeakMap<Page, DistrictState>();
 
@@ -61,9 +54,8 @@ export function setIntendedDistrict(page: Page, name: string | null): void {
 }
 
 function headerShowsDistrict(page: Page, districtName: string): Locator {
-  // The trailing (?!\w) stops a short name matching a longer one that starts
-  // with it — "Lees" must not match "Lees Summit R-7", and "Berkeley" must not
-  // match "Berkeley Heights".
+  // (?!\w) so a short name cannot match a longer one starting with it:
+  // "Lees" must not match "Lees Summit R-7".
   return page
     .getByRole('button', { name: /Switch district/i })
     .first()
@@ -141,24 +133,17 @@ export async function dismissAnyModal(page: Page): Promise<void> {
 
 type CloseDialogOptions = {
   /**
-   * Throw if the dialog is still up when we run out of attempts. Default true —
-   * a test that carries on with a modal covering the page fails later with a
-   * confusing message about the control underneath it. Pass false only on
-   * genuinely best-effort teardown paths.
+   * Throw if the dialog is still up after the last attempt. Default true: carrying
+   * on behind a modal fails later on the control underneath it, which reads as a
+   * missing element. Pass false on best-effort teardown only.
    */
   required?: boolean;
 };
 
-/**
- * Close whatever dialog is open, and verify it actually closed.
- *
- * Only named close affordances are clicked: an accessible-name match, an
- * aria-label containing "close", or a bare ×/X. There used to be a
- * `button:has(svg)).last()` catch-all here, which is a coin flip on any dialog
- * whose last icon button is something else (Delete, Reset) — worth an a11y bug
- * against a dialog with no named close control rather than a blind click.
- * Escape is the safe fallback and is pressed on every attempt anyway.
- */
+// Close whatever dialog is open and check it actually closed. Only named close
+// controls are clicked - an accessible name, an aria-label containing "close", or
+// a bare x. The old `button:has(svg)).last()` catch-all was a coin flip on any
+// dialog whose last icon button is Delete or Reset. Escape covers the rest.
 export async function closeOpenDialog(page: Page, options: CloseDialogOptions = {}): Promise<void> {
   const { required = true } = options;
   const dialog = page.locator('[role="dialog"]').first();
@@ -199,9 +184,8 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
   // The header switch control isn't rendered on every page; if it's not here,
   // go to the Districts page where the "Switch district" button reliably lives.
   if (!(await switchBtn.isVisible({ timeout: 3000 }).catch(() => false))) {
-    // Log rather than swallow: if this navigation is genuinely broken the next
-    // step still fails, but on "Switch district button not visible" instead of
-    // the real cause, which sends you looking at the wrong thing.
+    // Log rather than swallow: a broken navigation here otherwise fails later on
+    // "Switch district button not visible", which sends you to the wrong place.
     await navigateK12CateringMenu(page, 'Districts').catch((err) => {
       const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
       console.log(`[dataSync] could not open Districts before switching district: ${msg}`);
@@ -258,9 +242,8 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
       await confirmAfterCard.click();
     }
   } else {
-    // Anchored, and role-first: an unanchored getByText matches a substring, so
-    // picking "Lees" could land on "Lees Summit R-7" — switching the session to
-    // the wrong district, which then fails somewhere far away from here.
+    // Anchored and role-first: an unanchored getByText matches a substring, so
+    // "Lees" could pick "Lees Summit R-7" and switch to the wrong district.
     const exact = new RegExp(`^\\s*${districtPattern(districtName)}\\s*$`, 'i');
     let option = page
       .getByRole('option', { name: exact })
@@ -268,10 +251,9 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
       .or(page.getByText(exact))
       .first();
     if (!(await option.isVisible({ timeout: 5000 }).catch(() => false))) {
-      // Some builds render the name in a row alongside a status badge, so the
-      // text node is not exactly the name. Fall back to a word-boundary match —
-      // still refuses "Lees Summit R-7" for "Lees" — and take the LAST match so
-      // we land on the innermost element rather than a wrapping container.
+      // Some builds put the name in a row with a status badge, so the text node
+      // is not exactly the name. Fall back to a word-boundary match, last one so
+      // we get the innermost element rather than a wrapping container.
       option = page
         .getByText(new RegExp(`${districtPattern(districtName)}(?!\\w)`, 'i'))
         .last();
@@ -404,16 +386,14 @@ export async function ensureTargetDistrictOptedIn(page: Page, districtName: stri
 }
 
 /**
- * Click "Push sync now", confirm, and wait for the "Sync complete" toast.
+ * Click "Push sync now", confirm, wait for the "Sync complete" toast.
  *
- * Returns false without syncing when the button is disabled — that happens when
- * no target district is opted in (e.g. the only target of a single-target group
- * was just opted out), where there is genuinely nothing to push. Callers that
- * care about that case branch on the return value.
+ * Returns false without syncing when the button is disabled, which happens when no
+ * target district is opted in and there is nothing to push.
  *
- * `ensureTargetOptedIn` defaults to true because an opted-out target makes the
- * sync a silent no-op. Pass false in the one case where being opted out is the
- * thing under test (t-113438 step 8a), otherwise this would undo the test's setup.
+ * ensureTargetOptedIn defaults to true because an opted-out target makes the sync a
+ * silent no-op. Pass false where being opted out is the thing under test
+ * (t-113438 step 8a), or this undoes the setup.
  */
 export async function runPushSyncNow(
   page: Page,
@@ -479,8 +459,7 @@ async function openItemEdit(page: Page, name: string): Promise<void> {
 async function setChips(page: Page, inputId: string, kind: 'allergen' | 'ingredient', values: string[]): Promise<void> {
   const removeRe = new RegExp(`^Remove .+ ${kind}$`, 'i');
   const chips = page.getByRole('button', { name: removeRe });
-  // Each removal is confirmed by the chip count dropping, so there is nothing to
-  // sleep for. The loop is bounded so a chip that refuses to go cannot spin.
+  // The count dropping confirms each removal. Bounded so a stuck chip can't spin.
   for (let guard = 0; guard < 30; guard += 1) {
     const before = await chips.count();
     if (before === 0) break;
@@ -492,7 +471,7 @@ async function setChips(page: Page, inputId: string, kind: 'allergen' | 'ingredi
     await input.click();
     await input.fill(value);
     await input.press('Enter');
-    // The chip appearing is the confirmation that Enter registered.
+    // The chip appearing confirms Enter registered.
     await expect(
       page.getByRole('button', { name: new RegExp(`^Remove ${escapeRegExp(value)} ${kind}$`, 'i') }),
     ).toBeVisible({ timeout: 5000 });
@@ -552,8 +531,7 @@ export async function findSyncableItemRow(page: Page, name: string): Promise<Loc
   // the SPA after a district switch) so we are reliably on the Data Sync page.
   await goToDataSync(page);
 
-  // setListPageSize handles both the native <select> and the combobox flavours
-  // of this control; this used to carry its own copy of that logic.
+  // setListPageSize handles both the <select> and combobox flavours.
   await setListPageSize(page, 100);
 
   const search = page.getByRole('textbox', { name: /Search( syncable| items)?/i }).first();
@@ -563,8 +541,7 @@ export async function findSyncableItemRow(page: Page, name: string): Promise<Loc
     await waitForListSettled(page);
   }
 
-  // No sleep after the search: the row assertion below auto-waits for the
-  // filtered list to render.
+  // No sleep: the row assertion below waits for the filtered list.
   const row = page.locator(LIST_ROW_SELECTOR).filter({ hasText: name }).first();
   await expect(row).toBeVisible({ timeout: 15000 });
   return row;
@@ -633,7 +610,7 @@ export async function resetLocalOverride(page: Page, name: string): Promise<bool
   const details = page.getByRole('dialog').first();
   const resetBtn = details.getByRole('button', { name: /Reset Local Overrides/i }).first();
   if (!(await resetBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-    // Nothing to reset — this is a tolerant probe, so don't fail on the close.
+    // Nothing to reset; tolerant probe, so don't fail on the close.
     await closeOpenDialog(page, { required: false });
     return false;
   }
@@ -644,8 +621,7 @@ export async function resetLocalOverride(page: Page, name: string): Promise<bool
     .first();
   await expect(resetDialog).toBeVisible({ timeout: 10000 });
   await resetDialog.getByRole('button', { name: /Reset Overrides|^Reset$|^Confirm$/i }).last().click();
-  // waitFor, not isVisible: isVisible resolves immediately, so the old call
-  // asserted nothing and its timeout never applied.
+  // waitFor, not isVisible - isVisible returns at once, so its timeout never applied.
   await page
     .getByText(/Local overrides reset/i)
     .first()

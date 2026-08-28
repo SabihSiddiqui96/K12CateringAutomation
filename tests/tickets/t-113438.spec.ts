@@ -13,12 +13,9 @@ import {
   waitForListSettled,
   LIST_ROW_SELECTOR,
 } from '../../utils/helpers';
-// This spec used to carry private copies of escapeRegExp, ensureInK12CateringApp,
-// clickSidebarItem, safeNavigate, dismissAnyModal, switchDistrict, closeOpenDialog,
-// goToDataSync and runPushSyncNow. They had drifted from the shared ones (its
-// ensureInK12CateringApp CLICKED the launcher link, which opens a new tab and
-// strands this page on the interstitial), so they are gone and the shared
-// implementations are used instead.
+// These used to be private copies in this file. They had drifted from the shared
+// ones - the local ensureInK12CateringApp clicked the launcher link, which opens a
+// new tab and strands this page - so use the shared versions.
 import {
   ensureInK12CateringApp,
   clickSidebarItem,
@@ -37,14 +34,12 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-// Timestamp rather than Math.random(): two workers drawing the same 4-digit
-// number would rename each other's menu item, and the failure would look like a
-// sync bug. The last 6 digits of the epoch millisecond are unique per run.
+// Timestamp, not Math.random(): two workers drawing the same number would rename
+// each other's item and it would read as a sync bug.
 const RENAMED_MENU_ITEM = `AutoRenamed ${`${Date.now()}`.slice(-6)}`;
 
-// The name the Sync Log shows under "Triggered By" — i.e. the display name of
-// whoever PE_USERNAME belongs to. Env-driven like the district names, so a repo
-// running as a different QA user overrides it instead of editing the assertion.
+// What the Sync Log shows under "Triggered By" - the display name behind
+// PE_USERNAME. Env-driven so another QA user overrides it instead of editing this.
 const SYNC_TRIGGERED_BY =
   getEnvVar('SYNC_TRIGGERED_BY', { required: false }) || 'Sabih Siddiqui';
 
@@ -55,9 +50,7 @@ async function waitForDistrictsPageReady(page: Page): Promise<void> {
     page.getByRole('heading', { name: /District Management/i }).first(),
   ).toBeVisible({ timeout: 15000 });
 
-  // Let the page finish loading any list/widgets (spinners under Districts /
-  // Environments / Groups panels), then wait for the group panel's own action
-  // button rather than sleeping on top of it.
+  // Let the panels finish loading, then wait for the group panel's own button.
   await waitForListSettled(page);
   await page
     .getByRole('button', { name: /Edit (district )?group|View Districts/i })
@@ -337,7 +330,7 @@ async function toggleTargetDistrictOptIn(
     (await toggle.getAttribute('aria-checked').catch(() => null)) === 'true';
   if (isOn !== desiredOn) {
     await toggle.click();
-    // The attribute flipping IS the confirmation the opt-in was saved.
+    // The attribute flipping confirms the opt-in saved.
     await expect(toggle).toHaveAttribute('aria-checked', String(desiredOn), {
       timeout: 8000,
     });
@@ -486,8 +479,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
 
   const catering = await loginToK12Catering(page);
 
-  // Declared out here because they are produced in one step and asserted in a
-  // later one; each test.step() below is its own closure.
+  // Produced in one step and used in a later one; each test.step is its own closure.
   let chosenPrimary = '';
   let previousPrimary = '';
   let targetDistricts: string[] = [];
@@ -744,19 +736,14 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .first();
     await expect(paginationCombo).toBeVisible({ timeout: 10000 });
 
-    // Toggle one item, then open its details.
+    // Toggle one item, then open its details. Both were `if (isVisible)` guards,
+    // so whenever the session dropped here - several minutes into one PrimeroEdge
+    // session, which happens often - the checks quietly did nothing and the test
+    // still went green.
     //
-    // Both were `if (await x.isVisible())` guards, which meant that whenever the
-    // session dropped here — and it reliably does, this is several minutes into a
-    // single PrimeroEdge session — the checks silently did nothing and the test
-    // still reported green. They are assertions now, with the recovery the app
-    // actually needs around them.
-    //
-    // Locator FACTORIES rather than fixed locators, so each retry re-resolves
-    // against whatever the page looks like now after a relaunch.
-    // Rows are filtered on the Details button so this is a real item row — an
-    // unfiltered .first() can land on the table's header row, which has no
-    // controls at all.
+    // Locator factories, not fixed locators, so a retry re-resolves after a
+    // relaunch. Filtered on the Details button so this is a real item row: an
+    // unfiltered .first() can land on the header row, which has no controls.
     const itemRow = () =>
       catering
         .locator(LIST_ROW_SELECTOR)
@@ -773,19 +760,15 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       }
       await expect(itemToggle()).toBeVisible({ timeout: 10000 });
 
-      // Drive the switch in the one direction the status column actually reports.
+      // Only the disable direction is reported by the status column. This used to
+      // assert "Synced" when the row started disabled, which cannot pass -
+      // re-enabling does not restore that until a sync runs. It went unnoticed
+      // because the item is normally enabled, until a run died between the two
+      // clicks and left it disabled.
       //
-      // This used to branch on the row's starting state and assert /Synced/ when
-      // it started disabled — which cannot pass: re-enabling an item does not put
-      // the column back to "Synced" until a sync has actually run for it. That
-      // only ever went unnoticed because the item is normally enabled, so the
-      // branch was never taken; a run that died between the disable and re-enable
-      // clicks left it disabled and the next run asserted an impossible state.
-      //
-      // So: make sure it is enabled, disable it (the column must say "Disabled"),
-      // then put it back and confirm through the switch's own aria-checked rather
-      // than through a column that lags. That also repairs a half-toggled item
-      // left behind by an interrupted run.
+      // So: make sure it is enabled, disable it (column must say "Disabled"), then
+      // put it back and check the switch itself rather than the lagging column.
+      // That also repairs an item a previous run left half-toggled.
       if (!(await itemToggle().isChecked().catch(() => false))) {
         await itemToggle().click();
         await expect(itemToggle()).toBeChecked({ timeout: 10000 });
@@ -833,8 +816,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     // (after the switch) and edit it on the same district.
     await switchDistrict(catering, targetDistrict);
 
-    // No settle needed: the shared switchDistrict waits for the header to show the
-    // new district and re-anchors the app before returning.
+    // switchDistrict already waits for the header and re-anchors the app.
     await safeNavigate(catering, 'Menu');
     await expect(
       catering.getByRole('heading', { name: /^Menu$/i }).first(),
@@ -963,8 +945,8 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     // target (e.g. Lees on UAT), opting it out leaves 0 opted in, push sync is
     // disabled, and the override can't be cleared — so skip the check there. ──
     await toggleTargetDistrictOptIn(catering, targetDistrict, false);
-    // ensureTargetOptedIn:false — the shared helper otherwise opts the secondary
-    // district back in as a convenience, which would undo the opt-out we just made.
+    // ensureTargetOptedIn:false, or the helper opts the district back in and
+    // undoes the opt-out we just made.
     const pushedWithTargetOut = await runPushSyncNow(catering, { ensureTargetOptedIn: false });
     if (pushedWithTargetOut) {
       await expect(syncSearch2).toBeVisible({ timeout: 10000 });
@@ -1194,8 +1176,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
         .fill(customerPassword);
       await customerPage.getByRole('button', { name: /Sign in/i }).click();
 
-      // The URL leaving /login is the sign-in signal; networkidle just adds a racy
-      // wait on top of it.
+      // The URL leaving /login is the sign-in signal.
       await expect(customerPage).not.toHaveURL(/login/, { timeout: 15000 });
 
       const customerSidebar = customerPage.locator(

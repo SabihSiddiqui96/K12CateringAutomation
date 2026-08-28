@@ -2,7 +2,7 @@
 /**
  * Read-only Azure DevOps PBI reader — the companion to ado-workitem.js for the
  * ticket-docs flow, where the pasted link is a Product Backlog Item rather than
- * a Test Case (see CLAUDE.md "TICKET DOCS & ADO TEST-CASE STRUCTURE").
+ * a Test Case.
  *
  * Usage:
  *   node scripts/ado-pbi.js <workItemId | full ADO URL>

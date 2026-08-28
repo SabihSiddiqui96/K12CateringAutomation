@@ -29,8 +29,7 @@ test.describe('Orders', () => {
   test('Orders - Page heading, stat cards (Total, Status, Revenue) are displayed', async () => {
     await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible({ timeout: 10000 });
     await expect(catering.getByText('Track and manage all your orders')).toBeVisible();
-    // A bare digit match would pass on a card rendering "0 undefined" — assert the
-    // count actually parses to a non-negative whole number instead.
+    // A bare digit match would pass on a card rendering "0 undefined".
     const totalCard = catering.getByRole('button', { name: /Total orders:/i });
     await expect(totalCard).toBeVisible({ timeout: 10000 });
     const totalLabel = (await totalCard.getAttribute('aria-label')) ?? '';

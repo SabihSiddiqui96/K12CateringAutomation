@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Read-only Azure DevOps work-item fetcher used by the `regression` workflow to
- * validate a pasted link BEFORE anything else (CLAUDE.md Step 3).
+ * validate a pasted link before anything else.
  *
  * Usage:
  *   node scripts/ado-workitem.js <workItemId | full ADO URL>

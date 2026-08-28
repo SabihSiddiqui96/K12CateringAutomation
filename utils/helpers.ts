@@ -26,37 +26,18 @@ export async function registerReleaseNotificationHandler(page: Page): Promise<vo
   );
 }
 
-/**
- * Escape a string for safe use inside a RegExp. Single home for the repo — it
- * used to be re-declared in most spec files, which meant nine copies to keep in
- * step. `utils/dataSync` re-exports it so existing imports keep working.
- */
+// Escape a string for use inside a RegExp. dataSync re-exports it.
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Row selector for the app's paginated lists.
- *
- * Both shapes are real: Data Sync's syncable items and the Sync Log render a
- * genuine `<table>` (t-113438 reads their `<td>` cells directly), while a few
- * newer lists are ARIA grids with no table element. One selector covers both so
- * a list that changes shape does not silently match nothing.
- */
+// Rows in the app's paginated lists. Both shapes are real: Data Sync and the
+// Sync Log are real tables, a few newer lists are ARIA grids.
 export const LIST_ROW_SELECTOR = 'table tbody tr, [role="row"]';
 
-/**
- * Wait for a list/table to finish re-rendering after a filter, search or
- * page-size change, instead of sleeping a fixed number of milliseconds.
- *
- * Probing for a spinner that may legitimately not exist is the one case where
- * swallowing the timeout is correct: a list that renders synchronously never
- * shows one, and that is not a failure.
- *
- * Deliberately does NOT match `[role="status"]`: this app's toasts use it, and a
- * "Sync complete" toast sitting on screen would make every call here burn its
- * full timeout waiting for something that is not a loading state.
- */
+// Wait for a list to re-render after a filter/search/page-size change instead of
+// sleeping. A list with no spinner is fine, hence the catch. Not [role="status"]:
+// the toasts use that, so a "Sync complete" toast would eat the whole timeout.
 export async function waitForListSettled(page: Page): Promise<void> {
   await page
     .locator('[aria-busy="true"], [role="progressbar"], .animate-spin, svg.animate-spin')
@@ -192,14 +173,9 @@ export async function loginToSchoolCafe(page: Page): Promise<void> {
   });
 }
 
-/**
- * Sign in as the district user on a login form that is ALREADY on screen.
- *
- * Unlike loginToPrimeroEdge this deliberately does not call LoginPage.goto():
- * both callers reach the form by signing out of an existing session, so a goto
- * here would throw away the page they just landed on. Navigate first if you are
- * starting cold.
- */
+// Signs in on a login form that is already on screen. No goto() here, unlike
+// loginToPrimeroEdge: both callers arrive by signing out, and a goto would throw
+// away the page they just landed on. Navigate first if starting cold.
 export async function loginToK12CateringAsDistrictUser(page: Page): Promise<void> {
   const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
   const username = getRequiredEnvVar(isUAT ? 'PE_UAT_DISTRICT_EMAIL' : 'PE_DISTRICT_EMAIL');
@@ -278,9 +254,8 @@ async function finishK12CateringLaunch(page: Page): Promise<void> {
     }
   }
 
-  // The sidebar IS the "launch finished" signal, so wait on it rather than on
-  // networkidle — this app polls in the background, so networkidle is both slow
-  // and racy here (and Playwright discourages it for SPA flows).
+  // The sidebar is the "launch finished" signal. networkidle never settles here
+  // anyway, the app polls in the background.
   if (await sidebar.isVisible({ timeout: 15000 }).catch(() => false)) {
     return;
   }
@@ -484,15 +459,10 @@ export async function dismissReauthInterstitial(page: Page): Promise<void> {
     if (!(await banner.isVisible({ timeout: 1000 }).catch(() => false))) {
       return;
     }
-    // The interstitial link's accessible name is exactly "link"; click it to redirect
-    // immediately instead of waiting out the ~5s auto-redirect.
-    //
-    // NB: this stays a click, and keeps the networkidle wait. Navigating to the
-    // link's href instead looks tidier and matches what ensureInK12CateringApp
-    // does, but this function is also wired to a locator handler, so it runs on
-    // essentially every assertion — turning that into a navigation made the app
-    // drop its session EARLIER, not later. Left as the behaviour that is proven
-    // in the nightly.
+    // The link's accessible name is exactly "link". Click it to skip the ~5s
+    // auto-redirect. Keep the click and the networkidle: navigating to its href
+    // looks tidier, but a locator handler calls this on almost every assertion,
+    // and making that a navigation dropped the session sooner, not later.
     await page
       .getByRole('link', { name: 'link', exact: true })
       .first()
@@ -503,16 +473,10 @@ export async function dismissReauthInterstitial(page: Page): Promise<void> {
   }
 }
 
-/**
- * Scroll (the document, or a given container) until `target` is on screen.
- *
- * For an element that is merely below the fold, prefer
- * `locator.scrollIntoViewIfNeeded()` — Playwright's auto-waiting already covers
- * it. This exists for the lists that render lazily as you scroll, where the
- * element does not exist until something scrolls the container: the Data Sync
- * syncable-items table and the Districts page's group panels. `pauseMs` is the
- * settle between scroll steps for exactly that lazy render.
- */
+// For something merely below the fold use locator.scrollIntoViewIfNeeded().
+// This is for lists that render lazily as you scroll, where the element does not
+// exist until the container moves - the Data Sync items table and the Districts
+// group panels. pauseMs is the settle between steps for that.
 export async function scrollUntilVisible(
   page: Page,
   options: ScrollUntilVisibleOptions = {}
@@ -678,8 +642,7 @@ export async function setListPageSize(page: Page, size = 100): Promise<void> {
     }
   }
 
-  // Otherwise it is a popup menu — click the matching option, then wait for the
-  // menu to close and the list to re-render rather than sleeping on it.
+  // Otherwise it is a popup menu: click the option and wait for it to close.
   const option = page
     .getByRole('option', { name: new RegExp(`^\\s*${size}\\s*/\\s*page\\s*$`, 'i') })
     .first();
@@ -761,9 +724,7 @@ export async function findRowAcrossPages(
       (await next.isEnabled().catch(() => false));
     if (!canAdvance) break;
 
-    // Wait for the page of rows to actually turn over rather than sleeping: the
-    // Next control goes busy/disabled while the new page loads, and the list's
-    // spinner detaches once it has rendered.
+    // Wait for the rows to actually turn over rather than sleeping.
     const firstRowBefore = await page
       .locator(rowSelector)
       .first()

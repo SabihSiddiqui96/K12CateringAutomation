@@ -9,9 +9,9 @@
  * repo's several hundred.
  *
  * Only files git already tracks here are copied, which is what keeps secrets
- * out: .env, .env.release, node_modules, test-results and CLAUDE.md are all
- * gitignored, so they can never reach the shared repo. Files deleted here are
- * deleted there too, so the folder is a true mirror rather than an append.
+ * out: .env, .env.release, node_modules and test-results are all gitignored, so
+ * they can never reach the shared repo. Files deleted here are deleted there too,
+ * so the folder is a true mirror rather than an append.
  *
  * The mirror never lands on AutomationProjects itself. That branch is shared
  * company code, so a sync either cuts its own camelCase branch off it (--branch)
@@ -57,11 +57,8 @@ Auth: AZURE_DEVOPS_CODE_PAT in .env (Code Read & Write).`;
 
 class GitError extends Error {}
 
-/**
- * Run git in `repo`. Throws GitError on failure so the caller decides what to
- * do; `allowFail` is for probes where a non-zero exit is a legitimate answer
- * ("that ref does not exist") rather than a problem.
- */
+// Run git in `repo`. Throws so the caller decides what to do. allowFail is for
+// probes where a non-zero exit is a real answer ("that ref does not exist").
 function git(repo, gitArgs, allowFail = false) {
   try {
     return execFileSync('git', ['-C', repo, ...gitArgs], {
@@ -74,14 +71,10 @@ function git(repo, gitArgs, allowFail = false) {
   }
 }
 
-/**
- * Parse `git status --porcelain=v1 -z` into entry strings.
- *
- * -z is the robust form: the default output quotes and escapes unusual paths,
- * and a rename is written as "old -> new" on one line, so a filename containing
- * a newline or " -> " breaks a naive split. With -z each entry is NUL-terminated
- * and a rename spends two records (status+new path, then old path).
- */
+// Parse `git status --porcelain=v1 -z`. Use -z: the default output quotes odd
+// paths and puts a rename on one line as "old -> new", so a filename with a
+// newline or " -> " in it breaks a naive split. With -z each entry is
+// NUL-terminated and a rename spends two records.
 function porcelainEntries(repo) {
   const raw = (() => {
     try {
@@ -105,14 +98,10 @@ function porcelainEntries(repo) {
   return entries;
 }
 
-/**
- * Read one key out of this repo's .env.
- *
- * Handles `export KEY=`, comments, blank lines and quoted values. .env here is
- * hand- and tool-written, so it stays a deliberately small parser rather than a
- * dotenv dependency — but it no longer silently returns the quotes as part of
- * the PAT, which produced a baffling 401.
- */
+// Read one key out of .env. Handles `export KEY=`, comments and quoted values.
+// Small on purpose - .env here is only ever written by hand or by our own
+// tooling - but it no longer hands back the quotes as part of the PAT, which
+// showed up as a 401 that made no sense.
 function readEnvValue(key) {
   let text = '';
   try {
@@ -146,19 +135,17 @@ function run(args) {
     console.log(USAGE);
     return;
   }
-  // Set once we move the shared checkout off BRANCH, so the restore below only
-  // fires when there is something to restore (--help / --dry-run must not move it).
+  // Only restore the checkout if we actually moved it off BRANCH.
   let movedOffBaseBranch = false;
 
   const dryRun = args.includes('--dry-run');
   const noPush = args.includes('--no-push');
   const commitMessage = argValue(args, '-m', '--message') || 'Update K12Catering automation';
 
-  // Two ways to land the mirror, and neither is BRANCH itself: BRANCH is shared
-  // company code that other people build from.
+  // Neither lands on BRANCH itself - it is shared company code.
   //   --branch        cut a fresh branch off BRANCH (the normal case)
-  //   --update-branch reuse a branch that already exists remotely, so an open PR
-  //                   picks the new commit up instead of needing a second PR
+  //   --update-branch reuse an existing remote branch, so an open PR picks the
+  //                   new commit up instead of needing a second PR
   const featureBranch = argValue(args, '--branch', '-b');
   const updateBranch = argValue(args, '--update-branch', '-u');
   const targetBranch = updateBranch || featureBranch;
@@ -209,8 +196,7 @@ function run(args) {
           `The mirror is never pushed to ${BRANCH} directly.`,
       );
     }
-    // camelCase keeps the PR list readable, but only for branches we create —
-    // an existing branch already has whatever name its PR was opened with.
+    // camelCase only for branches we create; an existing one keeps its name.
     if (featureBranch && !/^[a-z][A-Za-z0-9]*$/.test(featureBranch)) {
       fail(
         `branch "${featureBranch}" is not camelCase. Use letters and digits only, ` +
@@ -222,10 +208,9 @@ function run(args) {
     }
   }
 
-  // Always start from what the REMOTE has right now, never from whatever this
-  // shared checkout happens to be parked on. A stale local platform checkout is
-  // exactly how you end up with a non-fast-forward push that fails after the
-  // commit has already been made.
+  // Start from what the remote has now, not from whatever this shared checkout
+  // is parked on - a stale checkout is how you get a non-fast-forward push that
+  // fails after the commit is already made.
   if (!dryRun) {
     const authFetch = `https://anything:${pat}@${REMOTE_PATH}`;
     git(TARGET_REPO, ['fetch', authFetch, BRANCH], true);
@@ -246,9 +231,8 @@ function run(args) {
         `Continuing ${updateBranch} from its remote tip (${remoteTip.slice(0, 7)}).`,
       );
     } else {
-      // If a branch of this name already exists remotely and has commits our new
-      // base does not contain, a plain push would be rejected — say so now
-      // rather than after committing.
+      // If that branch already exists remotely with commits our base does not
+      // have, the push would be rejected. Say so now, not after committing.
       git(TARGET_REPO, ['fetch', authFetch, featureBranch], true);
       const existingTip = git(TARGET_REPO, ['rev-parse', 'FETCH_HEAD'], true);
       if (existingTip && existingTip !== baseRef) {
@@ -444,9 +428,8 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
   }
 }
 
-// One place that turns a failure into an exit code, so the helpers above can
-// stay plain functions that throw (and stay testable) rather than each calling
-// process.exit(1) from deep inside and skipping the branch restore.
+// One place turns a failure into an exit code, so the helpers above can throw
+// instead of calling process.exit(1) from deep inside and skipping the restore.
 try {
   run(process.argv.slice(2));
 } catch (e) {

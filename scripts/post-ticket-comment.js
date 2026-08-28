@@ -1,26 +1,21 @@
 #!/usr/bin/env node
 /**
- * Posts the day's "what we fixed" note as a comment on the automation task,
- * ADO Task 114690 (K12Catering - Automation Testing, project "PrimeroEdge Classic").
+ * Posts the day's "what we fixed" note on ADO Task 114690
+ * (K12Catering - Automation Testing, PrimeroEdge Classic).
  *
- * WHY A QUEUE INSTEAD OF POSTING DIRECTLY: the note is written when a fix actually
- * lands (see the `ticket comment` rule in CLAUDE.md), but it must not appear on the
- * ticket at that moment. Two reasons. It has to land AFTER the morning re-run webhook
- * so the numbers in the channel and on the ticket agree, and a comment that shows up
- * at the same minute every day reads as a bot. So the note is queued to
- * .ticket-comment-queue.json and this script — run by Task Scheduler at a randomised
- * early-afternoon time — posts it.
+ * The note is queued to .ticket-comment-queue.json when a fix lands rather than
+ * posted there and then: it needs to come after the morning re-run webhook so the
+ * ticket and the channel agree on the numbers, and a comment at the same minute
+ * every day looks automated. Task Scheduler runs this at a random early-afternoon
+ * time.
  *
- * ONLY FIXES GET POSTED. A re-run that went green on its own is not a comment; it is
- * at most a clause inside one ("the other 2 just needed a re-run"). If the queue is
- * empty, this exits quietly, which is the normal outcome on most days.
- *
- * At most one comment per day: .ticket-comment-posted.json records what went out.
+ * Only fixes get a comment. An empty queue means there is nothing to say, which is
+ * most days. One comment per day, tracked in .ticket-comment-posted.json.
  *
  * Usage:
- *   node scripts/post-ticket-comment.js              # what Task Scheduler runs
- *   node scripts/post-ticket-comment.js --dry-run    # print what would post
- *   node scripts/post-ticket-comment.js --force      # ignore the once-a-day guard
+ *   node scripts/post-ticket-comment.js              # the scheduled run
+ *   node scripts/post-ticket-comment.js --dry-run    # print, do not post
+ *   node scripts/post-ticket-comment.js --force      # ignore the daily guard
  */
 const fs = require('fs');
 const path = require('path');
@@ -59,11 +54,7 @@ function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
 
-/**
- * ADO comments are HTML. The queued note is written as plain text with blank lines
- * between items, so convert rather than dumping raw text (which would collapse into
- * one paragraph and look nothing like the comments a person leaves).
- */
+// ADO comments are HTML; the queued note is plain text, so keep its line breaks.
 function toHtml(text) {
   return text
     .replace(/&/g, '&amp;')
@@ -130,13 +121,13 @@ function postComment(text, pat) {
   if (res.status >= 200 && res.status < 300) {
     log(`comment posted to work item ${WORK_ITEM} (HTTP ${res.status}).`);
     posted[today()] = { at: new Date().toISOString(), text };
-    // Keep the last 60 days; enough to answer "did we post that?" without growing.
+    // Keep 60 days of history.
     const keys = Object.keys(posted).sort();
     if (keys.length > 60) for (const k of keys.slice(0, keys.length - 60)) delete posted[k];
     fs.writeFileSync(POSTED, JSON.stringify(posted, null, 2));
     fs.rmSync(QUEUE, { force: true });
   } else {
-    // Leave the queue in place so the next run retries rather than losing the note.
+    // Keep the queue so the next run retries instead of losing the note.
     log(`FAILED to post (HTTP ${res.status}). Queue kept for retry. Response: ${res.body.slice(0, 300)}`);
     if (res.status === 401 || res.status === 403) {
       log('The PAT likely lacks "Work Items (Read & write)" scope - widen it in Azure DevOps.');
