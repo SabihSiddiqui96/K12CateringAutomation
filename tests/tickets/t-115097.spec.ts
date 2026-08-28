@@ -11,6 +11,7 @@ import {
   getCustomerAccountEmail,
   isUatDirectLogin,
   dismissReauthInterstitial,
+  escapeRegExp,
 } from '../../utils/helpers';
 import { switchToCustomerDistrict, switchDistrict } from '../../utils/dataSync';
 import { decryptPassword } from '../../utils/crypto';
@@ -18,7 +19,6 @@ import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl, getK12CateringUrl } from '../../utils/baseUrl';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
 
 // ─────────────────────────────────────────────
 // Dashboard Revenue Calculation
@@ -403,13 +403,6 @@ test.describe('Accounts Sorting', () => {
 // ─────────────────────────────────────────────
 // Districts — SKIPPED per user instruction
 // ─────────────────────────────────────────────
-
-// ─────────────────────────────────────────────
-// Settings Order Lead Time
-// ─────────────────────────────────────────────
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 function parseCurrency(value: string) {
   return parseFloat(value.replace(/[$,]/g, '').trim() || '0');

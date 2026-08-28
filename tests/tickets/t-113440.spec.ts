@@ -6,6 +6,7 @@ import {
   navigateK12CateringMenu,
   getCustomerAccountEmail,
   registerReleaseNotificationHandler,
+  escapeRegExp,
 } from '../../utils/helpers';
 import { decryptPassword } from '../../utils/crypto';
 import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
@@ -14,11 +15,6 @@ import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
 import { switchToCustomerDistrict } from '../../utils/dataSync';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 function menuButtonName(action: string, menuName: string): RegExp {
   return new RegExp(`^${action} ${escapeRegExp(menuName)}$`, 'i');

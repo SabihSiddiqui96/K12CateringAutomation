@@ -3,13 +3,33 @@
 import { test, expect, Page } from '@playwright/test';
 import {
   loginToK12Catering,
-  navigateK12CateringMenu,
   scrollUntilVisible,
   getDistrictName,
   getSecondaryDistrictName,
   getCustomerAccountEmail,
   isUatDirectLogin,
+  escapeRegExp,
+  setListPageSize,
+  waitForListSettled,
+  LIST_ROW_SELECTOR,
 } from '../../utils/helpers';
+// This spec used to carry private copies of escapeRegExp, ensureInK12CateringApp,
+// clickSidebarItem, safeNavigate, dismissAnyModal, switchDistrict, closeOpenDialog,
+// goToDataSync and runPushSyncNow. They had drifted from the shared ones (its
+// ensureInK12CateringApp CLICKED the launcher link, which opens a new tab and
+// strands this page on the interstitial), so they are gone and the shared
+// implementations are used instead.
+import {
+  ensureInK12CateringApp,
+  clickSidebarItem,
+  safeNavigate,
+  dismissAnyModal,
+  switchDistrict,
+  closeOpenDialog,
+  goToDataSync,
+  runPushSyncNow,
+} from '../../utils/dataSync';
+import { getEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl } from '../../utils/baseUrl';
 import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
 
@@ -17,120 +37,16 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const RANDOM_SUFFIX = Math.floor(1000 + Math.random() * 9000);
-const RENAMED_MENU_ITEM = `AutoRenamed ${RANDOM_SUFFIX}`;
+// Timestamp rather than Math.random(): two workers drawing the same 4-digit
+// number would rename each other's menu item, and the failure would look like a
+// sync bug. The last 6 digits of the epoch millisecond are unique per run.
+const RENAMED_MENU_ITEM = `AutoRenamed ${`${Date.now()}`.slice(-6)}`;
 
-// User performing the test (used to verify "Triggered by" in Sync Log)
-// TODO: confirm this matches the QA test user
-const SYNC_TRIGGERED_BY = 'Sabih Siddiqui';
-
-// ─── Generic helpers ───────────────────────────────────────────────────────
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-async function ensureInK12CateringApp(page: Page): Promise<void> {
-  await page.keyboard.press('Escape').catch(() => undefined);
-
-  const sidebar = page.locator('aside[aria-label="Main navigation"]');
-  if (await sidebar.isVisible({ timeout: 2000 }).catch(() => false)) {
-    return;
-  }
-
-  // PrimeroEdge launcher page — click the K12 token link to re-enter
-  const launcherLink = page.locator('a[href*="/login?token="]').first();
-  if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await launcherLink.click();
-    await page.waitForLoadState('domcontentloaded');
-  }
-
-  await expect(sidebar).toBeVisible({ timeout: 30000 });
-}
-
-async function clickSidebarItem(page: Page, name: string): Promise<void> {
-  await ensureInK12CateringApp(page);
-  const sidebar = page.locator('aside[aria-label="Main navigation"]');
-  const item = sidebar.getByLabel(`Navigate to ${name}`);
-  await expect(item).toBeVisible({ timeout: 10000 });
-  await item.click();
-  await page.waitForLoadState('domcontentloaded');
-}
-
-async function safeNavigate(
-  page: Page,
-  menuItem: Parameters<typeof navigateK12CateringMenu>[1],
-): Promise<void> {
-  await ensureInK12CateringApp(page);
-  await navigateK12CateringMenu(page, menuItem);
-  await page.waitForLoadState('domcontentloaded');
-  await ensureInK12CateringApp(page);
-}
-
-async function dismissAnyModal(page: Page): Promise<void> {
-  await page.keyboard.press('Escape').catch(() => undefined);
-  await page
-    .locator('div.fixed.inset-0')
-    .first()
-    .waitFor({ state: 'hidden', timeout: 3000 })
-    .catch(() => undefined);
-}
-
-async function switchDistrict(page: Page, districtName: string): Promise<void> {
-  const switchBtn = page
-    .getByRole('button', { name: /Switch district/i })
-    .first();
-  await expect(switchBtn).toBeVisible({ timeout: 10000 });
-  await switchBtn.click();
-  await page.waitForLoadState('domcontentloaded');
-
-  // The switch dialog paginates (and offers Browse-by-Letter), so a district can
-  // be off the first page. Type into the search box to surface it before picking.
-  const searchBox = page
-    .getByPlaceholder(/Search districts by name or state/i)
-    .or(page.getByRole('textbox', { name: /Search districts/i }))
-    .first();
-  if (await searchBox.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await searchBox.fill(districtName);
-    await page.waitForTimeout(800);
-  }
-
-  const option = page
-    .getByText(new RegExp(escapeRegExp(districtName), 'i'))
-    .first();
-  await expect(option).toBeVisible({ timeout: 10000 });
-  await option.click();
-  await page.waitForTimeout(500);
-
-  // Wait for the bottom action bar (Switch District button) to render —
-  // it only appears once a district is selected.
-  const confirmBtn = page
-    .getByRole('button', { name: /^Switch District$/i })
-    .last();
-  await expect(confirmBtn).toBeVisible({ timeout: 10000 });
-  await confirmBtn.click();
-
-  // Success can be signalled by either the "District Switched" toast OR the
-  // dialog closing — accept whichever comes first (the toast can disappear
-  // before our assertion catches it).
-  const toastVisible = await page
-    .getByText(/District Switched|switched.*successfully|switched/i)
-    .first()
-    .isVisible({ timeout: 15000 })
-    .catch(() => false);
-  const dialogGone = await page
-    .locator('[role="dialog"]')
-    .first()
-    .waitFor({ state: 'hidden', timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
-
-  expect(
-    toastVisible || dialogGone,
-    `District switch confirmation never appeared (toast: ${toastVisible}, dialog gone: ${dialogGone})`,
-  ).toBeTruthy();
-  await page.waitForLoadState('domcontentloaded');
-}
+// The name the Sync Log shows under "Triggered By" — i.e. the display name of
+// whoever PE_USERNAME belongs to. Env-driven like the district names, so a repo
+// running as a different QA user overrides it instead of editing the assertion.
+const SYNC_TRIGGERED_BY =
+  getEnvVar('SYNC_TRIGGERED_BY', { required: false }) || 'Sabih Siddiqui';
 
 // ─── Districts → District Group section ────────────────────────────────────
 
@@ -140,13 +56,14 @@ async function waitForDistrictsPageReady(page: Page): Promise<void> {
   ).toBeVisible({ timeout: 15000 });
 
   // Let the page finish loading any list/widgets (spinners under Districts /
-  // Environments / Groups panels)
+  // Environments / Groups panels), then wait for the group panel's own action
+  // button rather than sleeping on top of it.
+  await waitForListSettled(page);
   await page
-    .locator('[role="status"], .animate-spin, svg.animate-spin')
+    .getByRole('button', { name: /Edit (district )?group|View Districts/i })
     .first()
-    .waitFor({ state: 'hidden', timeout: 15000 })
+    .waitFor({ state: 'visible', timeout: 15000 })
     .catch(() => undefined);
-  await page.waitForTimeout(1500);
 }
 
 async function openViewDistrictsInGroupDialog(page: Page): Promise<void> {
@@ -179,33 +96,6 @@ async function openViewDistrictsInGroupDialog(page: Page): Promise<void> {
       .getByRole('dialog')
       .or(page.getByRole('heading', { name: /Districts in (this )?Group/i })),
   ).toBeVisible({ timeout: 10000 });
-}
-
-async function closeOpenDialog(page: Page): Promise<void> {
-  // Try several flavors of close: aria-labelled X, an inner Close button,
-  // pressing Escape. Repeat until no dialog remains visible.
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const dialog = page.locator('[role="dialog"]').first();
-    if (!(await dialog.isVisible({ timeout: 1000 }).catch(() => false))) {
-      return;
-    }
-
-    const closeCandidates = [
-      dialog.getByRole('button', { name: /^Close$|Close dialog|Dismiss/i }).first(),
-      dialog.locator('button[aria-label*="close" i]').first(),
-      dialog.locator('button:has(svg)').last(),
-    ];
-    for (const candidate of closeCandidates) {
-      if (await candidate.isVisible({ timeout: 500 }).catch(() => false)) {
-        await candidate.click({ force: true }).catch(() => undefined);
-        break;
-      }
-    }
-    await page.keyboard.press('Escape').catch(() => undefined);
-    await dialog
-      .waitFor({ state: 'hidden', timeout: 2000 })
-      .catch(() => undefined);
-  }
 }
 
 async function setPrimaryDistrict(
@@ -293,7 +183,11 @@ async function setPrimaryDistrict(
     } else {
       await page.keyboard.press('Escape');
     }
-    await page.waitForTimeout(500);
+    await page
+      .getByRole('dialog')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 5000 })
+      .catch(() => undefined);
     return desiredOption;
   }
 
@@ -375,7 +269,11 @@ async function togglePrimaryDistrict(
   } else {
     await page.keyboard.press('Escape');
   }
-  await page.waitForTimeout(500);
+  await page
+    .getByRole('dialog')
+    .first()
+    .waitFor({ state: 'hidden', timeout: 5000 })
+    .catch(() => undefined);
 
   // Set the group's primary to the data-sync district so the rest of the test
   // is predictable. Data Sync is per-district: on UAT only the secondary
@@ -392,19 +290,6 @@ async function togglePrimaryDistrict(
 }
 
 // ─── Data Sync page ────────────────────────────────────────────────────────
-
-async function goToDataSync(page: Page): Promise<void> {
-  await dismissAnyModal(page);
-  await ensureInK12CateringApp(page);
-  await clickSidebarItem(page, 'Data Sync');
-  // If the click didn't land (overlay/race), retry once
-  const heading = page.getByRole('heading', { name: /Data Sync/i }).first();
-  if (!(await heading.isVisible({ timeout: 5000 }).catch(() => false))) {
-    await ensureInK12CateringApp(page);
-    await clickSidebarItem(page, 'Data Sync');
-  }
-  await expect(heading).toBeVisible({ timeout: 15000 });
-}
 
 /**
  * Open the Data Sync "Target districts" Manage dialog, toggle the given
@@ -452,47 +337,13 @@ async function toggleTargetDistrictOptIn(
     (await toggle.getAttribute('aria-checked').catch(() => null)) === 'true';
   if (isOn !== desiredOn) {
     await toggle.click();
-    await page.waitForTimeout(400);
+    // The attribute flipping IS the confirmation the opt-in was saved.
+    await expect(toggle).toHaveAttribute('aria-checked', String(desiredOn), {
+      timeout: 8000,
+    });
   }
 
   await closeOpenDialog(page);
-}
-
-/**
- * Click "Push sync now", confirm in the dialog, and wait for the
- * "Sync complete — N items synced, M skipped" toast.
- */
-async function runPushSyncNow(page: Page): Promise<boolean> {
-  const pushBtn = page.getByRole('button', { name: /Push sync now/i }).first();
-  await scrollUntilVisible(page, { target: pushBtn }).catch(() => undefined);
-  // Push sync is disabled when no target districts are opted in (e.g. the only
-  // target of a single-target group was just opted out) — there's nothing to
-  // push, so skip gracefully instead of hanging on the disabled button.
-  if (await pushBtn.isDisabled().catch(() => false)) {
-    return false;
-  }
-  await pushBtn.click();
-
-  await expect(
-    page
-      .locator('div')
-      .filter({ hasText: /^Push sync now\?$/ })
-      .first(),
-  ).toBeVisible({ timeout: 10000 });
-
-  await page
-    .getByRole('button', { name: /Yes,?\s*Push Now/i })
-    .first()
-    .click();
-
-  await expect(
-    page
-      .getByText(
-        /Sync complete\s*[.,;:—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i,
-      )
-      .first(),
-  ).toBeVisible({ timeout: 90000 });
-  return true;
 }
 
 async function getTargetDistrictsFromManageDialog(
@@ -572,10 +423,10 @@ async function resetAllLocalOverrides(page: Page): Promise<void> {
         .first();
       if (!(await filterBtn.isVisible({ timeout: 8000 }).catch(() => false))) break;
       await filterBtn.click();
-      await page.waitForTimeout(1200);
+      await waitForListSettled(page);
 
       const row = page
-        .locator('table tbody tr, [role="row"]')
+        .locator(LIST_ROW_SELECTOR)
         .filter({ has: page.getByText(/^Overrides$/i) })
         .first();
       if (!(await row.isVisible({ timeout: 5000 }).catch(() => false))) break; // none left
@@ -590,7 +441,7 @@ async function resetAllLocalOverrides(page: Page): Promise<void> {
         .getByRole('button', { name: /Reset Local Overrides/i })
         .first();
       if (!(await resetBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-        await closeOpenDialog(page);
+        await closeOpenDialog(page, { required: false });
         break;
       }
       await resetBtn.click();
@@ -608,7 +459,7 @@ async function resetAllLocalOverrides(page: Page): Promise<void> {
         .first()
         .waitFor({ state: 'visible', timeout: 15000 })
         .catch(() => {});
-      await closeOpenDialog(page);
+      await closeOpenDialog(page, { required: false });
       resetAny = true;
     }
 
@@ -635,713 +486,729 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
 
   const catering = await loginToK12Catering(page);
 
-  // ── Step 1-2: Districts → View Districts in this Group ──
-  await openViewDistrictsInGroupDialog(catering);
-  const groupDialog = catering.getByRole('dialog').first();
-  await expect(groupDialog).toBeVisible({ timeout: 10000 });
-  // Verify at least one district is listed inside the group dialog
-  await expect(
-    groupDialog.locator('li, tr, [role="listitem"]').first(),
-  ).toBeVisible({ timeout: 10000 });
+  // Declared out here because they are produced in one step and asserted in a
+  // later one; each test.step() below is its own closure.
+  let chosenPrimary = '';
+  let previousPrimary = '';
+  let targetDistricts: string[] = [];
+  let homeDistrict = '';
+  let targetDistrict = '';
+  let originalMenuItemName = '';
 
-  await closeOpenDialog(catering);
-
-  // ── Step 3: Edit group → toggle Primary District → save ──
-  const { chosen: chosenPrimary, previous: previousPrimary } =
-    await togglePrimaryDistrict(catering);
-
-  // ── Step 4: Re-open the group view and verify Primary label is on it ──
-  await openViewDistrictsInGroupDialog(catering);
-  const groupDialog2 = catering.getByRole('dialog').first();
-  const primaryRow = groupDialog2
-    .locator('li, tr, [role="listitem"]')
-    .or(
-      groupDialog2
-        .locator('div')
-        .filter({ hasText: new RegExp(escapeRegExp(chosenPrimary), 'i') }),
-    )
-    .filter({ hasText: new RegExp(escapeRegExp(chosenPrimary), 'i') })
-    .first();
-  await expect(primaryRow).toBeVisible({ timeout: 10000 });
-  await expect(primaryRow).toContainText(/Primary/i);
-  await closeOpenDialog(catering);
-
-  // Note: previousPrimary captured for traceability; we intentionally don't
-  // restore it here because doing so requires re-opening the same group dialog
-  // before the previous save fully settles, and sometimes a different group
-  // dialog opens. The override flow below is tolerant of unsynced state.
-  void previousPrimary;
-
-  // ── Step 5: Data Sync — verify top-level controls ──
-  // Data Sync only exists when the active district is a data-sync primary. On
-  // UAT switch into the primary we just set (Alief ISD) so the sidebar item is
-  // present and the sub-header shows that district.
-  if (isUatDirectLogin()) {
-    await switchDistrict(catering, chosenPrimary);
-  }
-  await goToDataSync(catering);
-
-  // Verify the Data Sync sub-header reads:
-  //   "Push shared catalog from <Primary District> (primary) to opted-in districts"
-  // and the primary district name matches whatever we just set above.
-  await expect(
-    catering.getByText(
-      new RegExp(
-        `Push shared catalog from\\s+${escapeRegExp(chosenPrimary)}\\s*\\(primary\\)\\s+to opted-in districts`,
-        'i',
-      ),
-    ),
-  ).toBeVisible({ timeout: 10000 });
-
-  // Auto-sync toggle (label uses a hyphen in the UI)
-  const autoSyncToggle = catering
-    .getByRole('switch', { name: /Auto[\s-]?sync/i })
-    .or(catering.getByRole('checkbox', { name: /Auto[\s-]?sync/i }))
-    .or(catering.getByLabel(/Auto[\s-]?sync/i))
-    .first();
-  await expect(autoSyncToggle).toBeVisible({ timeout: 10000 });
-
-  // Sync frequency dropdown — verify both day-based and weekly options
-  // produce the right scheduled-time text below the dropdown
-  const frequencySelect = catering
-    .getByRole('combobox', { name: /Sync\s*frequency/i })
-    .or(catering.getByLabel(/Sync\s*frequency/i))
-    .first();
-  await expect(frequencySelect).toBeVisible({ timeout: 10000 });
-
-  // The frequency dropdown is disabled while Auto-sync is off. Enable Auto-sync
-  // (if needed) and wait for it to become enabled. The PrimeroEdge launcher
-  // (token refresh) can fire here on a long session — recover via goToDataSync
-  // (re-auths + returns to Data Sync) and retry rather than failing.
-  if (await frequencySelect.isDisabled().catch(() => false)) {
-    await autoSyncToggle.click();
-    await catering
-      .getByText(/Auto-sync settings saved/i)
-      .first()
-      .waitFor({ state: 'visible', timeout: 10000 })
-      .catch(() => {});
-    await expect(async () => {
-      const launcher = catering.locator('a[href*="/login?token="]').first();
-      if (await launcher.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await goToDataSync(catering);
-      }
-      expect(await frequencySelect.isEnabled().catch(() => false)).toBeTruthy();
-    }).toPass({ timeout: 40000, intervals: [3000, 5000, 8000] });
-  }
-
-  const frequencyOptions = (
-    await frequencySelect.locator('option').allTextContents()
-  ).map((o) => o.trim());
-
-  if (frequencyOptions.some((o) => /weekly/i.test(o))) {
-    const weeklyLabel =
-      frequencyOptions.find((o) => /weekly/i.test(o)) ?? 'Weekly';
-    await frequencySelect.selectOption({ label: weeklyLabel });
+  await test.step('Step 1-2 — Districts: View Districts in this Group', async () => {
+    // ── Step 1-2: Districts → View Districts in this Group ──
+    await openViewDistrictsInGroupDialog(catering);
+    const groupDialog = catering.getByRole('dialog').first();
+    await expect(groupDialog).toBeVisible({ timeout: 10000 });
+    // Verify at least one district is listed inside the group dialog
     await expect(
-      catering
-        .getByText(
-          /\d{1,2}:\d{2}\s*(AM|PM)\s*[A-Z]{2,4}\s*(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)/i,
-        )
-        .first(),
+      groupDialog.locator('li, tr, [role="listitem"]').first(),
     ).toBeVisible({ timeout: 10000 });
-  }
 
-  // The "daily" option is sometimes labelled Daily, Nightly, etc — pick any
-  // option that produces a "<time> <tz> daily" sub-text
-  const dailyCandidate =
-    frequencyOptions.find((o) => /daily|nightly/i.test(o)) ??
-    frequencyOptions.find((o) => o && !/weekly/i.test(o));
-  if (dailyCandidate) {
-    await frequencySelect.selectOption({ label: dailyCandidate });
-    await expect(
-      catering
-        .getByText(/\d{1,2}:\d{2}\s*(AM|PM)\s*[A-Z]{2,4}\s*daily/i)
-        .first(),
-    ).toBeVisible({ timeout: 10000 });
-  }
+    await closeOpenDialog(catering);
+  });
 
-  // Target Districts → Manage dialog shows districts
-  const targetDistricts = await getTargetDistrictsFromManageDialog(catering);
-  expect(targetDistricts.length).toBeGreaterThan(0);
+  await test.step('Step 3 — Edit group: change the Primary District and save', async () => {
+    // ── Step 3: Edit group → toggle Primary District → save ──
+    ({ chosen: chosenPrimary, previous: previousPrimary } =
+      await togglePrimaryDistrict(catering));
+  });
 
-  // Last Sync Completed format: Month Date, Year, Time
-  // (After we just toggled the primary district above, Last sync may show "—"
-  // because no sync has run for the new primary yet — accept that case.)
-  const lastSyncRegion = catering
-    .locator(
-      'xpath=//*[contains(normalize-space(.),"Last sync completed") or contains(normalize-space(.),"Last Sync Completed")][1]',
-    )
-    .first();
-  if (await lastSyncRegion.isVisible({ timeout: 5000 }).catch(() => false)) {
-    const lastSyncText = (await lastSyncRegion.innerText().catch(() => ''))
-      .replace(/\s+/g, ' ')
-      .trim();
-    const hasNoSyncYet = /^Last sync completed\s*[—–-]?\s*$/i.test(lastSyncText)
-      || /—|–|never|no sync/i.test(lastSyncText);
-    if (!hasNoSyncYet) {
-      expect(
-        lastSyncText,
-        `Last sync completed: ${lastSyncText}`,
-      ).toMatch(
-        /(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}[,\s]+\d{1,2}:\d{2}/i,
-      );
+  await test.step('Step 4 — Group view shows the new Primary district', async () => {
+    // ── Step 4: Re-open the group view and verify Primary label is on it ──
+    await openViewDistrictsInGroupDialog(catering);
+    const groupDialog2 = catering.getByRole('dialog').first();
+    const primaryRow = groupDialog2
+      .locator('li, tr, [role="listitem"]')
+      .or(
+        groupDialog2
+          .locator('div')
+          .filter({ hasText: new RegExp(escapeRegExp(chosenPrimary), 'i') }),
+      )
+      .filter({ hasText: new RegExp(escapeRegExp(chosenPrimary), 'i') })
+      .first();
+    await expect(primaryRow).toBeVisible({ timeout: 10000 });
+    await expect(primaryRow).toContainText(/Primary/i);
+    await closeOpenDialog(catering);
+
+    // Note: previousPrimary captured for traceability; we intentionally don't
+    // restore it here because doing so requires re-opening the same group dialog
+    // before the previous save fully settles, and sometimes a different group
+    // dialog opens. The override flow below is tolerant of unsynced state.
+    void previousPrimary;
+  });
+
+  await test.step('Step 5 — Data Sync: header, auto-sync, frequency, targets, sync log', async () => {
+    // ── Step 5: Data Sync — verify top-level controls ──
+    // Data Sync only exists when the active district is a data-sync primary. On
+    // UAT switch into the primary we just set (Alief ISD) so the sidebar item is
+    // present and the sub-header shows that district.
+    if (isUatDirectLogin()) {
+      await switchDistrict(catering, chosenPrimary);
     }
-  }
+    await goToDataSync(catering);
 
-  // View sync log → opens dialog → close
-  await catering.getByRole('button', { name: /View sync log/i }).first().click();
-  await expect(
-    catering
-      .getByRole('dialog')
-      .getByRole('heading', { name: /Sync Log/i })
-      .first(),
-  ).toBeVisible({ timeout: 10000 });
-  await closeOpenDialog(catering);
+    // Verify the Data Sync sub-header reads:
+    //   "Push shared catalog from <Primary District> (primary) to opted-in districts"
+    // and the primary district name matches whatever we just set above.
+    await expect(
+      catering.getByText(
+        new RegExp(
+          `Push shared catalog from\\s+${escapeRegExp(chosenPrimary)}\\s*\\(primary\\)\\s+to opted-in districts`,
+          'i',
+        ),
+      ),
+    ).toBeVisible({ timeout: 10000 });
 
-  // Push sync now → opens confirmation dialog → click Cancel (the actual
-  // sync is exercised later in the flow). The dialog uses a "Push sync now?"
-  // confirmation block with Cancel / Yes,Push Now buttons.
-  await catering.getByRole('button', { name: /Push sync now/i }).first().click();
-  await expect(
-    catering
-      .locator('div')
-      .filter({ hasText: /^Push sync now\?$/ })
-      .first(),
-  ).toBeVisible({ timeout: 10000 });
-  await catering.getByRole('button', { name: /^Cancel$/i }).first().click();
-  await expect(
-    catering
-      .locator('div')
-      .filter({ hasText: /^Push sync now\?$/ })
-      .first(),
-  ).toBeHidden({ timeout: 10000 });
+    // Auto-sync toggle (label uses a hyphen in the UI)
+    const autoSyncToggle = catering
+      .getByRole('switch', { name: /Auto[\s-]?sync/i })
+      .or(catering.getByRole('checkbox', { name: /Auto[\s-]?sync/i }))
+      .or(catering.getByLabel(/Auto[\s-]?sync/i))
+      .first();
+    await expect(autoSyncToggle).toBeVisible({ timeout: 10000 });
 
-  // Local-overrides explanatory label (case-insensitive, slight word variants)
-  await expect(
-    catering.getByText(
-      /Local overrides in a target district prevent that record from being updated by data sync for that district\. Use Reset [Ll]ocal [Oo]verrides on an item to allow sync to overwrite it again\./i,
-    ),
-  ).toBeVisible({ timeout: 10000 });
+    // Sync frequency dropdown — verify both day-based and weekly options
+    // produce the right scheduled-time text below the dropdown
+    const frequencySelect = catering
+      .getByRole('combobox', { name: /Sync\s*frequency/i })
+      .or(catering.getByLabel(/Sync\s*frequency/i))
+      .first();
+    await expect(frequencySelect).toBeVisible({ timeout: 10000 });
 
-  // ── Step 6: Syncable items section ──
-  const syncableHeading = catering
-    .getByText(/Syncable items/i)
-    .first();
-  await scrollUntilVisible(catering, { target: syncableHeading }).catch(
-    () => undefined,
-  );
-  await expect(syncableHeading).toBeVisible({ timeout: 10000 });
+    // The frequency dropdown is disabled while Auto-sync is off. Enable Auto-sync
+    // (if needed) and wait for it to become enabled. The PrimeroEdge launcher
+    // (token refresh) can fire here on a long session — recover via goToDataSync
+    // (re-auths + returns to Data Sync) and retry rather than failing.
+    if (await frequencySelect.isDisabled().catch(() => false)) {
+      await autoSyncToggle.click();
+      await catering
+        .getByText(/Auto-sync settings saved/i)
+        .first()
+        .waitFor({ state: 'visible', timeout: 10000 })
+        .catch(() => {});
+      await expect(async () => {
+        const launcher = catering.locator('a[href*="/login?token="]').first();
+        if (await launcher.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await goToDataSync(catering);
+        }
+        expect(await frequencySelect.isEnabled().catch(() => false)).toBeTruthy();
+      }).toPass({ timeout: 40000, intervals: [3000, 5000, 8000] });
+    }
 
-  // Total count rendered next to heading: "Syncable items — 128 items"
-  await expect(
-    catering.getByText(/\d+\s*items/i).first(),
-  ).toBeVisible({ timeout: 10000 });
+    const frequencyOptions = (
+      await frequencySelect.locator('option').allTextContents()
+    ).map((o) => o.trim());
 
-  // Search field — placeholder "Search items..." in the screenshot
-  const syncSearch = catering
-    .getByRole('textbox', { name: /Search/i })
-    .or(catering.getByPlaceholder(/Search items/i))
-    .first();
-  await expect(syncSearch).toBeVisible({ timeout: 10000 });
+    if (frequencyOptions.some((o) => /weekly/i.test(o))) {
+      const weeklyLabel =
+        frequencyOptions.find((o) => /weekly/i.test(o)) ?? 'Weekly';
+      await frequencySelect.selectOption({ label: weeklyLabel });
+      await expect(
+        catering
+          .getByText(
+            /\d{1,2}:\d{2}\s*(AM|PM)\s*[A-Z]{2,4}\s*(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)/i,
+          )
+          .first(),
+      ).toBeVisible({ timeout: 10000 });
+    }
 
-  // All types dropdown — it's a native <select aria-label="Filter by item
-  // type">. Verify it's visible and that "Holiday" is one of its options
-  // (read directly from the select; no need to open the native popup).
-  const allTypes = catering
-    .getByRole('combobox', { name: /Filter by item type|All types|Type/i })
-    .or(catering.locator('select[aria-label*="item type" i]'))
-    .first();
-  await expect(allTypes).toBeVisible({ timeout: 10000 });
-  const allTypesOptions = (
-    await allTypes.locator('option').allTextContents()
-  ).map((o) => o.trim());
-  expect(
-    allTypesOptions.some((o) => /^Holiday$/i.test(o)),
-    `Expected "Holiday" in All types options. Got: [${allTypesOptions.join(', ')}]`,
-  ).toBeTruthy();
+    // The "daily" option is sometimes labelled Daily, Nightly, etc — pick any
+    // option that produces a "<time> <tz> daily" sub-text
+    const dailyCandidate =
+      frequencyOptions.find((o) => /daily|nightly/i.test(o)) ??
+      frequencyOptions.find((o) => o && !/weekly/i.test(o));
+    if (dailyCandidate) {
+      await frequencySelect.selectOption({ label: dailyCandidate });
+      await expect(
+        catering
+          .getByText(/\d{1,2}:\d{2}\s*(AM|PM)\s*[A-Z]{2,4}\s*daily/i)
+          .first(),
+      ).toBeVisible({ timeout: 10000 });
+    }
 
-  // All statuses dropdown
-  const allStatus = catering
-    .getByRole('combobox', { name: /All statuses|All status|Status/i })
-    .or(catering.getByRole('button', { name: /All statuses/i }))
-    .first();
-  await expect(allStatus).toBeVisible({ timeout: 10000 });
+    // Target Districts → Manage dialog shows districts
+    targetDistricts = await getTargetDistrictsFromManageDialog(catering);
+    expect(targetDistricts.length).toBeGreaterThan(0);
 
-  // Pagination control — current value text is "20 / page"
-  const paginationCombo = catering
-    .getByRole('combobox', { name: /per page|page size|rows per page/i })
-    .or(catering.getByRole('button', { name: /\d+\s*\/\s*page/i }))
-    .or(catering.locator('select').filter({ hasText: /\d+\s*\/\s*page/i }))
-    .first();
-  await expect(paginationCombo).toBeVisible({ timeout: 10000 });
+    // Last Sync Completed format: Month Date, Year, Time
+    // (After we just toggled the primary district above, Last sync may show "—"
+    // because no sync has run for the new primary yet — accept that case.)
+    const lastSyncRegion = catering
+      .locator(
+        'xpath=//*[contains(normalize-space(.),"Last sync completed") or contains(normalize-space(.),"Last Sync Completed")][1]',
+      )
+      .first();
+    if (await lastSyncRegion.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const lastSyncText = (await lastSyncRegion.innerText().catch(() => ''))
+        .replace(/\s+/g, ' ')
+        .trim();
+      const hasNoSyncYet = /^Last sync completed\s*[—–-]?\s*$/i.test(lastSyncText)
+        || /—|–|never|no sync/i.test(lastSyncText);
+      if (!hasNoSyncYet) {
+        expect(
+          lastSyncText,
+          `Last sync completed: ${lastSyncText}`,
+        ).toMatch(
+          /(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}[,\s]+\d{1,2}:\d{2}/i,
+        );
+      }
+    }
 
-  // Toggle one item: enable/disable status text
-  const firstItemRow = catering
-    .locator('table tbody tr, [role="row"]')
-    .first();
-  await expect(firstItemRow).toBeVisible({ timeout: 10000 });
-
-  const itemToggle = firstItemRow
-    .getByRole('switch')
-    .or(firstItemRow.getByRole('checkbox'))
-    .first();
-  if (await itemToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
-    const wasEnabled = await itemToggle.isChecked().catch(() => true);
-    await itemToggle.click();
-    const expectedStatus = wasEnabled ? /Disabled/i : /Synced/i;
-    await expect(firstItemRow).toContainText(expectedStatus, {
-      timeout: 10000,
-    });
-    // Toggle back to original state
-    await itemToggle.click();
-  }
-
-  // Details opens Item Details dialog
-  const detailsBtn = firstItemRow
-    .getByRole('button', { name: /^Details$/i })
-    .first();
-  if (await detailsBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await detailsBtn.click();
+    // View sync log → opens dialog → close
+    await catering.getByRole('button', { name: /View sync log/i }).first().click();
     await expect(
       catering
         .getByRole('dialog')
-        .getByRole('heading', { name: /Item Details/i })
+        .getByRole('heading', { name: /Sync Log/i })
         .first(),
     ).toBeVisible({ timeout: 10000 });
     await closeOpenDialog(catering);
-  }
 
-  // ── Step 7: Pick a target district + first menu item, then switch ──
-  // Always switch to Berkeley as the target district. Mercer (home) is the
-  // primary; Berkeley is the opted-in sibling we edit on.
-  // Home = the data-sync primary/source; target = the opted-in sibling we edit
-  // overrides on. The Lees group on UAT is Alief ISD (primary) + Lees (sibling);
-  // on QA it's Mercer (home) + Berkeley (target).
-  const homeDistrict = isUatDirectLogin()
-    ? getSecondaryDistrictName()
-    : getDistrictName();
-  const targetDistrict = isUatDirectLogin() ? 'Lees' : 'Berkeley School District';
-  expect(
-    targetDistricts.length,
-    `No target districts parsed from the Manage dialog: [${targetDistricts.join(', ')}]`,
-  ).toBeGreaterThan(0);
+    // Push sync now → opens confirmation dialog → click Cancel (the actual
+    // sync is exercised later in the flow). The dialog uses a "Push sync now?"
+    // confirmation block with Cancel / Yes,Push Now buttons.
+    await catering.getByRole('button', { name: /Push sync now/i }).first().click();
+    await expect(
+      catering
+        .locator('div')
+        .filter({ hasText: /^Push sync now\?$/ })
+        .first(),
+    ).toBeVisible({ timeout: 10000 });
+    await catering.getByRole('button', { name: /^Cancel$/i }).first().click();
+    await expect(
+      catering
+        .locator('div')
+        .filter({ hasText: /^Push sync now\?$/ })
+        .first(),
+    ).toBeHidden({ timeout: 10000 });
 
-  // Clean any leftover local overrides from a prior interrupted run BEFORE we
-  // create ours — otherwise the target's first menu item still reads a stale
-  // "AutoRenamed ..." name (a previous run died before its reset step), and the
-  // later Data Sync search (by the home name) never finds the row.
-  await resetAllLocalOverrides(catering);
+    // Local-overrides explanatory label (case-insensitive, slight word variants)
+    await expect(
+      catering.getByText(
+        /Local overrides in a target district prevent that record from being updated by data sync for that district\. Use Reset [Ll]ocal [Oo]verrides on an item to allow sync to overwrite it again\./i,
+      ),
+    ).toBeVisible({ timeout: 10000 });
+  });
 
-  // Switch to the target district first — we capture the item title there
-  // (after the switch) and edit it on the same district.
-  await switchDistrict(catering, targetDistrict);
+  await test.step('Step 6 — Syncable items: filters, pagination, row toggle and details', async () => {
+    // ── Step 6: Syncable items section ──
+    const syncableHeading = catering
+      .getByText(/Syncable items/i)
+      .first();
+    await scrollUntilVisible(catering, { target: syncableHeading }).catch(
+      () => undefined,
+    );
+    await expect(syncableHeading).toBeVisible({ timeout: 10000 });
 
-  // After a switch, give the post-switch toast / page reload time to settle
-  // before navigating away — otherwise the sidebar click can race with the
-  // page state and never actually land on Menu.
-  await catering.waitForLoadState('networkidle').catch(() => undefined);
-  await catering.waitForTimeout(1500);
-  await ensureInK12CateringApp(catering);
+    // Total count rendered next to heading: "Syncable items — 128 items"
+    await expect(
+      catering.getByText(/\d+\s*items/i).first(),
+    ).toBeVisible({ timeout: 10000 });
 
-  await safeNavigate(catering, 'Menu');
-  await expect(
-    catering.getByRole('heading', { name: /^Menu$/i }).first(),
-  ).toBeVisible({ timeout: 15000 });
-  await catering
-    .getByText(/Loading Menu/i)
-    .waitFor({ state: 'hidden', timeout: 30000 })
-    .catch(() => undefined);
+    // Search field — placeholder "Search items..." in the screenshot
+    const syncSearch = catering
+      .getByRole('textbox', { name: /Search/i })
+      .or(catering.getByPlaceholder(/Search items/i))
+      .first();
+    await expect(syncSearch).toBeVisible({ timeout: 10000 });
 
-  // Switch the menu-name dropdown to "TheRealMenu" on the target district — only
-  // if the selector exists. Some target districts (e.g. Lees on UAT) have a
-  // single menu and render no selector; in that case the current menu is used.
-  const menuSelect = catering.locator('#admin-menu-select');
-  if (await menuSelect.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await menuSelect.click();
-    const realMenuOption = catering.getByRole('option', { name: /RealMenu/i }).first();
-    if (await realMenuOption.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await realMenuOption.click();
-      await catering
-        .getByText(/Loading Menu/i)
-        .waitFor({ state: 'hidden', timeout: 15000 })
-        .catch(() => {});
-      await catering.waitForTimeout(800);
-    }
-  }
+    // All types dropdown — it's a native <select aria-label="Filter by item
+    // type">. Verify it's visible and that "Holiday" is one of its options
+    // (read directly from the select; no need to open the native popup).
+    const allTypes = catering
+      .getByRole('combobox', { name: /Filter by item type|All types|Type/i })
+      .or(catering.locator('select[aria-label*="item type" i]'))
+      .first();
+    await expect(allTypes).toBeVisible({ timeout: 10000 });
+    const allTypesOptions = (
+      await allTypes.locator('option').allTextContents()
+    ).map((o) => o.trim());
+    expect(
+      allTypesOptions.some((o) => /^Holiday$/i.test(o)),
+      `Expected "Holiday" in All types options. Got: [${allTypesOptions.join(', ')}]`,
+    ).toBeTruthy();
 
-  // Pick the target-district menu item to rename, from the cards' Edit-pencil
-  // aria-labels (e.g. "Edit apple juice menu item"). IMPORTANT: skip any item
-  // whose name is itself a leftover from a prior run — a rename that a failed
-  // run never restored (e.g. "AutoRenamed 8144", "AutoSync 144264"). Those are
-  // target-LOCAL names with no matching item in the home district's shared
-  // catalog, so the home Data Sync view can never show an Overrides row for
-  // them. Choosing a genuine shared item (Cereal, Spaghetti, …) is what makes
-  // the override appear; a successful run then restores it, breaking the
-  // rename-leftover accumulation cycle.
-  const targetEditBtns = catering
-    .locator('#main-content')
-    .getByRole('button', { name: /^Edit\s+\S/i });
-  await expect(targetEditBtns.first()).toBeVisible({ timeout: 15000 });
-  const targetEditLabels = await targetEditBtns.evaluateAll((els) =>
-    els.map((e) => e.getAttribute('aria-label') || ''),
-  );
-  // No \b after the prefixes: t-117617 names its items "AutoSyncAI <stamp>", and
-  // "AutoSync\b" does NOT match that (the next char, "A", is a word char). Such an
-  // item was therefore treated as a genuine shared item, and since it is really a
-  // target-local leftover the home Data Sync view can never show an Overrides row
-  // for it — the whole 90s override lookup below timed out. Match any AutoRenamed*
-  // / AutoSync* prefix so every generated leftover is skipped.
-  const LEFTOVER_ITEM_RE = /^Edit\s+(?:AutoRenamed|AutoSync)/i;
-  let chosenIdx = targetEditLabels.findIndex(
-    (l) => /^Edit\s+\S/i.test(l) && !LEFTOVER_ITEM_RE.test(l),
-  );
-  if (chosenIdx < 0) chosenIdx = 0; // all items are leftovers — use the first
-  const firstTargetEditBtn = targetEditBtns.nth(chosenIdx);
-  const firstTargetLabel = targetEditLabels[chosenIdx] ?? '';
-  const firstTargetMatch = firstTargetLabel.match(
-    /^Edit\s+(.+?)(?:\s+menu item)?$/i,
-  );
-  expect(
-    firstTargetMatch,
-    `Could not parse menu item name from aria-label: "${firstTargetLabel}"`,
-  ).not.toBeNull();
-  const originalMenuItemName = firstTargetMatch![1].trim();
+    // All statuses dropdown
+    const allStatus = catering
+      .getByRole('combobox', { name: /All statuses|All status|Status/i })
+      .or(catering.getByRole('button', { name: /All statuses/i }))
+      .first();
+    await expect(allStatus).toBeVisible({ timeout: 10000 });
 
-  // Click the Edit pencil for that item, rename it, save
-  await firstTargetEditBtn.click();
-
-  const nameInput = catering
-    .getByRole('textbox', { name: /Menu Item Name|Item Name|^Name$/i })
-    .first();
-  await expect(nameInput).toBeVisible({ timeout: 10000 });
-  await nameInput.fill('');
-  await nameInput.fill(RENAMED_MENU_ITEM);
-
-  await catering
-    .getByRole('button', { name: /Update Menu Item|^Update$|^Save$/i })
-    .last()
-    .click();
-  await expect(
-    catering.getByText(/updated|saved|success/i).first(),
-  ).toBeVisible({ timeout: 10000 });
-
-  // Switch back to the home district (Mercer)
-  await switchDistrict(catering, homeDistrict);
-
-  // After the switch, let the post-switch toast / page reload settle, then
-  // ensure we're inside the K12 app before navigating to Data Sync.
-  await catering.waitForLoadState('networkidle').catch(() => undefined);
-  await catering.waitForTimeout(1500);
-  await ensureInK12CateringApp(catering);
-
-  // ── Step 8: Data Sync — find the renamed item, expect Overrides ──
-  // Search Data Sync by the ORIGINAL item name (not the renamed one) — the home
-  // district still has the original name; the override flag indicates the target
-  // district has a local change to that item.
-  const overrideRow = catering
-    .locator('table tbody tr, [role="row"]')
-    .filter({ hasText: new RegExp(escapeRegExp(originalMenuItemName), 'i') })
-    .first();
-  const syncSearch2 = catering
-    .getByRole('textbox', { name: /Search( syncable| items)?/i })
-    .first();
-
-  // The PrimeroEdge launcher (token refresh) can kick us to the relaunch page
-  // mid-flow, so re-enter Data Sync (goToDataSync re-auths), re-apply 100/page +
-  // the search, and re-find the row — retrying until it actually appears.
-  await expect(async () => {
-    await goToDataSync(catering);
-
-    // Pagination defaults to 20/page — set 100/page.
-    const paginationCombo2 = catering
+    // Pagination control — current value text is "20 / page"
+    const paginationCombo = catering
       .getByRole('combobox', { name: /per page|page size|rows per page/i })
       .or(catering.getByRole('button', { name: /\d+\s*\/\s*page/i }))
       .or(catering.locator('select').filter({ hasText: /\d+\s*\/\s*page/i }))
       .first();
-    if (await paginationCombo2.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await paginationCombo2.click();
-      const selected = await paginationCombo2.selectOption({ label: '100 / page' }).catch(() => null);
-      if (!selected) {
-        await paginationCombo2.selectOption({ label: '100/page' }).catch(async () => {
-          await catering.getByRole('option', { name: /^\s*100\s*\/\s*page\s*$/i }).first().click().catch(() => undefined);
-        });
+    await expect(paginationCombo).toBeVisible({ timeout: 10000 });
+
+    // Toggle one item, then open its details.
+    //
+    // Both were `if (await x.isVisible())` guards, which meant that whenever the
+    // session dropped here — and it reliably does, this is several minutes into a
+    // single PrimeroEdge session — the checks silently did nothing and the test
+    // still reported green. They are assertions now, with the recovery the app
+    // actually needs around them.
+    //
+    // Locator FACTORIES rather than fixed locators, so each retry re-resolves
+    // against whatever the page looks like now after a relaunch.
+    // Rows are filtered on the Details button so this is a real item row — an
+    // unfiltered .first() can land on the table's header row, which has no
+    // controls at all.
+    const itemRow = () =>
+      catering
+        .locator(LIST_ROW_SELECTOR)
+        .filter({ has: catering.getByRole('button', { name: /^Details$/i }) })
+        .first();
+    const itemToggle = () =>
+      itemRow().getByRole('switch').or(itemRow().getByRole('checkbox')).first();
+
+    await expect(async () => {
+      await closeOpenDialog(catering, { required: false });
+
+      if (!(await itemToggle().isVisible({ timeout: 3000 }).catch(() => false))) {
+        await goToDataSync(catering).catch(() => undefined);
       }
-      await catering.waitForTimeout(800);
+      await expect(itemToggle()).toBeVisible({ timeout: 10000 });
+
+      // Drive the switch in the one direction the status column actually reports.
+      //
+      // This used to branch on the row's starting state and assert /Synced/ when
+      // it started disabled — which cannot pass: re-enabling an item does not put
+      // the column back to "Synced" until a sync has actually run for it. That
+      // only ever went unnoticed because the item is normally enabled, so the
+      // branch was never taken; a run that died between the disable and re-enable
+      // clicks left it disabled and the next run asserted an impossible state.
+      //
+      // So: make sure it is enabled, disable it (the column must say "Disabled"),
+      // then put it back and confirm through the switch's own aria-checked rather
+      // than through a column that lags. That also repairs a half-toggled item
+      // left behind by an interrupted run.
+      if (!(await itemToggle().isChecked().catch(() => false))) {
+        await itemToggle().click();
+        await expect(itemToggle()).toBeChecked({ timeout: 10000 });
+      }
+      await itemToggle().click();
+      await expect(itemToggle()).not.toBeChecked({ timeout: 10000 });
+      await expect(itemRow()).toContainText(/Disabled/i, { timeout: 10000 });
+      await itemToggle().click();
+      await expect(itemToggle()).toBeChecked({ timeout: 10000 });
+
+      await itemRow().getByRole('button', { name: /^Details$/i }).first().click();
+      await expect(
+        catering
+          .getByRole('dialog')
+          .getByRole('heading', { name: /Item Details/i })
+          .first(),
+      ).toBeVisible({ timeout: 10000 });
+      await closeOpenDialog(catering);
+    }).toPass({ timeout: 180000, intervals: [2000, 5000, 8000] });
+  });
+
+  await test.step('Step 7 — Rename a menu item on the target district', async () => {
+    // ── Step 7: Pick a target district + first menu item, then switch ──
+    // Always switch to Berkeley as the target district. Mercer (home) is the
+    // primary; Berkeley is the opted-in sibling we edit on.
+    // Home = the data-sync primary/source; target = the opted-in sibling we edit
+    // overrides on. The Lees group on UAT is Alief ISD (primary) + Lees (sibling);
+    // on QA it's Mercer (home) + Berkeley (target).
+    homeDistrict = isUatDirectLogin()
+      ? getSecondaryDistrictName()
+      : getDistrictName();
+    targetDistrict = isUatDirectLogin() ? 'Lees' : 'Berkeley School District';
+    expect(
+      targetDistricts.length,
+      `No target districts parsed from the Manage dialog: [${targetDistricts.join(', ')}]`,
+    ).toBeGreaterThan(0);
+
+    // Clean any leftover local overrides from a prior interrupted run BEFORE we
+    // create ours — otherwise the target's first menu item still reads a stale
+    // "AutoRenamed ..." name (a previous run died before its reset step), and the
+    // later Data Sync search (by the home name) never finds the row.
+    await resetAllLocalOverrides(catering);
+
+    // Switch to the target district first — we capture the item title there
+    // (after the switch) and edit it on the same district.
+    await switchDistrict(catering, targetDistrict);
+
+    // No settle needed: the shared switchDistrict waits for the header to show the
+    // new district and re-anchors the app before returning.
+    await safeNavigate(catering, 'Menu');
+    await expect(
+      catering.getByRole('heading', { name: /^Menu$/i }).first(),
+    ).toBeVisible({ timeout: 15000 });
+    await catering
+      .getByText(/Loading Menu/i)
+      .waitFor({ state: 'hidden', timeout: 30000 })
+      .catch(() => undefined);
+
+    // Switch the menu-name dropdown to "TheRealMenu" on the target district — only
+    // if the selector exists. Some target districts (e.g. Lees on UAT) have a
+    // single menu and render no selector; in that case the current menu is used.
+    const menuSelect = catering.locator('#admin-menu-select');
+    if (await menuSelect.isVisible({ timeout: 8000 }).catch(() => false)) {
+      await menuSelect.click();
+      const realMenuOption = catering.getByRole('option', { name: /RealMenu/i }).first();
+      if (await realMenuOption.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await realMenuOption.click();
+        await catering
+          .getByText(/Loading Menu/i)
+          .waitFor({ state: 'hidden', timeout: 15000 })
+          .catch(() => {});
+      }
     }
 
-    if (await syncSearch2.isVisible({ timeout: 5000 }).catch(() => false)) {
+    // Pick the target-district menu item to rename, from the cards' Edit-pencil
+    // aria-labels (e.g. "Edit apple juice menu item"). IMPORTANT: skip any item
+    // whose name is itself a leftover from a prior run — a rename that a failed
+    // run never restored (e.g. "AutoRenamed 8144", "AutoSync 144264"). Those are
+    // target-LOCAL names with no matching item in the home district's shared
+    // catalog, so the home Data Sync view can never show an Overrides row for
+    // them. Choosing a genuine shared item (Cereal, Spaghetti, …) is what makes
+    // the override appear; a successful run then restores it, breaking the
+    // rename-leftover accumulation cycle.
+    const targetEditBtns = catering
+      .locator('#main-content')
+      .getByRole('button', { name: /^Edit\s+\S/i });
+    await expect(targetEditBtns.first()).toBeVisible({ timeout: 15000 });
+    const targetEditLabels = await targetEditBtns.evaluateAll((els) =>
+      els.map((e) => e.getAttribute('aria-label') || ''),
+    );
+    // No \b after the prefixes: t-117617 names its items "AutoSyncAI <stamp>", and
+    // "AutoSync\b" does NOT match that (the next char, "A", is a word char). Such an
+    // item was therefore treated as a genuine shared item, and since it is really a
+    // target-local leftover the home Data Sync view can never show an Overrides row
+    // for it — the whole 90s override lookup below timed out. Match any AutoRenamed*
+    // / AutoSync* prefix so every generated leftover is skipped.
+    const LEFTOVER_ITEM_RE = /^Edit\s+(?:AutoRenamed|AutoSync)/i;
+    let chosenIdx = targetEditLabels.findIndex(
+      (l) => /^Edit\s+\S/i.test(l) && !LEFTOVER_ITEM_RE.test(l),
+    );
+    if (chosenIdx < 0) chosenIdx = 0; // all items are leftovers — use the first
+    const firstTargetEditBtn = targetEditBtns.nth(chosenIdx);
+    const firstTargetLabel = targetEditLabels[chosenIdx] ?? '';
+    const firstTargetMatch = firstTargetLabel.match(
+      /^Edit\s+(.+?)(?:\s+menu item)?$/i,
+    );
+    expect(
+      firstTargetMatch,
+      `Could not parse menu item name from aria-label: "${firstTargetLabel}"`,
+    ).not.toBeNull();
+    originalMenuItemName = firstTargetMatch![1].trim();
+
+    // Click the Edit pencil for that item, rename it, save
+    await firstTargetEditBtn.click();
+
+    const nameInput = catering
+      .getByRole('textbox', { name: /Menu Item Name|Item Name|^Name$/i })
+      .first();
+    await expect(nameInput).toBeVisible({ timeout: 10000 });
+    await nameInput.fill('');
+    await nameInput.fill(RENAMED_MENU_ITEM);
+
+    await catering
+      .getByRole('button', { name: /Update Menu Item|^Update$|^Save$/i })
+      .last()
+      .click();
+    await expect(
+      catering.getByText(/updated|saved|success/i).first(),
+    ).toBeVisible({ timeout: 10000 });
+
+    // Switch back to the home district (Mercer)
+    await switchDistrict(catering, homeDistrict);
+  });
+
+  await test.step('Step 8 — Overrides badge appears, clears on opt-out, and resets', async () => {
+    // ── Step 8: Data Sync — find the renamed item, expect Overrides ──
+    // Search Data Sync by the ORIGINAL item name (not the renamed one) — the home
+    // district still has the original name; the override flag indicates the target
+    // district has a local change to that item.
+    const overrideRow = catering
+      .locator(LIST_ROW_SELECTOR)
+      .filter({ hasText: new RegExp(escapeRegExp(originalMenuItemName), 'i') })
+      .first();
+    const syncSearch2 = catering
+      .getByRole('textbox', { name: /Search( syncable| items)?/i })
+      .first();
+
+    // The PrimeroEdge launcher (token refresh) can kick us to the relaunch page
+    // mid-flow, so re-enter Data Sync (goToDataSync re-auths), re-apply 100/page +
+    // the search, and re-find the row — retrying until it actually appears.
+    await expect(async () => {
+      await goToDataSync(catering);
+
+      // Pagination defaults to 20/page — set 100/page.
+      await setListPageSize(catering, 100);
+
+      if (await syncSearch2.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await syncSearch2.fill('');
+        await syncSearch2.fill(originalMenuItemName);
+        await waitForListSettled(catering);
+      }
+
+      await expect(overrideRow).toBeVisible({ timeout: 8000 });
+    }).toPass({ timeout: 90000, intervals: [2000, 4000, 6000] });
+
+    // Overrides badge on that row — it's a styled <span>, not a button
+    const overridesBadge = overrideRow
+      .getByText(/^Overrides$/i)
+      .first();
+    await expect(overridesBadge).toBeVisible({ timeout: 10000 });
+
+    // ── Step 8a: Opt the target district OUT via Manage → push sync →
+    // verify Overrides badge disappears (no target opted in = no override).
+    // This only works when the group has another opted-in target: with a single
+    // target (e.g. Lees on UAT), opting it out leaves 0 opted in, push sync is
+    // disabled, and the override can't be cleared — so skip the check there. ──
+    await toggleTargetDistrictOptIn(catering, targetDistrict, false);
+    // ensureTargetOptedIn:false — the shared helper otherwise opts the secondary
+    // district back in as a convenience, which would undo the opt-out we just made.
+    const pushedWithTargetOut = await runPushSyncNow(catering, { ensureTargetOptedIn: false });
+    if (pushedWithTargetOut) {
+      await expect(syncSearch2).toBeVisible({ timeout: 10000 });
       await syncSearch2.fill('');
       await syncSearch2.fill(originalMenuItemName);
-      await catering.waitForTimeout(800);
+      await waitForListSettled(catering);
+      await expect(overrideRow.getByText(/^Overrides$/i)).not.toBeVisible({
+        timeout: 10000,
+      });
     }
 
-    await expect(overrideRow).toBeVisible({ timeout: 8000 });
-  }).toPass({ timeout: 90000, intervals: [2000, 4000, 6000] });
-
-  // Overrides badge on that row — it's a styled <span>, not a button
-  const overridesBadge = overrideRow
-    .getByText(/^Overrides$/i)
-    .first();
-  await expect(overridesBadge).toBeVisible({ timeout: 10000 });
-
-  // ── Step 8a: Opt the target district OUT via Manage → push sync →
-  // verify Overrides badge disappears (no target opted in = no override).
-  // This only works when the group has another opted-in target: with a single
-  // target (e.g. Lees on UAT), opting it out leaves 0 opted in, push sync is
-  // disabled, and the override can't be cleared — so skip the check there. ──
-  await toggleTargetDistrictOptIn(catering, targetDistrict, false);
-  const pushedWithTargetOut = await runPushSyncNow(catering);
-  if (pushedWithTargetOut) {
-    await expect(syncSearch2).toBeVisible({ timeout: 10000 });
+    // ── Step 8b: Opt the target district back IN, push sync, verify the
+    // Overrides badge is shown again ──
+    await toggleTargetDistrictOptIn(catering, targetDistrict, true);
+    await runPushSyncNow(catering);
     await syncSearch2.fill('');
     await syncSearch2.fill(originalMenuItemName);
-    await catering.waitForTimeout(800);
-    await expect(overrideRow.getByText(/^Overrides$/i)).not.toBeVisible({
-      timeout: 10000,
+    await waitForListSettled(catering);
+    await expect(overrideRow.getByText(/^Overrides$/i)).toBeVisible({
+      timeout: 15000,
     });
-  }
 
-  // ── Step 8b: Opt the target district back IN, push sync, verify the
-  // Overrides badge is shown again ──
-  await toggleTargetDistrictOptIn(catering, targetDistrict, true);
-  await runPushSyncNow(catering);
-  await syncSearch2.fill('');
-  await syncSearch2.fill(originalMenuItemName);
-  await catering.waitForTimeout(800);
-  await expect(overrideRow.getByText(/^Overrides$/i)).toBeVisible({
-    timeout: 15000,
-  });
-
-  // Open Item Details
-  await overrideRow.getByRole('button', { name: /^Details$/i }).first().click();
-  const itemDetailsDialog = catering.getByRole('dialog').first();
-  await expect(itemDetailsDialog).toBeVisible({ timeout: 10000 });
-  // The dialog renders these as two separate elements: a "Local overrides"
-  // section header and an "Overrides detected in 1 target district." line
-  // (with the count in a nested span). Verify both independently.
-  await expect(
-    itemDetailsDialog.getByText(/^Local overrides$/i).first(),
-  ).toBeVisible({ timeout: 10000 });
-  await expect(
-    itemDetailsDialog.getByText(
-      /Overrides detected in\s+1\s+target district/i,
-    ),
-  ).toBeVisible({ timeout: 10000 });
-
-  const resetLocalOverridesBtn = itemDetailsDialog
-    .getByRole('button', { name: /Reset Local Overrides/i })
-    .first();
-  await expect(resetLocalOverridesBtn).toBeVisible({ timeout: 10000 });
-  await resetLocalOverridesBtn.click();
-
-  const resetDialog = catering
-    .getByRole('dialog')
-    .filter({ has: catering.getByRole('heading', { name: /Reset Local Overrides/i }) })
-    .first();
-  await expect(resetDialog).toBeVisible({ timeout: 10000 });
-
-  // The dialog has an "Opted-in target districts" section listing the
-  // districts where the override exists — verify the target we edited is
-  // shown there (could be Berkeley or Mercer depending on which is primary).
-  await expect(resetDialog).toContainText(/Opted-?in target districts?/i);
-  await expect(resetDialog).toContainText(
-    new RegExp(escapeRegExp(targetDistrict), 'i'),
-  );
-
-  await resetDialog
-    .getByRole('button', { name: /Reset Overrides|^Reset$|^Confirm$/i })
-    .last()
-    .click();
-
-  await expect(
-    catering.getByText(/Local overrides reset \(1 row updated\)/i),
-  ).toBeVisible({ timeout: 15000 });
-
-  await closeOpenDialog(catering);
-  await expect(
-    overrideRow.getByText(/^Overrides$/i),
-  ).not.toBeVisible({ timeout: 10000 });
-
-  // ── Step 9: Push Sync Now ──
-  await scrollUntilVisible(catering, {
-    target: catering.getByRole('button', { name: /Push Sync Now/i }).first(),
-  });
-  await catering
-    .getByRole('button', { name: /Push Sync Now/i })
-    .first()
-    .click();
-  const pushDialog = catering.getByRole('dialog').first();
-  await pushDialog
-    .getByRole('button', { name: /Yes,? Push Now/i })
-    .first()
-    .click();
-
-  const syncCompleteText = await catering
-    .getByText(/Sync complete\s*[.,;:—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i)
-    .first()
-    .textContent({ timeout: 60000 });
-  expect(syncCompleteText, 'Sync complete message').toBeTruthy();
-  const syncCompleteCanonical = (syncCompleteText ?? '').trim();
-
-  // Open Sync Log → verify top entry
-  await catering.getByRole('button', { name: /View Sync Log/i }).first().click();
-  const syncLogDialog = catering
-    .getByRole('dialog')
-    .filter({ has: catering.getByRole('heading', { name: /Sync Log/i }) })
-    .first();
-  await expect(syncLogDialog).toBeVisible({ timeout: 10000 });
-
-  // The Sync Log table's first <tr> is the header row
-  // ("StartedTriggered ByStatusSyncedSkippedDurationNotes"). Scope to the
-  // tbody so we get the first actual data row.
-  const topEntry = syncLogDialog
-    .locator('tbody tr, li, [role="row"]:not(:has(th)), article')
-    .first();
-  await expect(topEntry).toBeVisible({ timeout: 10000 });
-
-  // The toast says "Sync complete — 89 items synced, 0 skipped." but the
-  // top Sync Log row is a table row with columns
-  //   Started | Triggered By | Status | Synced | Skipped | Duration | Notes
-  // So we verify the row's individual cells contain the same Synced and
-  // Skipped numbers, plus Sabih Siddiqui and today's date.
-  const countsMatch = syncCompleteCanonical.match(
-    /(\d+)\s*items?\s*synced,\s*(\d+)\s*skipped/i,
-  );
-  if (countsMatch) {
-    const syncedCount = countsMatch[1];
-    const skippedCount = countsMatch[2];
-    const cells = topEntry.locator('td');
-    if ((await cells.count()) >= 5) {
-      // Started | Triggered By | Status | Synced | Skipped | ...
-      await expect(cells.nth(3)).toContainText(
-        new RegExp(`^\\s*${syncedCount}\\s*$`),
-      );
-      await expect(cells.nth(4)).toContainText(
-        new RegExp(`^\\s*${skippedCount}\\s*$`),
-      );
-    } else {
-      // Non-table layout — fall back to "row contains both numbers"
-      await expect(topEntry).toContainText(new RegExp(`\\b${syncedCount}\\b`));
-      await expect(topEntry).toContainText(new RegExp(`\\b${skippedCount}\\b`));
-    }
-  }
-  await expect(topEntry).toContainText(
-    new RegExp(escapeRegExp(SYNC_TRIGGERED_BY), 'i'),
-  );
-  // Accept both full and abbreviated month names — the Sync Log renders dates
-  // like "Jun 01, 2026 11:13 AM" (abbreviated), not "June 01, 2026".
-  await expect(topEntry).toContainText(
-    /(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},\s+\d{4}[,\s]+\d{1,2}:\d{2}/i,
-  );
-
-  await closeOpenDialog(catering);
-
-  // ── Step 10: Switch back to target district & verify name restored ──
-  await switchDistrict(catering, targetDistrict);
-
-  // Let the post-switch toast / page reload settle, re-anchor the K12 app
-  // before clicking the sidebar (otherwise the click can race the reload
-  // and never actually land on Menu).
-  await catering.waitForLoadState('networkidle').catch(() => undefined);
-  await catering.waitForTimeout(1500);
-  await ensureInK12CateringApp(catering);
-
-  await safeNavigate(catering, 'Menu');
-  await expect(
-    catering.getByRole('heading', { name: /^Menu$/i }).first(),
-  ).toBeVisible({ timeout: 15000 });
-  await catering
-    .getByText(/Loading Menu/i)
-    .waitFor({ state: 'hidden', timeout: 30000 })
-    .catch(() => undefined);
-
-  // Select "TheRealMenu" again if the selector exists (single-menu target
-  // districts like Lees on UAT render none — the current menu is used).
-  const finalMenuSelect = catering.locator('#admin-menu-select');
-  if (await finalMenuSelect.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await finalMenuSelect.click();
-    const realMenuOption = catering.getByRole('option', { name: /RealMenu/i }).first();
-    if (await realMenuOption.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await realMenuOption.click();
-      await catering
-        .getByText(/Loading Menu/i)
-        .waitFor({ state: 'hidden', timeout: 15000 })
-        .catch(() => {});
-      await catering.waitForTimeout(800);
-    }
-  }
-
-  // Search for the ORIGINAL item name on the target district — after the
-  // reset + push sync, the renamed item should be back to its original name.
-  const finalSearch = catering
-    .getByRole('textbox', { name: /Search.*items?/i })
-    .first();
-  await finalSearch.fill(originalMenuItemName);
-  await catering.waitForTimeout(800);
-
-  await expect(
-    catering
-      .getByText(new RegExp(escapeRegExp(originalMenuItemName), 'i'))
-      .first(),
-  ).toBeVisible({ timeout: 15000 });
-  await expect(
-    catering.getByText(new RegExp(escapeRegExp(RENAMED_MENU_ITEM), 'i')),
-  ).not.toBeVisible({ timeout: 5000 });
-
-  // Restore Mercer as the active district at the end
-  await switchDistrict(catering, homeDistrict);
-
-  // Let the post-switch toast / page reload settle before we navigate the
-  // sidebar — otherwise the next sidebar click (Accounts inside
-  // resetCustomerPasswordFromAccounts) can race the toast overlay and never
-  // actually land.
-  await catering.waitForLoadState('networkidle').catch(() => undefined);
-  await catering.waitForTimeout(1500);
-  await ensureInK12CateringApp(catering);
-
-  // ── Step 11: Verify non-admin/customer role cannot access Data Sync ──
-  // First reset the customer's password from the admin session so the
-  // upcoming customer login is guaranteed to succeed (Accounts → search by
-  // email → Actions ⋯ → Change Password → "Password1!").
-  const customerEmail = getCustomerAccountEmail();
-  const customerPassword = 'Password1!';
-  await resetCustomerPasswordFromAccounts(
-    catering,
-    customerEmail,
-    customerPassword,
-  );
-
-  // Now open a fresh browser context (no shared auth) and log in as the
-  // customer, then assert the Data Sync sidebar item is not present.
-  const customerContext = await browser.newContext();
-  const customerPage = await customerContext.newPage();
-  try {
-    await customerPage.goto(
-      getK12CateringLoginUrl(),
-      { waitUntil: 'domcontentloaded' },
-    );
-
-    await customerPage
-      .getByRole('textbox', { name: /Email/i })
-      .fill(customerEmail);
-    await customerPage
-      .getByRole('textbox', { name: /Password/i })
-      .fill(customerPassword);
-    await customerPage.getByRole('button', { name: /Sign in/i }).click();
-
-    await customerPage.waitForLoadState('networkidle').catch(() => undefined);
-    await expect(customerPage).not.toHaveURL(/login/, { timeout: 15000 });
-
-    const customerSidebar = customerPage.locator(
-      'aside[aria-label="Main navigation"]',
-    );
-    await expect(customerSidebar).toBeVisible({ timeout: 30000 });
-
-    // The Data Sync sidebar item must not exist for non-admin users
+    // Open Item Details
+    await overrideRow.getByRole('button', { name: /^Details$/i }).first().click();
+    const itemDetailsDialog = catering.getByRole('dialog').first();
+    await expect(itemDetailsDialog).toBeVisible({ timeout: 10000 });
+    // The dialog renders these as two separate elements: a "Local overrides"
+    // section header and an "Overrides detected in 1 target district." line
+    // (with the count in a nested span). Verify both independently.
     await expect(
-      customerSidebar.getByLabel('Navigate to Data Sync'),
-    ).toHaveCount(0);
-  } finally {
-    await customerContext.close();
-  }
+      itemDetailsDialog.getByText(/^Local overrides$/i).first(),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      itemDetailsDialog.getByText(
+        /Overrides detected in\s+1\s+target district/i,
+      ),
+    ).toBeVisible({ timeout: 10000 });
+
+    const resetLocalOverridesBtn = itemDetailsDialog
+      .getByRole('button', { name: /Reset Local Overrides/i })
+      .first();
+    await expect(resetLocalOverridesBtn).toBeVisible({ timeout: 10000 });
+    await resetLocalOverridesBtn.click();
+
+    const resetDialog = catering
+      .getByRole('dialog')
+      .filter({ has: catering.getByRole('heading', { name: /Reset Local Overrides/i }) })
+      .first();
+    await expect(resetDialog).toBeVisible({ timeout: 10000 });
+
+    // The dialog has an "Opted-in target districts" section listing the
+    // districts where the override exists — verify the target we edited is
+    // shown there (could be Berkeley or Mercer depending on which is primary).
+    await expect(resetDialog).toContainText(/Opted-?in target districts?/i);
+    await expect(resetDialog).toContainText(
+      new RegExp(escapeRegExp(targetDistrict), 'i'),
+    );
+
+    await resetDialog
+      .getByRole('button', { name: /Reset Overrides|^Reset$|^Confirm$/i })
+      .last()
+      .click();
+
+    await expect(
+      catering.getByText(/Local overrides reset \(1 row updated\)/i),
+    ).toBeVisible({ timeout: 15000 });
+
+    await closeOpenDialog(catering);
+    await expect(
+      overrideRow.getByText(/^Overrides$/i),
+    ).not.toBeVisible({ timeout: 10000 });
+  });
+
+  await test.step('Step 9 — Push Sync Now and verify the Sync Log entry', async () => {
+    // ── Step 9: Push Sync Now ──
+    await scrollUntilVisible(catering, {
+      target: catering.getByRole('button', { name: /Push Sync Now/i }).first(),
+    });
+    await catering
+      .getByRole('button', { name: /Push Sync Now/i })
+      .first()
+      .click();
+    const pushDialog = catering.getByRole('dialog').first();
+    await pushDialog
+      .getByRole('button', { name: /Yes,? Push Now/i })
+      .first()
+      .click();
+
+    const syncCompleteText = await catering
+      .getByText(/Sync complete\s*[.,;:—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i)
+      .first()
+      .textContent({ timeout: 60000 });
+    expect(syncCompleteText, 'Sync complete message').toBeTruthy();
+    const syncCompleteCanonical = (syncCompleteText ?? '').trim();
+
+    // Open Sync Log → verify top entry
+    await catering.getByRole('button', { name: /View Sync Log/i }).first().click();
+    const syncLogDialog = catering
+      .getByRole('dialog')
+      .filter({ has: catering.getByRole('heading', { name: /Sync Log/i }) })
+      .first();
+    await expect(syncLogDialog).toBeVisible({ timeout: 10000 });
+
+    // The Sync Log table's first <tr> is the header row
+    // ("StartedTriggered ByStatusSyncedSkippedDurationNotes"). Scope to the
+    // tbody so we get the first actual data row.
+    const topEntry = syncLogDialog
+      .locator('tbody tr, li, [role="row"]:not(:has(th)), article')
+      .first();
+    await expect(topEntry).toBeVisible({ timeout: 10000 });
+
+    // The toast says "Sync complete — 89 items synced, 0 skipped." but the
+    // top Sync Log row is a table row with columns
+    //   Started | Triggered By | Status | Synced | Skipped | Duration | Notes
+    // So we verify the row's individual cells contain the same Synced and
+    // Skipped numbers, plus Sabih Siddiqui and today's date.
+    const countsMatch = syncCompleteCanonical.match(
+      /(\d+)\s*items?\s*synced,\s*(\d+)\s*skipped/i,
+    );
+    if (countsMatch) {
+      const syncedCount = countsMatch[1];
+      const skippedCount = countsMatch[2];
+      const cells = topEntry.locator('td');
+      if ((await cells.count()) >= 5) {
+        // Started | Triggered By | Status | Synced | Skipped | ...
+        await expect(cells.nth(3)).toContainText(
+          new RegExp(`^\\s*${syncedCount}\\s*$`),
+        );
+        await expect(cells.nth(4)).toContainText(
+          new RegExp(`^\\s*${skippedCount}\\s*$`),
+        );
+      } else {
+        // Non-table layout — fall back to "row contains both numbers"
+        await expect(topEntry).toContainText(new RegExp(`\\b${syncedCount}\\b`));
+        await expect(topEntry).toContainText(new RegExp(`\\b${skippedCount}\\b`));
+      }
+    }
+    await expect(topEntry).toContainText(
+      new RegExp(escapeRegExp(SYNC_TRIGGERED_BY), 'i'),
+    );
+    // Accept both full and abbreviated month names — the Sync Log renders dates
+    // like "Jun 01, 2026 11:13 AM" (abbreviated), not "June 01, 2026".
+    await expect(topEntry).toContainText(
+      /(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},\s+\d{4}[,\s]+\d{1,2}:\d{2}/i,
+    );
+
+    await closeOpenDialog(catering);
+  });
+
+  await test.step('Step 10 — Item name is restored on the target district', async () => {
+    // ── Step 10: Switch back to target district & verify name restored ──
+    await switchDistrict(catering, targetDistrict);
+
+    await safeNavigate(catering, 'Menu');
+    await expect(
+      catering.getByRole('heading', { name: /^Menu$/i }).first(),
+    ).toBeVisible({ timeout: 15000 });
+    await catering
+      .getByText(/Loading Menu/i)
+      .waitFor({ state: 'hidden', timeout: 30000 })
+      .catch(() => undefined);
+
+    // Select "TheRealMenu" again if the selector exists (single-menu target
+    // districts like Lees on UAT render none — the current menu is used).
+    const finalMenuSelect = catering.locator('#admin-menu-select');
+    if (await finalMenuSelect.isVisible({ timeout: 8000 }).catch(() => false)) {
+      await finalMenuSelect.click();
+      const realMenuOption = catering.getByRole('option', { name: /RealMenu/i }).first();
+      if (await realMenuOption.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await realMenuOption.click();
+        await catering
+          .getByText(/Loading Menu/i)
+          .waitFor({ state: 'hidden', timeout: 15000 })
+          .catch(() => {});
+      }
+    }
+
+    // Search for the ORIGINAL item name on the target district — after the
+    // reset + push sync, the renamed item should be back to its original name.
+    const finalSearch = catering
+      .getByRole('textbox', { name: /Search.*items?/i })
+      .first();
+    await finalSearch.fill(originalMenuItemName);
+    await waitForListSettled(catering);
+
+    await expect(
+      catering
+        .getByText(new RegExp(escapeRegExp(originalMenuItemName), 'i'))
+        .first(),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(
+      catering.getByText(new RegExp(escapeRegExp(RENAMED_MENU_ITEM), 'i')),
+    ).not.toBeVisible({ timeout: 5000 });
+
+    // Restore Mercer as the active district at the end
+    await switchDistrict(catering, homeDistrict);
+  });
+
+  await test.step('Step 11 — A customer account cannot reach Data Sync', async () => {
+    // ── Step 11: Verify non-admin/customer role cannot access Data Sync ──
+    // First reset the customer's password from the admin session so the
+    // upcoming customer login is guaranteed to succeed (Accounts → search by
+    // email → Actions ⋯ → Change Password → "Password1!").
+    const customerEmail = getCustomerAccountEmail();
+    const customerPassword = 'Password1!';
+    await resetCustomerPasswordFromAccounts(
+      catering,
+      customerEmail,
+      customerPassword,
+    );
+
+    // Now open a fresh browser context (no shared auth) and log in as the
+    // customer, then assert the Data Sync sidebar item is not present.
+    const customerContext = await browser.newContext();
+    const customerPage = await customerContext.newPage();
+    try {
+      await customerPage.goto(
+        getK12CateringLoginUrl(),
+        { waitUntil: 'domcontentloaded' },
+      );
+
+      await customerPage
+        .getByRole('textbox', { name: /Email/i })
+        .fill(customerEmail);
+      await customerPage
+        .getByRole('textbox', { name: /Password/i })
+        .fill(customerPassword);
+      await customerPage.getByRole('button', { name: /Sign in/i }).click();
+
+      // The URL leaving /login is the sign-in signal; networkidle just adds a racy
+      // wait on top of it.
+      await expect(customerPage).not.toHaveURL(/login/, { timeout: 15000 });
+
+      const customerSidebar = customerPage.locator(
+        'aside[aria-label="Main navigation"]',
+      );
+      await expect(customerSidebar).toBeVisible({ timeout: 30000 });
+
+      // The Data Sync sidebar item must not exist for non-admin users
+      await expect(
+        customerSidebar.getByLabel('Navigate to Data Sync'),
+      ).toHaveCount(0);
+    } finally {
+      await customerContext.close();
+    }
+  });
 });

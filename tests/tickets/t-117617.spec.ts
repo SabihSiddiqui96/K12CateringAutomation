@@ -208,7 +208,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     // mid-test and snaps back to the persisted district, which would otherwise
     // make the cross-district assertions run on the wrong district. The session
     // is already on HOME here (set in beforeAll).
-    setIntendedDistrict(HOME);
+    setIntendedDistrict(catering, HOME);
 
     // Capture the first TheRealMenu item, and clear any leftover override from a
     // prior interrupted run (keeps this stateful test idempotent).
@@ -281,7 +281,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
         /* best-effort cleanup */
       } finally {
         // Stop tracking so it can't affect later tests in this file.
-        setIntendedDistrict(null);
+        setIntendedDistrict(catering, null);
       }
     }
   });
@@ -302,7 +302,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     const INGREDIENT_SYNCED = 'AutoTestIngredientSynced';
     const INGREDIENT_LOCAL = 'AutoTestIngredientLocal';
 
-    setIntendedDistrict(HOME);
+    setIntendedDistrict(catering, HOME);
 
     // Capture the first TheRealMenu item + its original Allergens/Ingredients (to
     // restore in cleanup), and clear any leftover override from a prior interrupted run.
@@ -382,7 +382,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       } catch {
         /* best-effort cleanup */
       } finally {
-        setIntendedDistrict(null);
+        setIntendedDistrict(catering, null);
       }
     }
   });

@@ -7,10 +7,10 @@ import {
   navigateK12CateringMenu,
   scrollUntilVisible,
   getInputValueFromLocator,
+  escapeRegExp,
 } from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -439,10 +439,6 @@ async function placeOrderUsingDisplayLabel(
 
 function formatMonthYear(date: Date): string {
   return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function monthIndex(date: Date): number {

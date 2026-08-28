@@ -8,11 +8,20 @@
  * reuse them instead of duplicating. Locators are kept identical to those tests.
  */
 import { expect, Locator, Page } from '@playwright/test';
-import { navigateK12CateringMenu, scrollUntilVisible, setListPageSize, getSecondaryDistrictName, isUatDirectLogin } from './helpers';
+import {
+  escapeRegExp,
+  navigateK12CateringMenu,
+  scrollUntilVisible,
+  setListPageSize,
+  getSecondaryDistrictName,
+  isUatDirectLogin,
+  waitForListSettled,
+  LIST_ROW_SELECTOR,
+} from './helpers';
 
-export function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+// Lives in ./helpers now (it was declared in nine files); re-exported so the
+// specs that import it from here keep working.
+export { escapeRegExp } from './helpers';
 
 // District names can render with a typographic apostrophe (U+2019), e.g.
 // "Lee’s Summit R-7", while config/code use a straight quote ("Lee's ..."). Build
@@ -21,23 +30,44 @@ function districtPattern(name: string): string {
   return escapeRegExp(name).replace(/['’]/g, "['’]");
 }
 
-// The PrimeroEdge launcher periodically token-refreshes and reloads the app,
-// which reverts the active district back to the persisted one. Long, district-
-// switch-heavy flows (e.g. 117617 Test B) therefore lose the district they
-// switched to mid-test. A test can opt in to automatic restoration by calling
-// setIntendedDistrict(<name>); ensureInK12CateringApp() then re-switches back to
-// it after any relaunch. Tests that don't opt in (intendedDistrict === null) are
-// completely unaffected.
-let intendedDistrict: string | null = null;
-let restoringDistrict = false;
-export function setIntendedDistrict(name: string | null): void {
-  intendedDistrict = name;
+/**
+ * District-restoration state, scoped to the page it belongs to.
+ *
+ * The PrimeroEdge launcher periodically token-refreshes and reloads the app,
+ * which reverts the active district back to the persisted one. Long, district-
+ * switch-heavy flows (e.g. 117617 Test B) therefore lose the district they
+ * switched to mid-test. A test opts in by calling setIntendedDistrict(page, name);
+ * ensureInK12CateringApp() then re-switches back to it after any relaunch.
+ *
+ * Keyed by Page rather than held at module scope: module state is shared by every
+ * test a worker runs, so one spec's opt-in used to leak into the next test in the
+ * same file, and a parallel run had two tests writing the same variable. A WeakMap
+ * also means the entry disappears with the page, so nothing has to reset it.
+ */
+type DistrictState = { intended: string | null; restoring: boolean };
+const districtState = new WeakMap<Page, DistrictState>();
+
+function stateFor(page: Page): DistrictState {
+  let state = districtState.get(page);
+  if (!state) {
+    state = { intended: null, restoring: false };
+    districtState.set(page, state);
+  }
+  return state;
 }
+
+export function setIntendedDistrict(page: Page, name: string | null): void {
+  stateFor(page).intended = name;
+}
+
 function headerShowsDistrict(page: Page, districtName: string): Locator {
+  // The trailing (?!\w) stops a short name matching a longer one that starts
+  // with it — "Lees" must not match "Lees Summit R-7", and "Berkeley" must not
+  // match "Berkeley Heights".
   return page
     .getByRole('button', { name: /Switch district/i })
     .first()
-    .getByText(new RegExp(districtPattern(districtName), 'i'));
+    .getByText(new RegExp(`${districtPattern(districtName)}(?!\\w)`, 'i'));
 }
 
 export async function ensureInK12CateringApp(page: Page): Promise<void> {
@@ -67,19 +97,20 @@ export async function ensureInK12CateringApp(page: Page): Promise<void> {
   // persisted one even when the app reloads cleanly (sidebar stays visible), so
   // this check must run on EVERY call, not only after a relaunch. Restore the
   // district the test intends to be on (opt-in via setIntendedDistrict). The
-  // restoringDistrict guard prevents re-entry, since switchDistrict() calls back
-  // into this fn. Tests that don't opt in (intendedDistrict === null) are unaffected.
-  if (intendedDistrict && !restoringDistrict) {
-    const onIntended = await headerShowsDistrict(page, intendedDistrict)
+  // `restoring` guard prevents re-entry, since switchDistrict() calls back into
+  // this fn. Tests that don't opt in (intended === null) are unaffected.
+  const state = stateFor(page);
+  if (state.intended && !state.restoring) {
+    const onIntended = await headerShowsDistrict(page, state.intended)
       .waitFor({ state: 'visible', timeout: 2500 })
       .then(() => true)
       .catch(() => false);
     if (!onIntended) {
-      restoringDistrict = true;
+      state.restoring = true;
       try {
-        await switchDistrict(page, intendedDistrict);
+        await switchDistrict(page, state.intended);
       } finally {
-        restoringDistrict = false;
+        state.restoring = false;
       }
     }
   }
@@ -108,14 +139,36 @@ export async function dismissAnyModal(page: Page): Promise<void> {
   await page.locator('div.fixed.inset-0').first().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => undefined);
 }
 
-export async function closeOpenDialog(page: Page): Promise<void> {
+type CloseDialogOptions = {
+  /**
+   * Throw if the dialog is still up when we run out of attempts. Default true —
+   * a test that carries on with a modal covering the page fails later with a
+   * confusing message about the control underneath it. Pass false only on
+   * genuinely best-effort teardown paths.
+   */
+  required?: boolean;
+};
+
+/**
+ * Close whatever dialog is open, and verify it actually closed.
+ *
+ * Only named close affordances are clicked: an accessible-name match, an
+ * aria-label containing "close", or a bare ×/X. There used to be a
+ * `button:has(svg)).last()` catch-all here, which is a coin flip on any dialog
+ * whose last icon button is something else (Delete, Reset) — worth an a11y bug
+ * against a dialog with no named close control rather than a blind click.
+ * Escape is the safe fallback and is pressed on every attempt anyway.
+ */
+export async function closeOpenDialog(page: Page, options: CloseDialogOptions = {}): Promise<void> {
+  const { required = true } = options;
+  const dialog = page.locator('[role="dialog"]').first();
+
   for (let attempt = 0; attempt < 4; attempt++) {
-    const dialog = page.locator('[role="dialog"]').first();
     if (!(await dialog.isVisible({ timeout: 1000 }).catch(() => false))) return;
     const closeCandidates = [
       dialog.getByRole('button', { name: /^Close$|Close dialog|Dismiss|Cancel and close modal/i }).first(),
       dialog.locator('button[aria-label*="close" i]').first(),
-      dialog.locator('button:has(svg)').last(),
+      dialog.getByRole('button', { name: /^\s*[×✕✖xX]\s*$/ }).first(),
     ];
     for (const candidate of closeCandidates) {
       if (await candidate.isVisible({ timeout: 500 }).catch(() => false)) {
@@ -126,6 +179,19 @@ export async function closeOpenDialog(page: Page): Promise<void> {
     await page.keyboard.press('Escape').catch(() => undefined);
     await dialog.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => undefined);
   }
+
+  if (!required) return;
+  const stillOpen = await dialog.isVisible({ timeout: 500 }).catch(() => false);
+  if (stillOpen) {
+    const title = (await dialog.innerText().catch(() => ''))
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 120);
+    throw new Error(
+      `closeOpenDialog: a dialog is still open after 4 attempts — "${title}". ` +
+        'It has no close control we can find; the next step would run behind its overlay.',
+    );
+  }
 }
 
 export async function switchDistrict(page: Page, districtName: string): Promise<void> {
@@ -133,7 +199,13 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
   // The header switch control isn't rendered on every page; if it's not here,
   // go to the Districts page where the "Switch district" button reliably lives.
   if (!(await switchBtn.isVisible({ timeout: 3000 }).catch(() => false))) {
-    await navigateK12CateringMenu(page, 'Districts').catch(() => undefined);
+    // Log rather than swallow: if this navigation is genuinely broken the next
+    // step still fails, but on "Switch district button not visible" instead of
+    // the real cause, which sends you looking at the wrong thing.
+    await navigateK12CateringMenu(page, 'Districts').catch((err) => {
+      const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+      console.log(`[dataSync] could not open Districts before switching district: ${msg}`);
+    });
     await page.waitForLoadState('domcontentloaded');
     switchBtn = page.getByRole('button', { name: /Switch district/i }).first();
   }
@@ -161,8 +233,8 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
     // in the search box is the primary filter; if that doesn't surface the card,
     // fall back to the "Browse by Letter" button for the district's first letter.
     await searchBox.fill(districtName);
-    await page.waitForTimeout(800);
-    if (!(await card.isVisible().catch(() => false))) {
+    await waitForListSettled(page);
+    if (!(await card.isVisible({ timeout: 5000 }).catch(() => false))) {
       await searchBox.fill('');
       const letter = districtName.charAt(0).toUpperCase();
       await page
@@ -170,7 +242,7 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
         .first()
         .click()
         .catch(() => undefined);
-      await page.waitForTimeout(500);
+      await waitForListSettled(page);
     }
     await expect(card).toBeVisible({ timeout: 10000 });
     await card.click();
@@ -186,10 +258,26 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
       await confirmAfterCard.click();
     }
   } else {
-    const option = page.getByText(new RegExp(districtPattern(districtName), 'i')).first();
+    // Anchored, and role-first: an unanchored getByText matches a substring, so
+    // picking "Lees" could land on "Lees Summit R-7" — switching the session to
+    // the wrong district, which then fails somewhere far away from here.
+    const exact = new RegExp(`^\\s*${districtPattern(districtName)}\\s*$`, 'i');
+    let option = page
+      .getByRole('option', { name: exact })
+      .or(page.getByRole('button', { name: exact }))
+      .or(page.getByText(exact))
+      .first();
+    if (!(await option.isVisible({ timeout: 5000 }).catch(() => false))) {
+      // Some builds render the name in a row alongside a status badge, so the
+      // text node is not exactly the name. Fall back to a word-boundary match —
+      // still refuses "Lees Summit R-7" for "Lees" — and take the LAST match so
+      // we land on the innermost element rather than a wrapping container.
+      option = page
+        .getByText(new RegExp(`${districtPattern(districtName)}(?!\\w)`, 'i'))
+        .last();
+    }
     await expect(option).toBeVisible({ timeout: 10000 });
     await option.click();
-    await page.waitForTimeout(500);
 
     const confirmBtn = page.getByRole('button', { name: /^Switch District$/i }).last();
     await expect(confirmBtn).toBeVisible({ timeout: 10000 });
@@ -202,8 +290,8 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
   // passes vacuously on the full-page UI, so verify the switch actually landed.
   await expect(headerShowsDistrict(page, districtName)).toBeVisible({ timeout: 20000 });
   // Track the latest switch so a launcher relaunch restores it (opt-in tests).
-  if (intendedDistrict !== null) intendedDistrict = districtName;
-  await page.waitForTimeout(1500);
+  const state = stateFor(page);
+  if (state.intended !== null) state.intended = districtName;
   await ensureInK12CateringApp(page);
 }
 
@@ -262,7 +350,7 @@ export async function setGlobalSyncToggle(page: Page, attrLabel: string, on: boo
   const isOn = (await toggle.getAttribute('aria-checked').catch(() => null)) === 'true';
   if (isOn !== on) {
     await toggle.click();
-    await page.waitForTimeout(400);
+    // No sleep: the attribute assertion below IS the wait for the toggle to land.
     await expect(toggle).toHaveAttribute('aria-checked', String(on), { timeout: 5000 });
   }
   await closeOpenDialog(page);
@@ -303,7 +391,6 @@ export async function ensureTargetDistrictOptedIn(page: Page, districtName: stri
     const optedIn = (await toggle.getAttribute('aria-checked').catch(() => null)) === 'true';
     if (!optedIn) {
       await toggle.click();
-      await page.waitForTimeout(600);
       await expect(toggle).toHaveAttribute('aria-checked', 'true', { timeout: 8000 });
       changed = true;
       console.log(`[dataSync] "${districtName}" was opted OUT - opted it back in before syncing.`);
@@ -316,18 +403,36 @@ export async function ensureTargetDistrictOptedIn(page: Page, districtName: stri
   return changed;
 }
 
-/** Click "Push sync now", confirm, and wait for the "Sync complete" toast. */
-export async function runPushSyncNow(page: Page): Promise<void> {
-  // A target district that is opted out makes the sync a silent no-op, so make
-  // sure the one we sync to is opted in first.
-  await ensureTargetDistrictOptedIn(page, getSecondaryDistrictName()).catch(() => undefined);
-  await scrollUntilVisible(page, { target: page.getByRole('button', { name: /Push sync now/i }).first() }).catch(() => undefined);
-  await page.getByRole('button', { name: /Push sync now/i }).first().click();
+/**
+ * Click "Push sync now", confirm, and wait for the "Sync complete" toast.
+ *
+ * Returns false without syncing when the button is disabled — that happens when
+ * no target district is opted in (e.g. the only target of a single-target group
+ * was just opted out), where there is genuinely nothing to push. Callers that
+ * care about that case branch on the return value.
+ *
+ * `ensureTargetOptedIn` defaults to true because an opted-out target makes the
+ * sync a silent no-op. Pass false in the one case where being opted out is the
+ * thing under test (t-113438 step 8a), otherwise this would undo the test's setup.
+ */
+export async function runPushSyncNow(
+  page: Page,
+  options: { ensureTargetOptedIn?: boolean } = {},
+): Promise<boolean> {
+  const { ensureTargetOptedIn = true } = options;
+  if (ensureTargetOptedIn) {
+    await ensureTargetDistrictOptedIn(page, getSecondaryDistrictName()).catch(() => undefined);
+  }
+  const pushBtn = page.getByRole('button', { name: /Push sync now/i }).first();
+  await scrollUntilVisible(page, { target: pushBtn }).catch(() => undefined);
+  if (await pushBtn.isDisabled().catch(() => false)) return false;
+  await pushBtn.click();
   await expect(page.locator('div').filter({ hasText: /^Push sync now\?$/ }).first()).toBeVisible({ timeout: 10000 });
   await page.getByRole('button', { name: /Yes,?\s*Push Now/i }).first().click();
   await expect(
     page.getByText(/Sync complete\s*[.,;:—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i).first(),
   ).toBeVisible({ timeout: 90000 });
+  return true;
 }
 
 // ── Menu (TheRealMenu) item edit helpers ─────────────────────────────────────
@@ -341,8 +446,8 @@ export async function selectTheRealMenu(page: Page): Promise<void> {
   if (await menuSelect.isVisible({ timeout: 10000 }).catch(() => false)) {
     await menuSelect.click();
     await page.getByRole('option', { name: /RealMenu/i }).first().click().catch(() => undefined);
+    // "Loading Menu" detaching is the render signal; no sleep needed after it.
     await page.getByText(/Loading Menu/i).waitFor({ state: 'hidden', timeout: 15000 }).catch(() => undefined);
-    await page.waitForTimeout(800);
   }
 }
 
@@ -373,18 +478,24 @@ async function openItemEdit(page: Page, name: string): Promise<void> {
  */
 async function setChips(page: Page, inputId: string, kind: 'allergen' | 'ingredient', values: string[]): Promise<void> {
   const removeRe = new RegExp(`^Remove .+ ${kind}$`, 'i');
-  let removeBtn = page.getByRole('button', { name: removeRe }).first();
-  while (await removeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await removeBtn.click();
-    await page.waitForTimeout(250);
-    removeBtn = page.getByRole('button', { name: removeRe }).first();
+  const chips = page.getByRole('button', { name: removeRe });
+  // Each removal is confirmed by the chip count dropping, so there is nothing to
+  // sleep for. The loop is bounded so a chip that refuses to go cannot spin.
+  for (let guard = 0; guard < 30; guard += 1) {
+    const before = await chips.count();
+    if (before === 0) break;
+    await chips.first().click();
+    await expect(chips).toHaveCount(before - 1, { timeout: 5000 });
   }
   const input = page.locator(`#${inputId}`);
   for (const value of values) {
     await input.click();
     await input.fill(value);
     await input.press('Enter');
-    await page.waitForTimeout(250);
+    // The chip appearing is the confirmation that Enter registered.
+    await expect(
+      page.getByRole('button', { name: new RegExp(`^Remove ${escapeRegExp(value)} ${kind}$`, 'i') }),
+    ).toBeVisible({ timeout: 5000 });
   }
 }
 
@@ -441,30 +552,20 @@ export async function findSyncableItemRow(page: Page, name: string): Promise<Loc
   // the SPA after a district switch) so we are reliably on the Data Sync page.
   await goToDataSync(page);
 
-  const pageSize = page
-    .getByRole('combobox', { name: /per page|page size|rows per page/i })
-    .or(page.getByRole('button', { name: /\d+\s*\/\s*page/i }))
-    .or(page.locator('select').filter({ hasText: /\d+\s*\/\s*page/i }))
-    .first();
-  if (await pageSize.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await pageSize.click();
-    const ok = await pageSize.selectOption({ label: '100 / page' }).catch(() => null);
-    if (!ok) {
-      await pageSize.selectOption({ label: '100/page' }).catch(async () => {
-        await page.getByRole('option', { name: /^\s*100\s*\/\s*page\s*$/i }).first().click().catch(() => undefined);
-      });
-    }
-    await page.waitForTimeout(800);
-  }
+  // setListPageSize handles both the native <select> and the combobox flavours
+  // of this control; this used to carry its own copy of that logic.
+  await setListPageSize(page, 100);
 
   const search = page.getByRole('textbox', { name: /Search( syncable| items)?/i }).first();
   if (await search.isVisible({ timeout: 5000 }).catch(() => false)) {
     await search.fill('');
     await search.fill(name);
-    await page.waitForTimeout(800);
+    await waitForListSettled(page);
   }
 
-  const row = page.locator('table tbody tr, [role="row"]').filter({ hasText: name }).first();
+  // No sleep after the search: the row assertion below auto-waits for the
+  // filtered list to render.
+  const row = page.locator(LIST_ROW_SELECTOR).filter({ hasText: name }).first();
   await expect(row).toBeVisible({ timeout: 15000 });
   return row;
 }
@@ -488,7 +589,7 @@ export async function findItemUnderLocalOverridesFilter(page: Page, name: string
     const filterBtn = page.getByRole('button', { name: /^Local Overrides$/i }).first();
     if (!(await filterBtn.isVisible({ timeout: 8000 }).catch(() => false))) continue;
     await filterBtn.click();
-    await page.waitForTimeout(1200);
+    await waitForListSettled(page);
 
     // Walk the filtered list; bail to the outer retry if the launcher reappears.
     for (let p = 0; p < 8; p++) {
@@ -499,7 +600,7 @@ export async function findItemUnderLocalOverridesFilter(page: Page, name: string
         .catch(() => false);
       if (!onDataSync) break;
 
-      const row = page.locator('table tbody tr, [role="row"]').filter({ hasText: name }).first();
+      const row = page.locator(LIST_ROW_SELECTOR).filter({ hasText: name }).first();
       if (await row.isVisible({ timeout: 3000 }).catch(() => false)) {
         await row.scrollIntoViewIfNeeded().catch(() => undefined);
         return row;
@@ -507,7 +608,7 @@ export async function findItemUnderLocalOverridesFilter(page: Page, name: string
       const next = page.getByRole('button', { name: /^Next$/i }).first();
       if (!(await next.isVisible({ timeout: 1000 }).catch(() => false)) || !(await next.isEnabled().catch(() => false))) break;
       await next.click();
-      await page.waitForTimeout(800);
+      await waitForListSettled(page);
     }
   }
   throw new Error(`findItemUnderLocalOverridesFilter: "${name}" not found under the Local Overrides filter.`);
@@ -532,7 +633,8 @@ export async function resetLocalOverride(page: Page, name: string): Promise<bool
   const details = page.getByRole('dialog').first();
   const resetBtn = details.getByRole('button', { name: /Reset Local Overrides/i }).first();
   if (!(await resetBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-    await closeOpenDialog(page);
+    // Nothing to reset — this is a tolerant probe, so don't fail on the close.
+    await closeOpenDialog(page, { required: false });
     return false;
   }
   await resetBtn.click();
@@ -542,7 +644,13 @@ export async function resetLocalOverride(page: Page, name: string): Promise<bool
     .first();
   await expect(resetDialog).toBeVisible({ timeout: 10000 });
   await resetDialog.getByRole('button', { name: /Reset Overrides|^Reset$|^Confirm$/i }).last().click();
-  await page.getByText(/Local overrides reset/i).first().isVisible({ timeout: 15000 }).catch(() => undefined);
+  // waitFor, not isVisible: isVisible resolves immediately, so the old call
+  // asserted nothing and its timeout never applied.
+  await page
+    .getByText(/Local overrides reset/i)
+    .first()
+    .waitFor({ state: 'visible', timeout: 15000 })
+    .catch(() => undefined);
   await closeOpenDialog(page);
   return true;
 }

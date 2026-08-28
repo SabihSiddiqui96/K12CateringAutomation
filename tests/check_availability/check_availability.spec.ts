@@ -51,7 +51,13 @@ async function resetToStep1(page: Page): Promise<void> {
     const backBtn = page.getByRole('button', { name: /Go back to previous step/i });
     if (await backBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
       await backBtn.click();
-      await page.waitForTimeout(600);
+      // The wizard has stepped back once either the date button reappears or the
+      // step behind this one renders; the loop re-checks, so just wait for either.
+      await page
+        .getByRole('button', { name: /Select Event Date|Continue to time selection/i })
+        .first()
+        .waitFor({ state: 'visible', timeout: 8000 })
+        .catch(() => undefined);
     } else {
       break;
     }
@@ -63,7 +69,7 @@ async function pickFirstAvailableDate(page: Page): Promise<void> {
   const datePickerBtn = page.getByRole('button', { name: /Select Event Date/i });
   await expect(datePickerBtn).toBeVisible({ timeout: 10000 });
   await datePickerBtn.click();
-  await page.waitForTimeout(500);
+  // No sleep: the calendar assertion below is the wait for it to open.
   await expect(page.getByRole('button', { name: /Previous month/i })).toBeVisible({ timeout: 5000 });
 
   const nextBtn = page.getByRole('button', { name: /Next month/i });
@@ -81,24 +87,28 @@ async function pickFirstAvailableDate(page: Page): Promise<void> {
         !aria.includes('Close')
       ) {
         await btn.click();
-        await page.waitForTimeout(400);
         const confirmBtn = page.getByRole('button', { name: /Confirm date selection/i });
-        if (await confirmBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+        if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
           await confirmBtn.click();
-          await page.waitForTimeout(600);
+          // The calendar closing is the signal the date was taken.
+          await confirmBtn.waitFor({ state: 'hidden', timeout: 8000 }).catch(() => undefined);
         }
         return;
       }
     }
     await nextBtn.click();
-    await page.waitForTimeout(400);
   }
 }
 
 async function proceedToTimeStep(page: Page): Promise<void> {
   await pickFirstAvailableDate(page);
   await page.getByRole('button', { name: /Continue to time selection/i }).click();
-  await page.waitForTimeout(1000);
+  // Landing on the time step is the observable outcome — wait for it rather than
+  // guessing a second. Best-effort: callers assert on what they actually need.
+  await page
+    .getByRole('heading', { name: /Select Event Setup Time/i })
+    .waitFor({ state: 'visible', timeout: 15000 })
+    .catch(() => undefined);
 }
 
 /**
@@ -130,7 +140,6 @@ async function proceedToResultStep(page: Page): Promise<void> {
     const timeBtn = page.getByRole('button', { name: /Select .+ for event setup/i }).first();
     if (await timeBtn.waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false)) {
       await timeBtn.click().catch(() => undefined);
-      await page.waitForTimeout(1000);
     }
 
     const landed = await page
@@ -236,6 +245,12 @@ test.describe('Check Availability', () => {
   });
 
   test('Check Availability - Page loads without errors', async () => {
+    // The absence of an error string alone would also pass on a blank page, so
+    // assert the wizard actually rendered first.
+    await expect(catering.locator('h1')).toContainText('Check Availability', { timeout: 10000 });
+    await expect(
+      catering.getByRole('button', { name: /Select Event Date/i }),
+    ).toBeVisible({ timeout: 10000 });
     await expect(catering.getByText(/Error Code: 404|something went wrong/i)).not.toBeVisible();
   });
 
@@ -243,7 +258,6 @@ test.describe('Check Availability', () => {
 
   test('Check Availability - Select Event Date button opens date picker', async () => {
     await catering.getByRole('button', { name: /Select Event Date/i }).click();
-    await catering.waitForTimeout(500);
 
     await expect(
       catering.getByRole('button', { name: /Previous month/i }),
@@ -259,7 +273,6 @@ test.describe('Check Availability', () => {
 
   test('Check Availability - Date picker has previous and next month navigation', async () => {
     await catering.getByRole('button', { name: /Select Event Date/i }).click();
-    await catering.waitForTimeout(500);
 
     await expect(catering.getByRole('button', { name: /Previous month/i })).toBeVisible({ timeout: 5000 });
     await expect(catering.getByRole('button', { name: /Next month/i })).toBeVisible({ timeout: 5000 });
@@ -298,7 +311,6 @@ test.describe('Check Availability', () => {
   test('Check Availability - Back button at time step returns to date step', async () => {
     await proceedToTimeStep(catering);
     await catering.getByRole('button', { name: /Go back to previous step/i }).click();
-    await catering.waitForTimeout(800);
 
     await expect(
       catering
@@ -341,7 +353,6 @@ test.describe('Check Availability', () => {
   test('Check Availability - Back button at result step returns to time step', async () => {
     await proceedToResultStep(catering);
     await catering.getByRole('button', { name: /Go back to previous step/i }).click();
-    await catering.waitForTimeout(800);
 
     await expect(
       catering.getByRole('heading', { name: /Select Event Setup Time/i }),

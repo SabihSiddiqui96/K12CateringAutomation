@@ -8,6 +8,7 @@ import {
   navigateK12CateringMenu,
   scrollUntilVisible,
   dismissReauthInterstitial,
+  escapeRegExp,
 } from '../../utils/helpers';
 import { getEnvVar } from '../../utils/env';
 
@@ -15,10 +16,6 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const ENV_LABEL =
   getEnvVar('ENVIRONMENT_LABEL', { required: false }) || 'QA (PrimeroEdge)';
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 async function goToDistricts(page: Page): Promise<void> {
   await dismissReauthInterstitial(page);

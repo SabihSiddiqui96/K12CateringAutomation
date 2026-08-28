@@ -2,14 +2,11 @@ import { test, expect, Page } from '@playwright/test';
 import {
   loginToK12Catering,
   navigateK12CateringMenu,
+  escapeRegExp,
 } from '../../utils/helpers';
 import { getEnvVar } from '../../utils/env';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 test.describe('Guest Menu', () => {
   let catering: Page;

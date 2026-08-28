@@ -2,13 +2,10 @@ import { test, expect, Page } from '@playwright/test';
 import {
   loginToK12Catering,
   navigateK12CateringMenu,
+  escapeRegExp,
 } from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 test.describe('Orders', () => {
   let catering: Page;
@@ -32,9 +29,15 @@ test.describe('Orders', () => {
   test('Orders - Page heading, stat cards (Total, Status, Revenue) are displayed', async () => {
     await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible({ timeout: 10000 });
     await expect(catering.getByText('Track and manage all your orders')).toBeVisible();
+    // A bare digit match would pass on a card rendering "0 undefined" — assert the
+    // count actually parses to a non-negative whole number instead.
     const totalCard = catering.getByRole('button', { name: /Total orders:/i });
     await expect(totalCard).toBeVisible({ timeout: 10000 });
-    expect(await totalCard.textContent()).toMatch(/\d+/);
+    const totalLabel = (await totalCard.getAttribute('aria-label')) ?? '';
+    const totalMatch = totalLabel.match(/Total orders:\s*([\d,]+)/i);
+    expect(totalMatch, `Total orders card had no count: "${totalLabel}"`).not.toBeNull();
+    const totalOrders = Number(totalMatch![1].replace(/,/g, ''));
+    expect(Number.isInteger(totalOrders) && totalOrders >= 0).toBeTruthy();
     await expect(catering.getByRole('button', { name: /Accepted orders:/i })).toBeVisible({ timeout: 10000 });
     await expect(
       catering.getByRole('button', { name: /Completed orders/i })
@@ -42,7 +45,11 @@ test.describe('Orders', () => {
     ).toBeVisible({ timeout: 10000 });
     const revenueCard = catering.getByRole('button', { name: /Total Revenue:/i });
     await expect(revenueCard).toBeVisible({ timeout: 10000 });
-    expect(await revenueCard.textContent()).toMatch(/\$/);
+    const revenueLabel = (await revenueCard.getAttribute('aria-label')) ?? '';
+    const revenueMatch = revenueLabel.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+    expect(revenueMatch, `Total Revenue card had no amount: "${revenueLabel}"`).not.toBeNull();
+    const revenue = Number(revenueMatch![1].replace(/,/g, ''));
+    expect(Number.isFinite(revenue) && revenue >= 0).toBeTruthy();
   });
 
   test('Orders - Order list shows cards with required fields, status badge, and pagination', async () => {

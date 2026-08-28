@@ -4,6 +4,7 @@ import { expect, Page, test } from '@playwright/test';
 import {
   loginToK12Catering,
   navigateK12CateringMenu,
+  escapeRegExp,
 } from '../../utils/helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -19,10 +20,6 @@ const testLocation = {
   state: 'Texas',
   zipCode: '77498',
 };
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 async function openAddLocationForm(page: Page): Promise<void> {
   const addLocationButton = page
