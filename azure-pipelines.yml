@@ -55,7 +55,11 @@ stages:
     jobs:
       - job: PlaywrightTests
         displayName: Playwright smoke tests
-        timeoutInMinutes: 120
+        # 141 tests at --workers=1 outgrew the old 120-minute cap: build 554696
+        # (20260828.1) was cancelled at 2h00m, which loses the results artifact
+        # entirely, so the notify step and the 09:00 re-run both had nothing to
+        # read. 240 still finishes the ~3am run well before the 09:00 re-run.
+        timeoutInMinutes: 240
         steps:
           - checkout: self
 
