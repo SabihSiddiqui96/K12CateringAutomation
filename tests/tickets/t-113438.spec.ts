@@ -780,12 +780,11 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       await expect(itemToggle()).toBeChecked({ timeout: 10000 });
 
       await itemRow().getByRole('button', { name: /^Details$/i }).first().click();
-      await expect(
-        catering
-          .getByRole('dialog')
-          .getByRole('heading', { name: /Item Details/i })
-          .first(),
-      ).toBeVisible({ timeout: 10000 });
+      // Assert the dialog itself rather than a heading named "Item Details": the
+      // dialog carries no such heading, so this could never pass, and it burned the
+      // full 180s toPass budget every run looking for it. Step 12 below opens the
+      // very same dialog and checks getByRole('dialog') — match that.
+      await expect(catering.getByRole('dialog').first()).toBeVisible({ timeout: 10000 });
       await closeOpenDialog(catering);
     }).toPass({ timeout: 180000, intervals: [2000, 5000, 8000] });
   });

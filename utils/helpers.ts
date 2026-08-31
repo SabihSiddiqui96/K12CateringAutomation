@@ -457,8 +457,10 @@ export async function dismissReauthInterstitial(page: Page): Promise<void> {
       /automatically authenticated and redirected to Catering/i
     );
     if (!(await banner.isVisible({ timeout: 1000 }).catch(() => false))) {
+      if (i > 0) console.log(`[reauth] interstitial cleared after ${i} attempt(s)`);
       return;
     }
+    console.log(`[reauth] interstitial visible, attempt ${i + 1}/3 at ${page.url().slice(0, 80)}`);
     // The link's accessible name is exactly "link". Click it to skip the ~5s
     // auto-redirect. Keep the click and the networkidle: navigating to its href
     // looks tidier, but a locator handler calls this on almost every assertion,
