@@ -48,20 +48,35 @@ export async function selectFirstContactCardInSection(page: Page, sectionHeading
  *  Iterates from the LAST available date so we get a clearly-future date, not today. */
 export async function selectAvailableEventDate(page: Page): Promise<string> {
   await page.getByRole('button', { name: ORDER.selectEventDate }).click();
-  const allDateButtons = page.locator('button[aria-label*=", 2026"]:not([disabled])');
-  const count = await allDateButtons.count();
-  for (let i = count - 1; i >= 0; i--) {
-    const btn = allDateButtons.nth(i);
-    const label = (await btn.getAttribute('aria-label')) ?? '';
-    const dateMatch = label.match(/\w+,\s+(\w+\s+\d+,\s+\d+)/);
-    if (dateMatch) {
-      const day = new Date(dateMatch[1]).getDay();
-      if (day === 0 || day === 6) continue; // skip weekends
+
+  // Search this month, then walk forward. The picker opens on the current month, and
+  // near the end of one every remaining weekday can be inside the order lead time —
+  // so there is nothing bookable left in view and no amount of retrying finds one.
+  // Without advancing the calendar this throws for a calendar reason that looks
+  // exactly like a broken checkout (2026-08-30 and 08-31: both t-118254 tests failed
+  // this way on month-end, having passed all month).
+  for (let month = 0; month < 4; month += 1) {
+    // Year-agnostic on purpose: the label carries a 4-digit year, and pinning it to
+    // one silently empties this list the day the calendar rolls into the next year.
+    const allDateButtons = page.locator('button[aria-label*=", 20"]:not([disabled])');
+    const count = await allDateButtons.count();
+    for (let i = count - 1; i >= 0; i--) {
+      const btn = allDateButtons.nth(i);
+      const label = (await btn.getAttribute('aria-label')) ?? '';
+      const dateMatch = label.match(/\w+,\s+(\w+\s+\d+,\s+\d+)/);
+      if (dateMatch) {
+        const day = new Date(dateMatch[1]).getDay();
+        if (day === 0 || day === 6) continue; // skip weekends
+      }
+      await btn.click({ force: true });
+      await page.waitForTimeout(300);
+      const hasError = await page.getByText(/not available for events/i).isVisible().catch(() => false);
+      if (!hasError) return dateMatch ? dateMatch[1] : '';
     }
-    await btn.click({ force: true });
-    await page.waitForTimeout(300);
-    const hasError = await page.getByText(/not available for events/i).isVisible().catch(() => false);
-    if (!hasError) return dateMatch ? dateMatch[1] : '';
+    const next = page.getByRole('button', { name: /next month/i }).first();
+    if (!(await next.isVisible({ timeout: 2000 }).catch(() => false))) break;
+    await next.click();
+    await page.waitForTimeout(400);
   }
   throw new Error('Could not find an available event date');
 }

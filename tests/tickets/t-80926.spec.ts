@@ -328,8 +328,14 @@ async function selectFirstContactCardInSection(
 async function selectAvailableEventDate(page: Page) {
   await page.getByRole('button', { name: selectEventDate }).click();
 
+  // Year-agnostic: pinning the year silently empties this list the day the calendar
+  // rolls into the next one. (utils/orders.ts had the same literal.)
+  // NOTE: this copy still only searches the CURRENTLY DISPLAYED month, so it can
+  // still come up empty at month-end when every remaining weekday is inside the
+  // order lead time. utils/orderFlow.ts shows the fix — walk forward with the
+  // "Next month" button. Left alone here because this spec was not re-run today.
   const allDateButtons = page.locator(
-    'button[aria-label*=", 2026"]:not([disabled])',
+    'button[aria-label*=", 20"]:not([disabled])',
   );
   const count = await allDateButtons.count();
 
