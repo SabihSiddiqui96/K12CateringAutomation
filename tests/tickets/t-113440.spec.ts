@@ -13,6 +13,7 @@ import { getEnvVar, getRequiredEnvVar } from '../../utils/env';
 import { getK12CateringLoginUrl } from '../../utils/baseUrl';
 import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
 import { switchToCustomerDistrict } from '../../utils/dataSync';
+import { getCustomerPassword } from '../../utils/testData';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -506,7 +507,7 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
   const renamedMenuNumber = menuNumber === 999 ? 100 : menuNumber + 1;
   const menuName = `${menuNumber} - SabihTesting`;
   const renamedMenuName = `${renamedMenuNumber} - SabihTesting`;
-  const customerPassword = 'Password1!';
+  const customerPassword = getCustomerPassword();
 
   try {
     await openManageMenus(catering);

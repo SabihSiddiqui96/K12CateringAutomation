@@ -5,10 +5,11 @@ import { loginToK12Catering, getCustomerAccountEmail } from '../../utils/helpers
 import { ensureInK12CateringApp, clickSidebarItem } from '../../utils/dataSync';
 import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
 import { getK12CateringUrl, getK12CateringLoginUrl } from '../../utils/baseUrl';
+import { getCustomerPassword } from '../../utils/testData';
 
 // QA: SabihQATesting@outlook.com — UAT: SiddiquiUATTesting@outlook.com (under Alief ISD).
 const CUSTOMER_EMAIL = getCustomerAccountEmail();
-const CUSTOMER_PASSWORD = 'Password1!';
+const CUSTOMER_PASSWORD = getCustomerPassword();
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

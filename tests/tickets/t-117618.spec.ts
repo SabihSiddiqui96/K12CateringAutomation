@@ -232,150 +232,160 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
   await selectTheRealMenu(catering);
 
   const dupName = `Dup117618-${randomFourDigits()}`;
+  // Captured in the first step, compared against in two later ones.
+  let originalItems: string[] = [];
 
   try {
-    // ── Capture the original menu's items ─────────────────────────────────────
-    await selectMenuFromDropdown(catering, ORIGINAL_MENU);
-    const originalItems = await menuItemNames(catering);
-    expect(
-      originalItems.length,
-      `${ORIGINAL_MENU} should have menu items to copy`,
-    ).toBeGreaterThan(0);
+    await test.step('Capture the original menu\'s items', async () => {
+      await selectMenuFromDropdown(catering, ORIGINAL_MENU);
+      originalItems = await menuItemNames(catering);
+      expect(
+        originalItems.length,
+        `${ORIGINAL_MENU} should have menu items to copy`,
+      ).toBeGreaterThan(0);
+    });
 
-    // ── Duplicate the menu ────────────────────────────────────────────────────
-    await openManageMenus(catering);
-    await expect(
-      catering.getByRole('button', {
-        name: menuButtonName('Duplicate', ORIGINAL_MENU),
-      }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering
-      .getByRole('button', { name: menuButtonName('Duplicate', ORIGINAL_MENU) })
-      .click();
+    await test.step('Duplicate the menu', async () => {
+      await openManageMenus(catering);
+      await expect(
+        catering.getByRole('button', {
+          name: menuButtonName('Duplicate', ORIGINAL_MENU),
+        }),
+      ).toBeVisible({ timeout: 10000 });
+      await catering
+        .getByRole('button', { name: menuButtonName('Duplicate', ORIGINAL_MENU) })
+        .click();
 
-    await expect(
-      catering.getByRole('heading', { name: `Duplicate "${ORIGINAL_MENU}"` }),
-    ).toBeVisible({ timeout: 10000 });
-    const dupNameInput = catering.locator('#duplicate-menu-name');
-    await expect(dupNameInput).toBeVisible({ timeout: 10000 });
+      await expect(
+        catering.getByRole('heading', { name: `Duplicate "${ORIGINAL_MENU}"` }),
+      ).toBeVisible({ timeout: 10000 });
+      const dupNameInput = catering.locator('#duplicate-menu-name');
+      await expect(dupNameInput).toBeVisible({ timeout: 10000 });
 
-    // A new name is required: with the field empty the "Create menu" button is
-    // disabled (or, if clickable, no menu is created).
-    const createBtn = catering.getByRole('button', { name: /^Create menu$/i });
-    await dupNameInput.fill('');
-    if (await createBtn.isDisabled().catch(() => false)) {
-      await expect(createBtn).toBeDisabled();
-    } else {
+      // A new name is required: with the field empty the "Create menu" button is
+      // disabled (or, if clickable, no menu is created).
+      const createBtn = catering.getByRole('button', { name: /^Create menu$/i });
+      await dupNameInput.fill('');
+      if (await createBtn.isDisabled().catch(() => false)) {
+        await expect(createBtn).toBeDisabled();
+      } else {
+        await createBtn.click();
+        await expect(dupNameInput).toBeVisible(); // still on the prompt — not created
+      }
+
+      // Enter a unique name and create the copy. The launcher often fires right
+      // after submit (wiping the transient toast), so confirm via the durable
+      // Manage Menus row — re-creating if the launcher ate the submit.
+      await dupNameInput.fill(dupName);
       await createBtn.click();
-      await expect(dupNameInput).toBeVisible(); // still on the prompt — not created
-    }
+      await catering
+        .getByText(/Menu (created|duplicated)|duplicated/i)
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .catch(() => { });
+      await reauthIfLauncher(catering);
+      await ensureDuplicateExists(catering, ORIGINAL_MENU, dupName);
+      await closeManageMenus(catering);
+    });
 
-    // Enter a unique name and create the copy. The launcher often fires right
-    // after submit (wiping the transient toast), so confirm via the durable
-    // Manage Menus row — re-creating if the launcher ate the submit.
-    await dupNameInput.fill(dupName);
-    await createBtn.click();
-    await catering
-      .getByText(/Menu (created|duplicated)|duplicated/i)
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .catch(() => { });
-    await reauthIfLauncher(catering);
-    await ensureDuplicateExists(catering, ORIGINAL_MENU, dupName);
-    await closeManageMenus(catering);
+    await test.step('The copy has the SAME items as the original', async () => {
+      await selectMenuFromDropdown(catering, dupName);
+      const dupItems = await menuItemNames(catering);
+      expect(dupItems).toEqual(originalItems);
+    });
 
-    // ── The copy has the SAME items as the original ───────────────────────────
-    await selectMenuFromDropdown(catering, dupName);
-    const dupItems = await menuItemNames(catering);
-    expect(dupItems).toEqual(originalItems);
+    await test.step('The original is unchanged', async () => {
+      await selectMenuFromDropdown(catering, ORIGINAL_MENU);
+      const originalAfter = await menuItemNames(catering);
+      expect(originalAfter).toEqual(originalItems);
+    });
 
-    // ── The original is unchanged ─────────────────────────────────────────────
-    await selectMenuFromDropdown(catering, ORIGINAL_MENU);
-    const originalAfter = await menuItemNames(catering);
-    expect(originalAfter).toEqual(originalItems);
+    await test.step('"Sort Items" per-menu warning (ADO 117618 comment)', async () => {
+      // The per-category "Sort menu items in <category>" dialog warns the reorder
+      // applies to THIS menu only. Verify that text, then Cancel (the actual drag
+      // reorder + cross-menu comparison stay manual).
+      const sortItemsBtn = catering
+        .locator('#main-content')
+        .getByRole('button', { name: /^Sort menu items in /i })
+        .first();
+      await expect(sortItemsBtn).toBeVisible({ timeout: 10000 });
+      await sortItemsBtn.click();
+      const sortDialog = catering.getByRole('dialog').first();
+      await expect(
+        sortDialog.getByRole('heading', { name: /Sort menu item order/i }),
+      ).toBeVisible({ timeout: 10000 });
+      await expect(sortDialog).toContainText(
+        /This will only update the display order of items in the .+ category of .+/i,
+      );
+      await expect(sortDialog).toContainText(
+        /go to the editing mode for All Items at the top of the screen/i,
+      );
+      await sortDialog.getByRole('button', { name: /^Cancel$/i }).click();
+      await expect(sortDialog).not.toBeVisible({ timeout: 8000 });
+    });
 
-    // ── "Sort Items" per-menu warning (ADO 117618 comment) ────────────────────
-    // The per-category "Sort menu items in <category>" dialog warns the reorder
-    // applies to THIS menu only. Verify that text, then Cancel (the actual drag
-    // reorder + cross-menu comparison stay manual).
-    const sortItemsBtn = catering
-      .locator('#main-content')
-      .getByRole('button', { name: /^Sort menu items in /i })
-      .first();
-    await expect(sortItemsBtn).toBeVisible({ timeout: 10000 });
-    await sortItemsBtn.click();
-    const sortDialog = catering.getByRole('dialog').first();
-    await expect(
-      sortDialog.getByRole('heading', { name: /Sort menu item order/i }),
-    ).toBeVisible({ timeout: 10000 });
-    await expect(sortDialog).toContainText(
-      /This will only update the display order of items in the .+ category of .+/i,
-    );
-    await expect(sortDialog).toContainText(
-      /go to the editing mode for All Items at the top of the screen/i,
-    );
-    await sortDialog.getByRole('button', { name: /^Cancel$/i }).click();
-    await expect(sortDialog).not.toBeVisible({ timeout: 8000 });
+    await test.step('"Select all" in the Add-Items pop-up (run on the throwaway duplicate)', async () => {
+      await openItemsDialog(catering, dupName);
+      const before = await checkboxStats(catering);
+      expect(before.total).toBeGreaterThan(0);
 
-    // ── "Select all" in the Add-Items pop-up (run on the throwaway duplicate) ──
-    await openItemsDialog(catering, dupName);
-    const before = await checkboxStats(catering);
-    expect(before.total).toBeGreaterThan(0);
+      await catering.getByRole('button', { name: /^Select all$/i }).click();
+      await expect
+        .poll(async () => (await checkboxStats(catering)).checked)
+        .toBe(before.total);
 
-    await catering.getByRole('button', { name: /^Select all$/i }).click();
-    await expect
-      .poll(async () => (await checkboxStats(catering)).checked)
-      .toBe(before.total);
+      // Deselect one item — only the still-selected items should be saved.
+      const firstCheckbox = catering.getByRole('checkbox').first();
+      const deselectedName =
+        (await firstCheckbox.getAttribute('aria-label')) ?? '(first item)';
+      await firstCheckbox.uncheck();
+      await expect
+        .poll(async () => (await checkboxStats(catering)).checked)
+        .toBe(before.total - 1);
 
-    // Deselect one item — only the still-selected items should be saved.
-    const firstCheckbox = catering.getByRole('checkbox').first();
-    const deselectedName =
-      (await firstCheckbox.getAttribute('aria-label')) ?? '(first item)';
-    await firstCheckbox.uncheck();
-    await expect
-      .poll(async () => (await checkboxStats(catering)).checked)
-      .toBe(before.total - 1);
+      await catering.getByRole('button', { name: /^Save$/ }).click();
+      await expect(
+        catering.getByText(/updated|saved|success/i).first(),
+      ).toBeVisible({ timeout: 10000 });
 
-    await catering.getByRole('button', { name: /^Save$/ }).click();
-    await expect(
-      catering.getByText(/updated|saved|success/i).first(),
-    ).toBeVisible({ timeout: 10000 });
+      // Re-open the pop-up: the saved selection persisted — every item except the
+      // one we deselected (count is order-independent, so reordering is fine).
+      await ensureMenuPage(catering);
+      await openItemsDialog(catering, dupName);
+      const after = await checkboxStats(catering);
+      expect(after.total).toBe(before.total);
+      expect(
+        after.checked,
+        `Expected all but the deselected "${deselectedName}" to be saved`,
+      ).toBe(before.total - 1);
+      await catering.getByRole('button', { name: /Back to Manage Menus/i }).click();
+      await expect(
+        catering.getByRole('heading', { name: 'Manage Menus' }),
+      ).toBeVisible({ timeout: 8000 });
+    });
 
-    // Re-open the pop-up: the saved selection persisted — every item except the
-    // one we deselected (count is order-independent, so reordering is fine).
-    await ensureMenuPage(catering);
-    await openItemsDialog(catering, dupName);
-    const after = await checkboxStats(catering);
-    expect(after.total).toBe(before.total);
-    expect(
-      after.checked,
-      `Expected all but the deselected "${deselectedName}" to be saved`,
-    ).toBe(before.total - 1);
-    await catering.getByRole('button', { name: /Back to Manage Menus/i }).click();
-    await expect(
-      catering.getByRole('heading', { name: 'Manage Menus' }),
-    ).toBeVisible({ timeout: 8000 });
+    await test.step('Delete-with-items just deletes (ADO 117618 comment)', async () => {
+      // The duplicate still has items (Select all added them). Deleting it now must
+      // JUST delete — the app clears the items for us — with NO "remove items first"
+      // error; only the Delete Menu prompt warns.
+      await catering
+        .getByRole('button', { name: menuButtonName('Delete', dupName) })
+        .click();
+      await expect(
+        catering.getByRole('heading', { name: 'Delete Menu' }),
+      ).toBeVisible({ timeout: 10000 });
+      await catering.getByRole('button', { name: /^Delete$/ }).last().click();
+      await expect(
+        catering.getByText(/Menu deleted/i).first(),
+      ).toBeVisible({ timeout: 12000 });
+      await expect(
+        catering.getByText(
+          /cannot be deleted|clear the items first|remove items first/i,
+        ),
+      ).toHaveCount(0);
+      await closeManageMenus(catering);
+    });
 
-    // ── Delete-with-items just deletes (ADO 117618 comment) ───────────────────
-    // The duplicate still has items (Select all added them). Deleting it now must
-    // JUST delete — the app clears the items for us — with NO "remove items first"
-    // error; only the Delete Menu prompt warns.
-    await catering
-      .getByRole('button', { name: menuButtonName('Delete', dupName) })
-      .click();
-    await expect(
-      catering.getByRole('heading', { name: 'Delete Menu' }),
-    ).toBeVisible({ timeout: 10000 });
-    await catering.getByRole('button', { name: /^Delete$/ }).last().click();
-    await expect(
-      catering.getByText(/Menu deleted/i).first(),
-    ).toBeVisible({ timeout: 12000 });
-    await expect(
-      catering.getByText(
-        /cannot be deleted|clear the items first|remove items first/i,
-      ),
-    ).toHaveCount(0);
-    await closeManageMenus(catering);
   } finally {
     // Backup cleanup if the test failed before the delete step above.
     await deleteMenu(catering, dupName);

@@ -8,6 +8,7 @@ import {
   scrollUntilVisible,
   getTextFromLocator,
   getInputValueFromLocator,
+  waitForListSettled,
 } from '../../utils/helpers';
 import { downloadInvoiceWithOptions } from '../../utils/orders';
 
@@ -373,397 +374,416 @@ test('Catering - Settings - Add district customization settings for Payment disp
 
   const catering = await loginToK12Catering(page, { navigateTo: 'Settings' });
 
+  // Set in the Format Requirements step and asserted by several later ones.
+  let newAccountingStringDescriptionValue = '';
+
   await catering.waitForLoadState('domcontentloaded');
-  await catering.waitForTimeout(2000);
+  await waitForListSettled(catering);
 
-  // ── Payment Display Label ──────────────────────────────────────────────────
+  await test.step('Payment Display Label', async () => {
 
-  await scrollUntilVisible(catering, {
-    target: catering.getByText(paymentDisplayLabel, { exact: false }),
-  });
+    await scrollUntilVisible(catering, {
+      target: catering.getByText(paymentDisplayLabel, { exact: false }),
+    });
 
-  await expect(
-    catering.getByText(paymentDisplayLabel, { exact: false }),
-  ).toBeVisible();
-  await expect(
-    catering.getByText(paymentFieldFormatRequirementsLabel, { exact: false }),
-  ).toBeVisible();
+    await expect(
+      catering.getByText(paymentDisplayLabel, { exact: false }),
+    ).toBeVisible();
+    await expect(
+      catering.getByText(paymentFieldFormatRequirementsLabel, { exact: false }),
+    ).toBeVisible();
 
-  const accountingStringDescriptionRow = catering
-    .locator('h3', { hasText: paymentDisplayLabel })
-    .locator("xpath=ancestor::div[contains(@class, 'flex')][2]");
+    const accountingStringDescriptionRow = catering
+      .locator('h3', { hasText: paymentDisplayLabel })
+      .locator("xpath=ancestor::div[contains(@class, 'flex')][2]");
 
-  const originalDisplayedValue = await getTextFromLocator(
-    catering,
-    accountingStringDescriptionRow.locator('p').first(),
-  );
+    const originalDisplayedValue = await getTextFromLocator(
+      catering,
+      accountingStringDescriptionRow.locator('p').first(),
+    );
 
-  await clickEditButtonForSetting(
-    catering,
-    paymentDisplayLabel,
-    'Edit accounting string description',
-  );
+    await clickEditButtonForSetting(
+      catering,
+      paymentDisplayLabel,
+      'Edit accounting string description',
+    );
 
-  const originalInputValue = await getInputValueFromLocator(
-    catering,
-    '#accounting-string-description-input',
-  );
-  expect(originalInputValue).toBe(originalDisplayedValue);
-
-  const newAccountingStringDescriptionValue =
-    generateRandomAccountingStringDescription();
-  const descriptionInput = catering.locator(
-    '#accounting-string-description-input',
-  );
-  await descriptionInput.fill('');
-  await descriptionInput.fill(newAccountingStringDescriptionValue);
-
-  expect(
-    await getInputValueFromLocator(
+    const originalInputValue = await getInputValueFromLocator(
       catering,
       '#accounting-string-description-input',
-    ),
-  ).toBe(newAccountingStringDescriptionValue);
+    );
+    expect(originalInputValue).toBe(originalDisplayedValue);
 
-  await catering.getByRole('button', { name: saveChangesBtn }).click();
+    newAccountingStringDescriptionValue =
+      generateRandomAccountingStringDescription();
+    const descriptionInput = catering.locator(
+      '#accounting-string-description-input',
+    );
+    await descriptionInput.fill('');
+    await descriptionInput.fill(newAccountingStringDescriptionValue);
 
-  const descriptionToast = catering.getByRole('alert');
-  await expect(descriptionToast).toBeVisible({ timeout: 10000 });
-  await expect(descriptionToast).toContainText(updateDescriptionSuccessTitle);
-  await expect(descriptionToast).toContainText(updateDescriptionSuccessBody);
-  await catering.waitForTimeout(1000);
-  await expect(descriptionToast).not.toBeVisible({ timeout: 30000 });
+    expect(
+      await getInputValueFromLocator(
+        catering,
+        '#accounting-string-description-input',
+      ),
+    ).toBe(newAccountingStringDescriptionValue);
 
-  const descriptionSection = catering
-    .getByLabel('Edit accounting string description')
-    .locator(
-      "xpath=ancestor::div[.//h3[contains(normalize-space(),'Payment display label')]][1]",
+    await catering.getByRole('button', { name: saveChangesBtn }).click();
+
+    const descriptionToast = catering.getByRole('alert');
+    await expect(descriptionToast).toBeVisible({ timeout: 10000 });
+    await expect(descriptionToast).toContainText(updateDescriptionSuccessTitle);
+    await expect(descriptionToast).toContainText(updateDescriptionSuccessBody);
+    await catering.waitForTimeout(1000);
+    await expect(descriptionToast).not.toBeVisible({ timeout: 30000 });
+
+    const descriptionSection = catering
+      .getByLabel('Edit accounting string description')
+      .locator(
+        "xpath=ancestor::div[.//h3[contains(normalize-space(),'Payment display label')]][1]",
+      );
+
+    expect(
+      await getTextFromLocator(catering, descriptionSection.locator('p').first()),
+    ).toBe(newAccountingStringDescriptionValue);
+  });
+
+  await test.step('Format Requirements', async () => {
+
+    await clickEditButtonForSetting(
+      catering,
+      paymentFieldFormatRequirementsLabel,
+      'Edit accounting string requirements',
     );
 
-  expect(
-    await getTextFromLocator(catering, descriptionSection.locator('p').first()),
-  ).toBe(newAccountingStringDescriptionValue);
+    await expect(
+      catering.getByRole('heading', {
+        name: editFormatRequirementsDialogTitle,
+        exact: false,
+      }),
+    ).toBeVisible();
 
-  // ── Format Requirements ───────────────────────────────────────────────────
+    const requirementsSelect = catering.locator(formatRuleDropdown);
+    await expect(requirementsSelect).toBeVisible();
 
-  await clickEditButtonForSetting(
-    catering,
-    paymentFieldFormatRequirementsLabel,
-    'Edit accounting string requirements',
-  );
-
-  await expect(
-    catering.getByRole('heading', {
-      name: editFormatRequirementsDialogTitle,
-      exact: false,
-    }),
-  ).toBeVisible();
-
-  const requirementsSelect = catering.locator(formatRuleDropdown);
-  await expect(requirementsSelect).toBeVisible();
-
-  // Reset to known state
-  await requirementsSelect.selectOption({ label: 'Allow any text' });
-  await expect(catering.locator(formatRuleDescriptionText)).toContainText(
-    'No format check',
-  );
-
-  // Verify all dropdown options exist
-  const options = (
-    await requirementsSelect.locator('option').allTextContents()
-  ).map((o) => o.trim());
-  expect(options).toEqual([
-    'Allow any text',
-    'Exactly 9 digits',
-    'Exactly 10 digits',
-    'Letters and numbers only',
-    'Letters, numbers, and spaces',
-    'Digits with optional dashes',
-    'Custom pattern (advanced)',
-  ]);
-
-  // Verify each option's description and stored pattern
-  for (const option of formatRuleOptionsToVerify) {
-    await requirementsSelect.selectOption({ label: option.optionName });
+    // Reset to known state
+    await requirementsSelect.selectOption({ label: 'Allow any text' });
     await expect(catering.locator(formatRuleDescriptionText)).toContainText(
-      option.expectedDescription,
+      'No format check',
     );
 
-    if (option.expectedStoredPattern) {
-      const storedPatternLabel = catering
-        .getByText('Stored pattern', { exact: false })
-        .first();
-      await expect(storedPatternLabel).toBeVisible();
+    // Verify all dropdown options exist
+    const options = (
+      await requirementsSelect.locator('option').allTextContents()
+    ).map((o) => o.trim());
+    expect(options).toEqual([
+      'Allow any text',
+      'Exactly 9 digits',
+      'Exactly 10 digits',
+      'Letters and numbers only',
+      'Letters, numbers, and spaces',
+      'Digits with optional dashes',
+      'Custom pattern (advanced)',
+    ]);
 
-      await expect
-        .poll(
-          async () =>
-            (
-              (await storedPatternLabel.locator('xpath=..').textContent()) ?? ''
-            ).trim(),
-          {
-            timeout: 5000,
-            intervals: [250, 500, 1000],
-          },
-        )
-        .toContain(option.expectedStoredPattern);
+    // Verify each option's description and stored pattern
+    for (const option of formatRuleOptionsToVerify) {
+      await requirementsSelect.selectOption({ label: option.optionName });
+      await expect(catering.locator(formatRuleDescriptionText)).toContainText(
+        option.expectedDescription,
+      );
+
+      if (option.expectedStoredPattern) {
+        const storedPatternLabel = catering
+          .getByText('Stored pattern', { exact: false })
+          .first();
+        await expect(storedPatternLabel).toBeVisible();
+
+        await expect
+          .poll(
+            async () =>
+              (
+                (await storedPatternLabel.locator('xpath=..').textContent()) ?? ''
+              ).trim(),
+            {
+              timeout: 5000,
+              intervals: [250, 500, 1000],
+            },
+          )
+          .toContain(option.expectedStoredPattern);
+      }
     }
-  }
 
-  // Verify custom pattern option
-  await requirementsSelect.selectOption({ label: 'Custom pattern (advanced)' });
-  await expect(catering.locator(formatRuleDescriptionText)).toContainText(
-    'Enter a valid JavaScript regular expression below (required)',
-  );
-  await expect(catering.locator(customPatternHintText)).toBeVisible();
-  await expect(catering.locator(customPatternInput)).toBeVisible();
-
-  // Verify error shown when saving without regex
-  const saveButton = catering.getByRole('button', { name: saveChangesBtn });
-  await saveButton.scrollIntoViewIfNeeded();
-  await saveButton.click();
-  await expect(catering.locator(customPatternError)).toBeVisible();
-
-  // Reset to Allow any text and save
-  await requirementsSelect.selectOption({ label: 'Allow any text' });
-  await saveButton.scrollIntoViewIfNeeded();
-  await saveButton.click();
-
-  const requirementsToast = catering.getByRole('alert');
-  await expect(requirementsToast).toBeVisible({ timeout: 10000 });
-  await expect(requirementsToast).toContainText(updateRequirementsSuccessTitle);
-  await expect(requirementsToast).toContainText(updateRequirementsSuccessBody);
-  await catering.waitForTimeout(1000);
-  await expect(requirementsToast).not.toBeVisible({ timeout: 30000 });
-
-  // ── Add to Cart ───────────────────────────────────────────────────────────
-
-  await navigateK12CateringMenu(catering, 'Menu');
-
-  const firstAddToCartButton = catering
-    .getByRole('button', { name: addToCardBtn })
-    .first();
-  await expect(firstAddToCartButton).toBeVisible();
-  await firstAddToCartButton.click();
-
-  const addToCartModal = catering
-    .getByText('Add to Cart', { exact: true })
-    .locator("xpath=ancestor::div[contains(@class,'rounded-lg')][1]");
-
-  await expect(
-    addToCartModal.getByRole('button', { name: addToCardBtn }).first(),
-  ).toBeVisible();
-  await addToCartModal
-    .getByRole('button', { name: addToCardBtn })
-    .first()
-    .click();
-
-  await catering.getByRole('button', { name: proceedToCheckoutBtn }).click();
-
-  // ── Event Date ────────────────────────────────────────────────────────────
-
-  await selectAvailableEventDate(catering);
-  await expect(
-    catering.getByText(/not available for events/i),
-  ).not.toBeVisible();
-  await clickNext(catering);
-
-  // ── Event Time ────────────────────────────────────────────────────────────
-
-  await pickTimeAndConfirm(catering, eventStartTime);
-  await pickTimeAndConfirm(catering, eventEndTime);
-  await clickNext(catering);
-
-  // ── Setup Time ────────────────────────────────────────────────────────────
-
-  await pickTimeAndConfirm(catering, setupTimeBtn);
-  await clickNext(catering);
-
-  // ── Delivery Contact ──────────────────────────────────────────────────────
-
-  await catering
-    .getByRole('button', { name: /Select from Address Book/i })
-    .click();
-  await selectFirstContactCardInSection(catering, /Select Contact/i);
-
-  await clickNext(catering);
-
-  // ── Additional Details ────────────────────────────────────────────────────
-
-  const numGuestsInput = catering.locator('#num-guests-input');
-  await expect(numGuestsInput).toBeVisible();
-  await numGuestsInput.fill('2');
-  // Event Name (or Nickname) is a new REQUIRED field at Additional Details (ADO 117619);
-  // without it the "Next" button stays disabled.
-  const eventNameInput = catering.locator('#event-name-input');
-  if (await eventNameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await eventNameInput.fill('Automation Event');
-  }
-  await clickNext(catering);
-
-  // ── Payment Info ──────────────────────────────────────────────────────────
-
-  const paymentMethodLabel = catering
-    .locator('[id="payment-method-group"]')
-    .locator('span.font-medium')
-    .filter({ hasText: newAccountingStringDescriptionValue })
-    .first();
-
-  await expect(paymentMethodLabel).toBeVisible();
-  expect(await getTextFromLocator(catering, paymentMethodLabel)).toBe(
-    newAccountingStringDescriptionValue,
-  );
-  await paymentMethodLabel.locator('xpath=ancestor::button[1]').click();
-
-  const programNameInput = catering.locator(checkoutProgramNameInput);
-  await programNameInput.scrollIntoViewIfNeeded();
-  await expect(programNameInput).toBeVisible();
-  await programNameInput.fill(checkoutProgramNameValue);
-
-  // Verify Allow any text accepts any value
-  await verifyAccountingStringInput(catering, 'ABC-123@#');
-
-  // Verify each format rule
-  for (const ruleCase of ruleValidationCases) {
-    await saveAccountingStringRequirementsRule(
-      catering,
-      ruleCase.ruleName,
-      ruleCase.customMessage,
-      ruleCase.customRegex,
+    // Verify custom pattern option
+    await requirementsSelect.selectOption({ label: 'Custom pattern (advanced)' });
+    await expect(catering.locator(formatRuleDescriptionText)).toContainText(
+      'Enter a valid JavaScript regular expression below (required)',
     );
-    await returnToPaymentInformation(
-      catering,
+    await expect(catering.locator(customPatternHintText)).toBeVisible();
+    await expect(catering.locator(customPatternInput)).toBeVisible();
+
+    // Verify error shown when saving without regex
+    const saveButton = catering.getByRole('button', { name: saveChangesBtn });
+    await saveButton.scrollIntoViewIfNeeded();
+    await saveButton.click();
+    await expect(catering.locator(customPatternError)).toBeVisible();
+
+    // Reset to Allow any text and save
+    await requirementsSelect.selectOption({ label: 'Allow any text' });
+    await saveButton.scrollIntoViewIfNeeded();
+    await saveButton.click();
+
+    const requirementsToast = catering.getByRole('alert');
+    await expect(requirementsToast).toBeVisible({ timeout: 10000 });
+    await expect(requirementsToast).toContainText(updateRequirementsSuccessTitle);
+    await expect(requirementsToast).toContainText(updateRequirementsSuccessBody);
+    await catering.waitForTimeout(1000);
+    await expect(requirementsToast).not.toBeVisible({ timeout: 30000 });
+  });
+
+  await test.step('Add to Cart', async () => {
+
+    await navigateK12CateringMenu(catering, 'Menu');
+
+    const firstAddToCartButton = catering
+      .getByRole('button', { name: addToCardBtn })
+      .first();
+    await expect(firstAddToCartButton).toBeVisible();
+    await firstAddToCartButton.click();
+
+    const addToCartModal = catering
+      .getByText('Add to Cart', { exact: true })
+      .locator("xpath=ancestor::div[contains(@class,'rounded-lg')][1]");
+
+    await expect(
+      addToCartModal.getByRole('button', { name: addToCardBtn }).first(),
+    ).toBeVisible();
+    await addToCartModal
+      .getByRole('button', { name: addToCardBtn })
+      .first()
+      .click();
+
+    await catering.getByRole('button', { name: proceedToCheckoutBtn }).click();
+  });
+
+  await test.step('Event Date', async () => {
+
+    await selectAvailableEventDate(catering);
+    await expect(
+      catering.getByText(/not available for events/i),
+    ).not.toBeVisible();
+    await clickNext(catering);
+  });
+
+  await test.step('Event Time', async () => {
+
+    await pickTimeAndConfirm(catering, eventStartTime);
+    await pickTimeAndConfirm(catering, eventEndTime);
+    await clickNext(catering);
+  });
+
+  await test.step('Setup Time', async () => {
+
+    await pickTimeAndConfirm(catering, setupTimeBtn);
+    await clickNext(catering);
+  });
+
+  await test.step('Delivery Contact', async () => {
+
+    await catering
+      .getByRole('button', { name: /Select from Address Book/i })
+      .click();
+    await selectFirstContactCardInSection(catering, /Select Contact/i);
+
+    await clickNext(catering);
+  });
+
+  await test.step('Additional Details', async () => {
+
+    const numGuestsInput = catering.locator('#num-guests-input');
+    await expect(numGuestsInput).toBeVisible();
+    await numGuestsInput.fill('2');
+    // Event Name (or Nickname) is a new REQUIRED field at Additional Details (ADO 117619);
+    // without it the "Next" button stays disabled.
+    const eventNameInput = catering.locator('#event-name-input');
+    if (await eventNameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await eventNameInput.fill('Automation Event');
+    }
+    await clickNext(catering);
+  });
+
+  await test.step('Payment Info', async () => {
+
+    const paymentMethodLabel = catering
+      .locator('[id="payment-method-group"]')
+      .locator('span.font-medium')
+      .filter({ hasText: newAccountingStringDescriptionValue })
+      .first();
+
+    await expect(paymentMethodLabel).toBeVisible();
+    expect(await getTextFromLocator(catering, paymentMethodLabel)).toBe(
       newAccountingStringDescriptionValue,
     );
-    await verifyAccountingStringInput(
+    await paymentMethodLabel.locator('xpath=ancestor::button[1]').click();
+
+    const programNameInput = catering.locator(checkoutProgramNameInput);
+    await programNameInput.scrollIntoViewIfNeeded();
+    await expect(programNameInput).toBeVisible();
+    await programNameInput.fill(checkoutProgramNameValue);
+
+    // Verify Allow any text accepts any value
+    await verifyAccountingStringInput(catering, 'ABC-123@#');
+
+    // Verify each format rule
+    for (const ruleCase of ruleValidationCases) {
+      await saveAccountingStringRequirementsRule(
+        catering,
+        ruleCase.ruleName,
+        ruleCase.customMessage,
+        ruleCase.customRegex,
+      );
+      await returnToPaymentInformation(
+        catering,
+        newAccountingStringDescriptionValue,
+      );
+      await verifyAccountingStringInput(
+        catering,
+        ruleCase.validValue,
+        ruleCase.invalidValue,
+        ruleCase.customMessage,
+      );
+    }
+  });
+
+  await test.step('Payment Contact', async () => {
+
+    await selectFirstContactCardInSection(
       catering,
-      ruleCase.validValue,
-      ruleCase.invalidValue,
-      ruleCase.customMessage,
+      /Select Payment Contact/i,
     );
-  }
-
-  // ── Payment Contact ───────────────────────────────────────────────────────
-
-  await selectFirstContactCardInSection(
-    catering,
-    /Select Payment Contact/i,
-  );
-  await clickNext(catering);
-
-  // ── Review & Place Order ──────────────────────────────────────────────────
-
-  const agreementCheckbox = catering
-    .getByText(orderAgreementCheckbox, { exact: false })
-    .first();
-  await agreementCheckbox.scrollIntoViewIfNeeded();
-  await expect(agreementCheckbox).toBeVisible();
-  await agreementCheckbox.click();
-
-  const placeOrderButton = catering.getByRole('button', {
-    name: placeOrderBtn,
-  });
-  await placeOrderButton.scrollIntoViewIfNeeded();
-  await expect(placeOrderButton).toBeVisible();
-  await placeOrderButton.click();
-
-  await Promise.race([
-    catering
-      .getByText(orderPlacedSuccessTitle, { exact: false })
-      .waitFor({ state: 'visible', timeout: 10000 })
-      .catch(() => null),
-    catering
-      .getByRole('heading', { name: /Order Management/i })
-      .waitFor({ state: 'visible', timeout: 15000 }),
-  ]);
-
-  // ── Verify Payment Type in Orders ─────────────────────────────────────────
-
-  const paymentTypeInOrders = await getTextFromLocator(
-    catering,
-    catering
-      .locator('article')
-      .first()
-      .getByText('Payment Type', { exact: true })
-      .locator('xpath=following-sibling::p[1]'),
-  );
-  expect(paymentTypeInOrders).toBe(newAccountingStringDescriptionValue);
-
-  // ── Verify Order in Orders List ───────────────────────────────────────────
-
-  await expect(
-    catering.getByRole('heading', { name: /Order Management/i }),
-  ).toBeVisible({ timeout: 15000 });
-  await catering.waitForLoadState('domcontentloaded');
-  await catering.waitForTimeout(2000);
-
-  const latestOrderCard = catering.locator('article').first();
-  await expect(latestOrderCard).toBeVisible();
-
-  const latestOrderPaymentType = await getTextFromLocator(
-    catering,
-    latestOrderCard
-      .getByText('Payment Type', { exact: true })
-      .locator('xpath=following-sibling::p[1]'),
-  );
-  expect(latestOrderPaymentType).toBe(newAccountingStringDescriptionValue);
-
-  const viewDetailsButton = latestOrderCard
-    .getByRole('button', { name: viewDetailsForOrderBtn })
-    .first();
-  await expect(viewDetailsButton).toBeVisible();
-  await viewDetailsButton.click();
-
-  // "Download Invoice" now opens a "Download Invoice Options" modal (T-118254)
-  // before the file is produced, so a bare click-and-wait-for-download never
-  // fires. downloadInvoiceWithOptions keeps every section checked, which is what
-  // this assertion expects.
-  const invoiceText = await downloadInvoiceWithOptions(catering);
-  expect(invoiceText).toContain(newAccountingStringDescriptionValue);
-
-  // ── Logout & Login as District User ───────────────────────────────────────
-
-  await catering.getByLabel('User account menu').click();
-
-  const signOutBtn = catering.getByLabel('Sign out of your account');
-  await expect(signOutBtn).toBeVisible();
-  await signOutBtn.click();
-
-  await expect(catering.locator('#email-input')).toBeVisible();
-  await loginToK12CateringAsDistrictUser(catering);
-
-  await catering.waitForLoadState('domcontentloaded');
-
-  await expect(
-    catering.locator('aside[aria-label="Main navigation"]'),
-  ).toBeVisible();
-
-  // ── Verify District User Cannot Change Accounting String Expression ───────
-
-  await navigateK12CateringMenu(catering, 'Settings');
-
-  await scrollUntilVisible(catering, {
-    target: catering.getByText(paymentFieldFormatRequirementsLabel, {
-      exact: false,
-    }),
+    await clickNext(catering);
   });
 
-  await clickEditButtonForSetting(
-    catering,
-    paymentFieldFormatRequirementsLabel,
-    'Edit accounting string requirements',
-  );
+  await test.step('Review & Place Order', async () => {
 
-  await expect(
-    catering.getByRole('heading', {
-      name: editFormatRequirementsDialogTitle,
-    }),
-  ).toBeVisible();
+    const agreementCheckbox = catering
+      .getByText(orderAgreementCheckbox, { exact: false })
+      .first();
+    await agreementCheckbox.scrollIntoViewIfNeeded();
+    await expect(agreementCheckbox).toBeVisible();
+    await agreementCheckbox.click();
 
-  await expect(
-    catering.getByText(
-      'Only a Cybersoft Admin can change this expression. To switch to a standard rule, select a format above and save.',
-      { exact: false },
-    ),
-  ).toBeVisible();
+    const placeOrderButton = catering.getByRole('button', {
+      name: placeOrderBtn,
+    });
+    await placeOrderButton.scrollIntoViewIfNeeded();
+    await expect(placeOrderButton).toBeVisible();
+    await placeOrderButton.click();
+
+    await Promise.race([
+      catering
+        .getByText(orderPlacedSuccessTitle, { exact: false })
+        .waitFor({ state: 'visible', timeout: 10000 })
+        .catch(() => null),
+      catering
+        .getByRole('heading', { name: /Order Management/i })
+        .waitFor({ state: 'visible', timeout: 15000 }),
+    ]);
+  });
+
+  await test.step('Verify Payment Type in Orders', async () => {
+
+    const paymentTypeInOrders = await getTextFromLocator(
+      catering,
+      catering
+        .locator('article')
+        .first()
+        .getByText('Payment Type', { exact: true })
+        .locator('xpath=following-sibling::p[1]'),
+    );
+    expect(paymentTypeInOrders).toBe(newAccountingStringDescriptionValue);
+  });
+
+  await test.step('Verify Order in Orders List', async () => {
+
+    await expect(
+      catering.getByRole('heading', { name: /Order Management/i }),
+    ).toBeVisible({ timeout: 15000 });
+    await catering.waitForLoadState('domcontentloaded');
+    await catering.waitForTimeout(2000);
+
+    const latestOrderCard = catering.locator('article').first();
+    await expect(latestOrderCard).toBeVisible();
+
+    const latestOrderPaymentType = await getTextFromLocator(
+      catering,
+      latestOrderCard
+        .getByText('Payment Type', { exact: true })
+        .locator('xpath=following-sibling::p[1]'),
+    );
+    expect(latestOrderPaymentType).toBe(newAccountingStringDescriptionValue);
+
+    const viewDetailsButton = latestOrderCard
+      .getByRole('button', { name: viewDetailsForOrderBtn })
+      .first();
+    await expect(viewDetailsButton).toBeVisible();
+    await viewDetailsButton.click();
+
+    // "Download Invoice" now opens a "Download Invoice Options" modal (T-118254)
+    // before the file is produced, so a bare click-and-wait-for-download never
+    // fires. downloadInvoiceWithOptions keeps every section checked, which is what
+    // this assertion expects.
+    const invoiceText = await downloadInvoiceWithOptions(catering);
+    expect(invoiceText).toContain(newAccountingStringDescriptionValue);
+  });
+
+  await test.step('Logout & Login as District User', async () => {
+
+    await catering.getByLabel('User account menu').click();
+
+    const signOutBtn = catering.getByLabel('Sign out of your account');
+    await expect(signOutBtn).toBeVisible();
+    await signOutBtn.click();
+
+    await expect(catering.locator('#email-input')).toBeVisible();
+    await loginToK12CateringAsDistrictUser(catering);
+
+    await catering.waitForLoadState('domcontentloaded');
+
+    await expect(
+      catering.locator('aside[aria-label="Main navigation"]'),
+    ).toBeVisible();
+  });
+
+  await test.step('Verify District User Cannot Change Accounting String Expression', async () => {
+
+    await navigateK12CateringMenu(catering, 'Settings');
+
+    await scrollUntilVisible(catering, {
+      target: catering.getByText(paymentFieldFormatRequirementsLabel, {
+        exact: false,
+      }),
+    });
+
+    await clickEditButtonForSetting(
+      catering,
+      paymentFieldFormatRequirementsLabel,
+      'Edit accounting string requirements',
+    );
+
+    await expect(
+      catering.getByRole('heading', {
+        name: editFormatRequirementsDialogTitle,
+      }),
+    ).toBeVisible();
+
+    await expect(
+      catering.getByText(
+        'Only a Cybersoft Admin can change this expression. To switch to a standard rule, select a format above and save.',
+        { exact: false },
+      ),
+    ).toBeVisible();
+  });
+
 });

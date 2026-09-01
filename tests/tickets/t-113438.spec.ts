@@ -27,6 +27,7 @@ import {
   runPushSyncNow,
 } from '../../utils/dataSync';
 import { getEnvVar } from '../../utils/env';
+import { getCustomerPassword, getDataSyncTargetDistrict } from '../../utils/testData';
 import { getK12CateringLoginUrl } from '../../utils/baseUrl';
 import { resetCustomerPasswordFromAccounts } from '../../utils/accountFlow';
 
@@ -799,7 +800,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     homeDistrict = isUatDirectLogin()
       ? getSecondaryDistrictName()
       : getDistrictName();
-    targetDistrict = isUatDirectLogin() ? 'Lees' : 'Berkeley School District';
+    targetDistrict = getDataSyncTargetDistrict();
     expect(
       targetDistricts.length,
       `No target districts parsed from the Manage dialog: [${targetDistricts.join(', ')}]`,
@@ -1150,7 +1151,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     // upcoming customer login is guaranteed to succeed (Accounts → search by
     // email → Actions ⋯ → Change Password → "Password1!").
     const customerEmail = getCustomerAccountEmail();
-    const customerPassword = 'Password1!';
+    const customerPassword = getCustomerPassword();
     await resetCustomerPasswordFromAccounts(
       catering,
       customerEmail,

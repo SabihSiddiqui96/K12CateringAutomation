@@ -257,73 +257,85 @@ test.describe('T-119591', () => {
     const stamp = Date.now();
     const c = await loginToK12Catering(page);
 
-    // ── unsupported type ──────────────────────────────────────────────────────
-    await openFeedbackForm(c, OPT_ISSUE);
-    await c.locator(FB_COMMENT).fill(`T-119591 unsupported ${stamp}`);
-    await c.locator(FB_ATTACHMENT).setInputFiles(unsupportedTxt());
-    await expect(
-      c.getByText(UNSUPPORTED_TYPE_ERROR).first(),
-      'a .txt is rejected by type',
-    ).toBeVisible({ timeout: 10000 });
-    await closeFeedbackWidget(c);
+    // Written in one step and read back in a later one.
+    let feedbackText = '';
+    let attachment: Locator;
 
-    // ── over the size limit ───────────────────────────────────────────────────
-    await openFeedbackForm(c, OPT_ISSUE);
-    await c.locator(FB_COMMENT).fill(`T-119591 oversize ${stamp}`);
-    await c.locator(FB_ATTACHMENT).setInputFiles(oversizePng());
-    await expect(
-      c.getByText(/5\s*MB|too large|exceeds/i).first(),
-      `a file over ${MAX_ATTACHMENT_MB} MB is rejected`,
-    ).toBeVisible({ timeout: 15000 });
-    await closeFeedbackWidget(c);
-
-    // ── a supported file goes through ─────────────────────────────────────────
-    const feedbackText = `T-119591 attachment check ${stamp}`;
-    await openFeedbackForm(c, OPT_ISSUE);
-    await c.locator(FB_COMMENT).fill(feedbackText);
-    await c.locator(FB_ATTACHMENT).setInputFiles(validPng());
-    await expect(c.getByText(UNSUPPORTED_TYPE_ERROR)).toHaveCount(0);
-    await submitButton(c).click();
-    await expect(c.locator(FB_COMMENT)).toBeHidden({ timeout: 20000 });
-    await closeFeedbackWidget(c);
-
-    // ── the other supported types go through too ──────────────────────────────
-    for (const file of SUPPORTED_FILES.filter((f) => !f.name.endsWith('.png'))) {
+    await test.step('unsupported type', async () => {
       await openFeedbackForm(c, OPT_ISSUE);
-      await c.locator(FB_COMMENT).fill(`T-119591 ${file.name} ${stamp}`);
-      await c.locator(FB_ATTACHMENT).setInputFiles(file);
+      await c.locator(FB_COMMENT).fill(`T-119591 unsupported ${stamp}`);
+      await c.locator(FB_ATTACHMENT).setInputFiles(unsupportedTxt());
       await expect(
-        c.getByText(UNSUPPORTED_TYPE_ERROR),
-        `${file.name} is an accepted type`,
-      ).toHaveCount(0);
+        c.getByText(UNSUPPORTED_TYPE_ERROR).first(),
+        'a .txt is rejected by type',
+      ).toBeVisible({ timeout: 10000 });
+      await closeFeedbackWidget(c);
+    });
+
+    await test.step('over the size limit', async () => {
+      await openFeedbackForm(c, OPT_ISSUE);
+      await c.locator(FB_COMMENT).fill(`T-119591 oversize ${stamp}`);
+      await c.locator(FB_ATTACHMENT).setInputFiles(oversizePng());
+      await expect(
+        c.getByText(/5\s*MB|too large|exceeds/i).first(),
+        `a file over ${MAX_ATTACHMENT_MB} MB is rejected`,
+      ).toBeVisible({ timeout: 15000 });
+      await closeFeedbackWidget(c);
+    });
+
+    await test.step('a supported file goes through', async () => {
+      feedbackText = `T-119591 attachment check ${stamp}`;
+      await openFeedbackForm(c, OPT_ISSUE);
+      await c.locator(FB_COMMENT).fill(feedbackText);
+      await c.locator(FB_ATTACHMENT).setInputFiles(validPng());
+      await expect(c.getByText(UNSUPPORTED_TYPE_ERROR)).toHaveCount(0);
       await submitButton(c).click();
       await expect(c.locator(FB_COMMENT)).toBeHidden({ timeout: 20000 });
       await closeFeedbackWidget(c);
-    }
-
-    // ── the attachment is optional ────────────────────────────────────────────
-    await submitFeedback(c, `T-119591 no attachment ${stamp}`);
-
-    // ── it lands in the inbox, attachment and all ─────────────────────────────
-    await goToUserFeedback(c);
-    await statusFilter(c, 'New').click();
-    await c.waitForTimeout(1500);
-    const card = feedbackCard(c, feedbackText);
-    await expect(card, 'the submitted feedback reaches the inbox').toBeVisible({ timeout: 25000 });
-    const attachment = card.getByText(/\.png$/i).first();
-    await expect(attachment, 'the attachment is listed by file name').toBeVisible({
-      timeout: 15000,
     });
 
-    // ── and it opens ──────────────────────────────────────────────────────────
-    // The app previews the file in an in-page overlay rather than opening a tab or
-    // starting a download, so assert the overlay rather than a navigation.
-    await attachment.click();
-    await expect(
-      c.locator('[role="dialog"], div.fixed').filter({ hasText: /qa-attachment\.png/i }).last(),
-      'clicking the attachment opens its preview',
-    ).toBeVisible({ timeout: 15000 });
-    await c.keyboard.press('Escape').catch(() => undefined);
+    await test.step('the other supported types go through too', async () => {
+      for (const file of SUPPORTED_FILES.filter((f) => !f.name.endsWith('.png'))) {
+        await openFeedbackForm(c, OPT_ISSUE);
+        await c.locator(FB_COMMENT).fill(`T-119591 ${file.name} ${stamp}`);
+        await c.locator(FB_ATTACHMENT).setInputFiles(file);
+        await expect(
+          c.getByText(UNSUPPORTED_TYPE_ERROR),
+          `${file.name} is an accepted type`,
+        ).toHaveCount(0);
+        await submitButton(c).click();
+        await expect(c.locator(FB_COMMENT)).toBeHidden({ timeout: 20000 });
+        await closeFeedbackWidget(c);
+      }
+    });
+
+    await test.step('the attachment is optional', async () => {
+      await submitFeedback(c, `T-119591 no attachment ${stamp}`);
+    });
+
+    await test.step('it lands in the inbox, attachment and all', async () => {
+      await goToUserFeedback(c);
+      await statusFilter(c, 'New').click();
+      await c.waitForTimeout(1500);
+      const card = feedbackCard(c, feedbackText);
+      await expect(card, 'the submitted feedback reaches the inbox').toBeVisible({ timeout: 25000 });
+      attachment = card.getByText(/\.png$/i).first();
+      await expect(attachment, 'the attachment is listed by file name').toBeVisible({
+        timeout: 15000,
+      });
+    });
+
+    await test.step('and it opens', async () => {
+      // The app previews the file in an in-page overlay rather than opening a tab or
+      // starting a download, so assert the overlay rather than a navigation.
+      await attachment.click();
+      await expect(
+        c.locator('[role="dialog"], div.fixed').filter({ hasText: /qa-attachment\.png/i }).last(),
+        'clicking the attachment opens its preview',
+      ).toBeVisible({ timeout: 15000 });
+      await c.keyboard.press('Escape').catch(() => undefined);
+    });
+
   });
 
   test('Feedback Inbox defaults to New and resolving records who resolved it', async ({ page }) => {
@@ -428,63 +440,68 @@ test.describe('T-119591', () => {
       .innerText()
       .catch(() => '');
 
-    // ── In Progress behaves like Resolved: it moves the item out of New ───────
-    await statusFilter(c, 'New').click();
-    await c.waitForTimeout(1500);
-    const card = feedbackCard(c, marker);
-    await expect(card, 'the submitted feedback is in New').toBeVisible({ timeout: 25000 });
-    const control = card.locator('button[aria-label^="Change status"]').first();
-    await control.click();
-    await control
-      .locator('xpath=..')
-      .locator('button')
-      .filter({ hasText: /^In Progress$/ })
-      .first()
-      .click({ timeout: 15000 });
-    await c.waitForTimeout(2500);
+    await test.step('In Progress behaves like Resolved: it moves the item out of New', async () => {
+      await statusFilter(c, 'New').click();
+      await c.waitForTimeout(1500);
+      const card = feedbackCard(c, marker);
+      await expect(card, 'the submitted feedback is in New').toBeVisible({ timeout: 25000 });
+      const control = card.locator('button[aria-label^="Change status"]').first();
+      await control.click();
+      await control
+        .locator('xpath=..')
+        .locator('button')
+        .filter({ hasText: /^In Progress$/ })
+        .first()
+        .click({ timeout: 15000 });
+      await c.waitForTimeout(2500);
 
-    await statusFilter(c, 'New').click();
-    await c.waitForTimeout(2000);
-    await expect(
-      inbox(c).getByText(marker, { exact: false }),
-      'the item drops out of New',
-    ).toHaveCount(0);
+      await statusFilter(c, 'New').click();
+      await c.waitForTimeout(2000);
+      await expect(
+        inbox(c).getByText(marker, { exact: false }),
+        'the item drops out of New',
+      ).toHaveCount(0);
 
-    await statusFilter(c, 'In Progress').click();
-    await c.waitForTimeout(2500);
-    await expect(
-      inbox(c).getByText(marker, { exact: false }).first(),
-      'the item is listed under In Progress',
-    ).toBeVisible({ timeout: 25000 });
+      await statusFilter(c, 'In Progress').click();
+      await c.waitForTimeout(2500);
+      await expect(
+        inbox(c).getByText(marker, { exact: false }).first(),
+        'the item is listed under In Progress',
+      ).toBeVisible({ timeout: 25000 });
+    });
 
-    // ── the headline totals are untouched by a status change ─────────────────
-    const totalsAfter = await inbox(c).locator('xpath=ancestor::div[2]').innerText().catch(() => '');
-    for (const label of ['Total Responses', 'Issues Reported', 'Ideas Submitted']) {
-      const before = totalsBefore.match(new RegExp('(\d[\d,]*)\s*' + label));
-      const after = totalsAfter.match(new RegExp('(\d[\d,]*)\s*' + label));
-      if (before && after) {
-        expect(after[1], `${label} is unchanged by a status change`).toBe(before[1]);
+    await test.step('the headline totals are untouched by a status change', async () => {
+      const totalsAfter = await inbox(c).locator('xpath=ancestor::div[2]').innerText().catch(() => '');
+      for (const label of ['Total Responses', 'Issues Reported', 'Ideas Submitted']) {
+        const before = totalsBefore.match(new RegExp('(\d[\d,]*)\s*' + label));
+        const after = totalsAfter.match(new RegExp('(\d[\d,]*)\s*' + label));
+        if (before && after) {
+          expect(after[1], `${label} is unchanged by a status change`).toBe(before[1]);
+        }
       }
-    }
+    });
 
-    // ── the type filters still work alongside the status filters ─────────────
-    // Matched on plain substrings: the pills carry emoji and a count
-    // ("⭐ Ratings (50)"), so an anchored pattern is more trouble than it is worth.
-    await statusFilter(c, 'All').click();
-    await c.waitForTimeout(1500);
-    for (const type of ['Ratings', 'Positive', 'Questions', 'Issues', 'Ideas']) {
-      const pill = inbox(c).locator('button').filter({ hasText: type }).first();
-      await expect(pill, `the ${type} type filter is present`).toBeVisible({ timeout: 15000 });
-      await pill.click();
+    await test.step('the type filters still work alongside the status filters', async () => {
+      // Matched on plain substrings: the pills carry emoji and a count
+      // ("⭐ Ratings (50)"), so an anchored pattern is more trouble than it is worth.
+      await statusFilter(c, 'All').click();
+      await c.waitForTimeout(1500);
+      for (const type of ['Ratings', 'Positive', 'Questions', 'Issues', 'Ideas']) {
+        const pill = inbox(c).locator('button').filter({ hasText: type }).first();
+        await expect(pill, `the ${type} type filter is present`).toBeVisible({ timeout: 15000 });
+        await pill.click();
+        await c.waitForTimeout(1200);
+      }
+      await inbox(c).locator('button').filter({ hasText: 'All (' }).first().click();
       await c.waitForTimeout(1200);
-    }
-    await inbox(c).locator('button').filter({ hasText: 'All (' }).first().click();
-    await c.waitForTimeout(1200);
+    });
 
-    // ── Export CSV still produces a file ─────────────────────────────────────
-    const downloadPromise = c.waitForEvent('download', { timeout: 30000 });
-    await c.getByRole('button', { name: /Export CSV/i }).first().click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename(), 'Export CSV produces a csv').toMatch(/\.csv$/i);
+    await test.step('Export CSV still produces a file', async () => {
+      const downloadPromise = c.waitForEvent('download', { timeout: 30000 });
+      await c.getByRole('button', { name: /Export CSV/i }).first().click();
+      const download = await downloadPromise;
+      expect(download.suggestedFilename(), 'Export CSV produces a csv').toMatch(/\.csv$/i);
+    });
+
   });
 });

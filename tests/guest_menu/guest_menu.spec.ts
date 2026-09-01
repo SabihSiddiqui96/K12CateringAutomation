@@ -3,6 +3,7 @@ import {
   loginToK12Catering,
   navigateK12CateringMenu,
   escapeRegExp,
+  getSecondaryDistrictName,
 } from '../../utils/helpers';
 import { getEnvVar } from '../../utils/env';
 
@@ -93,7 +94,7 @@ test.describe('Guest Menu', () => {
   test('Guest Menu - District dropdown opens with searchable list and selecting updates menu', async () => {
     await catering.getByRole('button', { name: 'Select a district to view menu' }).click();
     await expect(catering.getByPlaceholder(/search/i)).toBeVisible({ timeout: 5000 });
-    const secondaryDistrict = getEnvVar('SECONDARY_DISTRICT_NAME', { required: false }) || 'Berkeley School District';
+    const secondaryDistrict = getSecondaryDistrictName();
     await expect(catering.getByText(secondaryDistrict)).toBeVisible();
 
     await catering.getByPlaceholder(/search/i).fill(secondaryDistrict.split(' ')[0]);

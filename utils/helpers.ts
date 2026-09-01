@@ -84,7 +84,8 @@ type ScrollUntilVisibleOptions = {
   container?: Locator;
   maxScrolls?: number;
   stepPx?: number;
-  pauseMs?: number;
+  /** Ceiling on the per-step wait, not a fixed sleep. */
+  settleMs?: number;
 };
 
 type ScrollUntilVisibleAndClickOptions = {
@@ -92,7 +93,7 @@ type ScrollUntilVisibleAndClickOptions = {
   container?: Locator;
   maxScrolls?: number;
   stepPx?: number;
-  pauseMs?: number;
+  settleMs?: number;
 };
 
 function toLocator(page: Page, target: Locator | string): Locator {
@@ -412,7 +413,11 @@ export async function loginToK12Catering(
   // off the shared login means every spec that enters through this helper is covered,
   // including ones written later that would not know to ask.
   await catering.addLocatorHandler(
-    catering.getByText(/automatically authenticated and redirected to Catering/i),
+    // .first() is load-bearing. Without it this matches the text node AND its
+    // ancestors, so every visibility check on it throws a strict-mode violation -
+    // which the callers swallow, leaving the handler silently dead. It has been
+    // registered on every spec all along and never once fired.
+    catering.getByText(/automatically authenticated and redirected to Catering/i).first(),
     async () => {
       await dismissReauthInterstitial(catering);
     }
@@ -453,9 +458,12 @@ export async function dismissReauthInterstitial(page: Page): Promise<void> {
   // The relaunch can re-trigger (e.g. it pops again right after a redirect), so try
   // a few times until the banner stays gone.
   for (let i = 0; i < 3; i += 1) {
-    const banner = page.getByText(
-      /automatically authenticated and redirected to Catering/i
-    );
+    // .first() for the same reason as the handler above: an unscoped getByText
+    // matches the ancestors too, isVisible() throws strict-mode, the .catch below
+    // turns that into "no banner", and this returns having done nothing.
+    const banner = page
+      .getByText(/automatically authenticated and redirected to Catering/i)
+      .first();
     if (!(await banner.isVisible({ timeout: 1000 }).catch(() => false))) {
       if (i > 0) console.log(`[reauth] interstitial cleared after ${i} attempt(s)`);
       return;
@@ -478,7 +486,12 @@ export async function dismissReauthInterstitial(page: Page): Promise<void> {
 // For something merely below the fold use locator.scrollIntoViewIfNeeded().
 // This is for lists that render lazily as you scroll, where the element does not
 // exist until the container moves - the Data Sync items table and the Districts
-// group panels. pauseMs is the settle between steps for that.
+// group panels.
+//
+// Each step waits on what the scroll is supposed to produce, not on the clock:
+// the target becoming visible, or failing that the scroll position / content
+// height changing as new rows render. settleMs is only the ceiling on that wait,
+// so a list that renders immediately costs a few milliseconds instead of 500.
 export async function scrollUntilVisible(
   page: Page,
   options: ScrollUntilVisibleOptions = {}
@@ -488,7 +501,7 @@ export async function scrollUntilVisible(
     container,
     maxScrolls = 100,
     stepPx = 900,
-    pauseMs = 500,
+    settleMs = 500,
   } = options;
 
   const locator = target ? toLocator(page, target).first() : null;
@@ -498,12 +511,13 @@ export async function scrollUntilVisible(
     return;
   }
 
+  const readState = () =>
+    container ? getContainerScrollState(container) : getDocumentScrollState(page);
+
   let stagnantCount = 0;
 
   for (let i = 0; i < maxScrolls; i++) {
-    const before = container
-      ? await getContainerScrollState(container)
-      : await getDocumentScrollState(page);
+    const before = await readState();
 
     if (container) {
       await scrollContainerDown(container, stepPx);
@@ -511,16 +525,35 @@ export async function scrollUntilVisible(
       await scrollDocumentDown(page, stepPx);
     }
 
-    await page.waitForTimeout(pauseMs);
-
-    if (locator && await locator.isVisible().catch(() => false)) {
-      await locator.scrollIntoViewIfNeeded();
-      return;
+    if (locator) {
+      // The target showing up is the whole point of the scroll, so wait for that
+      // rather than a fixed pause. Not finding it just means "keep scrolling".
+      const appeared = await locator
+        .waitFor({ state: 'visible', timeout: settleMs })
+        .then(() => true)
+        .catch(() => false);
+      if (appeared) {
+        await locator.scrollIntoViewIfNeeded();
+        return;
+      }
+    } else {
+      // No target: wait for the view to actually move or for more content to
+      // render. Both are the signal that this step did something; if neither
+      // happens the stagnation counter below ends the loop.
+      await expect(async () => {
+        const now = await readState();
+        expect(
+          now.scrollTop !== before.scrollTop || now.scrollHeight !== before.scrollHeight,
+        ).toBeTruthy();
+      })
+        .toPass({ timeout: settleMs, intervals: [50, 100, 200] })
+        .catch(() => undefined);
     }
 
-    const after = container
-      ? await getContainerScrollState(container)
-      : await getDocumentScrollState(page);
+    // Lazily-rendered rows can still be arriving after the scroll settles.
+    await waitForListSettled(page);
+
+    const after = await readState();
 
     const reachedBottom =
       after.scrollTop + after.clientHeight >= after.scrollHeight - 5;
@@ -560,7 +593,7 @@ export async function scrollUntilVisibleAndClick(
     container,
     maxScrolls = 100,
     stepPx = 900,
-    pauseMs = 500,
+    settleMs = 500,
   } = options;
 
   const locator = toLocator(page, target).first();
@@ -570,7 +603,7 @@ export async function scrollUntilVisibleAndClick(
     container,
     maxScrolls,
     stepPx,
-    pauseMs,
+    settleMs,
   });
 
   await locator.click();
