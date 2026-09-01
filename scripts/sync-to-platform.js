@@ -303,8 +303,6 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
   // removal candidates would silently delete them from the shared repo on the next sync,
   // which is a much bigger action than "stop mirroring this file".
   const EXCLUDE = new Set([
-    // Real home is the FO-SprintBurnDown repo; the copy here is paused and dead.
-    'scripts/freshdesk-notify.js',
     // Local Task Scheduler tooling for this machine, not shared test automation. The
     // .vbs hardcodes an absolute path under this user profile, and auto-rerun-latest.js
     // shells out to scripts/rerun-failed.js, which is gitignored and therefore absent
@@ -336,6 +334,9 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
     // nobody in the monorepo can run it - and mirroring it would copy the patterns
     // above into the shared repo, which is the very thing they exist to prevent.
     /^scripts\/sync-to-platform\.js$/,
+    // Real home is the FO-SprintBurnDown repo; the copy here is paused and nothing
+    // runs it, so the copy in the shared repo is dead weight.
+    /^scripts\/freshdesk-notify\.js$/,
   ];
   const isPurged = (f) => PURGE_PATTERNS.some((re) => re.test(f));
 
