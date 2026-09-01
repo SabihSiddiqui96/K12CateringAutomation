@@ -332,6 +332,10 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
     // Hands the still-failing set to a headless assistant session; local-only, and
     // it shells out to rerun-failed.js which is gitignored and absent from the mirror.
     /^scripts\/auto-triage\.js$/,
+    // This script itself. It hardcodes an absolute path under one user profile, so
+    // nobody in the monorepo can run it - and mirroring it would copy the patterns
+    // above into the shared repo, which is the very thing they exist to prevent.
+    /^scripts\/sync-to-platform\.js$/,
   ];
   const isPurged = (f) => PURGE_PATTERNS.some((re) => re.test(f));
 
