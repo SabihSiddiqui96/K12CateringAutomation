@@ -16,8 +16,8 @@ function addToCartModal(page: Page) {
 async function clickNext(page: Page): Promise<void> {
   const nextButton = page.getByRole('button', { name: /^Next$/i });
   await nextButton.scrollIntoViewIfNeeded();
-  await expect(nextButton).toBeVisible({ timeout: 10000 });
-  await expect(nextButton).toBeEnabled({ timeout: 10000 });
+  await expect(nextButton).toBeVisible();
+  await expect(nextButton).toBeEnabled();
   await nextButton.click();
 }
 
@@ -41,7 +41,7 @@ async function selectFirstContactCardInSection(
   sectionHeading: RegExp | string,
 ): Promise<void> {
   const heading = page.getByRole('heading', { name: sectionHeading }).first();
-  await expect(heading).toBeVisible({ timeout: 10000 });
+  await expect(heading).toBeVisible();
 
   const section = heading.locator(
     'xpath=ancestor::div[contains(@class,"space-y-3")][1]',
@@ -49,7 +49,7 @@ async function selectFirstContactCardInSection(
   const contactCard = section.locator('article').first();
 
   await contactCard.scrollIntoViewIfNeeded();
-  await expect(contactCard).toBeVisible({ timeout: 10000 });
+  await expect(contactCard).toBeVisible();
   await contactCard.click();
 }
 
@@ -61,7 +61,7 @@ async function selectAvailableEventDate(page: Page): Promise<void> {
 
   await expect(
     page.getByRole('button', { name: /Previous month/i }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 
   const nextMonthButton = page.getByRole('button', { name: /Next month/i });
 
@@ -122,18 +122,18 @@ export async function addFirstMenuItemToCart(page: Page): Promise<void> {
     .first();
 
   await addToCartButton.scrollIntoViewIfNeeded();
-  await expect(addToCartButton).toBeVisible({ timeout: 15000 });
+  await expect(addToCartButton).toBeVisible();
   await addToCartButton.click();
 
   const modal = addToCartModal(page);
-  await expect(modal).toBeVisible({ timeout: 10000 });
+  await expect(modal).toBeVisible();
 
   const modalAddToCart = modal.getByRole('button', {
     name: /^Add to Cart$/i,
   });
-  await expect(modalAddToCart).toBeEnabled({ timeout: 10000 });
+  await expect(modalAddToCart).toBeEnabled();
   await modalAddToCart.click();
-  await expect(modal).toBeHidden({ timeout: 10000 });
+  await expect(modal).toBeHidden();
 
   await expect(page.getByRole('region', { name: /Cart items/i })).not.toContainText(
     'Your cart is empty',
@@ -146,10 +146,10 @@ export async function proceedToCheckout(page: Page): Promise<void> {
     name: /Proceed to Checkout/i,
   });
 
-  await expect(proceedButton).toBeVisible({ timeout: 10000 });
-  await expect(proceedButton).toBeEnabled({ timeout: 10000 });
+  await expect(proceedButton).toBeVisible();
+  await expect(proceedButton).toBeEnabled();
   await proceedButton.click();
-  await expect(page).toHaveURL(/\/checkout/i, { timeout: 15000 });
+  await expect(page).toHaveURL(/\/checkout/i);
 }
 
 export async function placeBasicCheckoutOrder(page: Page): Promise<void> {
@@ -219,12 +219,12 @@ export async function placeBasicCheckoutOrder(page: Page): Promise<void> {
     .getByText(/I acknowledge and agree to the terms/i)
     .first();
   await agreement.scrollIntoViewIfNeeded();
-  await expect(agreement).toBeVisible({ timeout: 10000 });
+  await expect(agreement).toBeVisible();
   await agreement.click();
 
   const placeOrderButton = page.getByRole('button', { name: /Place Order/i });
   await placeOrderButton.scrollIntoViewIfNeeded();
-  await expect(placeOrderButton).toBeEnabled({ timeout: 10000 });
+  await expect(placeOrderButton).toBeEnabled();
   await placeOrderButton.click();
 
   await Promise.race([
@@ -248,7 +248,7 @@ export async function ensureAtLeastOneOrder(page: Page): Promise<void> {
   await navigateK12CateringMenu(page, 'Orders');
   await page.waitForLoadState('domcontentloaded');
 
-  await expect(page.locator('h1')).toContainText(/Order/i, { timeout: 15000 });
+  await expect(page.locator('h1')).toContainText(/Order/i);
 
   // Existing orders show a "View details for order …" button on each card
   const anyExistingOrder = page

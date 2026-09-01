@@ -38,7 +38,7 @@ async function ensureMenuPage(page: Page): Promise<void> {
   await reauthIfLauncher(page);
   await expect(
     page.getByRole('heading', { name: 'Menu', exact: true }),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 }
 
 // The menu-item names currently on the selected menu (read from the "Edit <name>
@@ -70,7 +70,7 @@ async function menuItemNames(page: Page): Promise<string[]> {
 async function selectMenuFromDropdown(page: Page, name: string): Promise<void> {
   await ensureMenuPage(page);
   const select = page.locator('#admin-menu-select');
-  await expect(select).toBeVisible({ timeout: 10000 });
+  await expect(select).toBeVisible();
 
   const isNative = await select
     .evaluate((el) => el.tagName.toLowerCase() === 'select')
@@ -167,7 +167,7 @@ async function ensureDuplicateExists(
   await openManageMenus(page);
   await expect(
     page.getByRole('button', { name: menuButtonName('Rename', dupName) }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 // Open the Add-Items pop-up ("Items in <menu>") for a menu and wait for it to load.
@@ -178,7 +178,7 @@ async function openItemsDialog(page: Page, menuName: string): Promise<void> {
     .click();
   await expect(
     page.getByRole('heading', { name: `Items in "${menuName}"` }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
   await page
     .getByRole('checkbox')
     .first()
@@ -251,16 +251,16 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
         catering.getByRole('button', {
           name: menuButtonName('Duplicate', ORIGINAL_MENU),
         }),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
       await catering
         .getByRole('button', { name: menuButtonName('Duplicate', ORIGINAL_MENU) })
         .click();
 
       await expect(
         catering.getByRole('heading', { name: `Duplicate "${ORIGINAL_MENU}"` }),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
       const dupNameInput = catering.locator('#duplicate-menu-name');
-      await expect(dupNameInput).toBeVisible({ timeout: 10000 });
+      await expect(dupNameInput).toBeVisible();
 
       // A new name is required: with the field empty the "Create menu" button is
       // disabled (or, if clickable, no menu is created).
@@ -308,12 +308,12 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
         .locator('#main-content')
         .getByRole('button', { name: /^Sort menu items in /i })
         .first();
-      await expect(sortItemsBtn).toBeVisible({ timeout: 10000 });
+      await expect(sortItemsBtn).toBeVisible();
       await sortItemsBtn.click();
       const sortDialog = catering.getByRole('dialog').first();
       await expect(
         sortDialog.getByRole('heading', { name: /Sort menu item order/i }),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
       await expect(sortDialog).toContainText(
         /This will only update the display order of items in the .+ category of .+/i,
       );
@@ -346,7 +346,7 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
       await catering.getByRole('button', { name: /^Save$/ }).click();
       await expect(
         catering.getByText(/updated|saved|success/i).first(),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
 
       // Re-open the pop-up: the saved selection persisted — every item except the
       // one we deselected (count is order-independent, so reordering is fine).
@@ -373,7 +373,7 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
         .click();
       await expect(
         catering.getByRole('heading', { name: 'Delete Menu' }),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
       await catering.getByRole('button', { name: /^Delete$/ }).last().click();
       await expect(
         catering.getByText(/Menu deleted/i).first(),

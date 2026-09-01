@@ -111,7 +111,7 @@ export async function ensureInK12CateringApp(page: Page): Promise<void> {
 export async function clickSidebarItem(page: Page, name: string): Promise<void> {
   await ensureInK12CateringApp(page);
   const item = page.locator('aside[aria-label="Main navigation"]').getByLabel(`Navigate to ${name}`);
-  await expect(item).toBeVisible({ timeout: 10000 });
+  await expect(item).toBeVisible();
   await item.click();
   await page.waitForLoadState('domcontentloaded');
 }
@@ -193,7 +193,7 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
     await page.waitForLoadState('domcontentloaded');
     switchBtn = page.getByRole('button', { name: /Switch district/i }).first();
   }
-  await expect(switchBtn).toBeVisible({ timeout: 10000 });
+  await expect(switchBtn).toBeVisible();
   await switchBtn.click();
   await page.waitForLoadState('domcontentloaded');
 
@@ -228,7 +228,7 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
         .catch(() => undefined);
       await waitForListSettled(page);
     }
-    await expect(card).toBeVisible({ timeout: 10000 });
+    await expect(card).toBeVisible();
     await card.click();
     // Some variants pop a confirm after picking a card; wait briefly for it and
     // click it if it shows (waitFor, since isVisible() doesn't wait).
@@ -258,11 +258,11 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
         .getByText(new RegExp(`${districtPattern(districtName)}(?!\\w)`, 'i'))
         .last();
     }
-    await expect(option).toBeVisible({ timeout: 10000 });
+    await expect(option).toBeVisible();
     await option.click();
 
     const confirmBtn = page.getByRole('button', { name: /^Switch District$/i }).last();
-    await expect(confirmBtn).toBeVisible({ timeout: 10000 });
+    await expect(confirmBtn).toBeVisible();
     await confirmBtn.click();
   }
 
@@ -316,19 +316,19 @@ export async function goToDataSync(page: Page): Promise<void> {
     await ensureInK12CateringApp(page);
     await clickSidebarItem(page, 'Data Sync');
   }
-  await expect(heading).toBeVisible({ timeout: 15000 });
+  await expect(heading).toBeVisible();
 }
 
 /** Open Manage, set the "Sync <attr>" global toggle to on/off, then close. */
 export async function setGlobalSyncToggle(page: Page, attrLabel: string, on: boolean): Promise<void> {
   const manageBtn = page.getByRole('button', { name: /^Manage$/i }).or(page.getByRole('link', { name: /^Manage$/i })).first();
   await scrollUntilVisible(page, { target: manageBtn }).catch(() => undefined);
-  await expect(manageBtn).toBeVisible({ timeout: 10000 });
+  await expect(manageBtn).toBeVisible();
   await manageBtn.click();
   const dialog = page.getByRole('dialog').first();
-  await expect(dialog).toBeVisible({ timeout: 10000 });
+  await expect(dialog).toBeVisible();
   const toggle = dialog.getByRole('switch', { name: attrLabel, exact: true });
-  await expect(toggle).toBeVisible({ timeout: 10000 });
+  await expect(toggle).toBeVisible();
   const isOn = (await toggle.getAttribute('aria-checked').catch(() => null)) === 'true';
   if (isOn !== on) {
     await toggle.click();
@@ -354,11 +354,11 @@ export async function ensureTargetDistrictOptedIn(page: Page, districtName: stri
     .or(page.getByRole('link', { name: /^Manage$/i }))
     .first();
   await scrollUntilVisible(page, { target: manageBtn }).catch(() => undefined);
-  await expect(manageBtn).toBeVisible({ timeout: 10000 });
+  await expect(manageBtn).toBeVisible();
   await manageBtn.click();
 
   const dialog = page.getByRole('dialog').first();
-  await expect(dialog).toBeVisible({ timeout: 10000 });
+  await expect(dialog).toBeVisible();
 
   // Each target district is a row carrying its name and its own opt-in switch.
   const row = dialog
@@ -407,7 +407,7 @@ export async function runPushSyncNow(
   await scrollUntilVisible(page, { target: pushBtn }).catch(() => undefined);
   if (await pushBtn.isDisabled().catch(() => false)) return false;
   await pushBtn.click();
-  await expect(page.locator('div').filter({ hasText: /^Push sync now\?$/ }).first()).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('div').filter({ hasText: /^Push sync now\?$/ }).first()).toBeVisible();
   await page.getByRole('button', { name: /Yes,?\s*Push Now/i }).first().click();
   await expect(
     page.getByText(/Sync complete\s*[.,;:—–-]?\s*\d+\s*items?\s*synced,\s*\d+\s*skipped/i).first(),
@@ -420,7 +420,7 @@ export async function runPushSyncNow(
 /** Navigate to Menu and ensure the top-right menu dropdown is "TheRealMenu". */
 export async function selectTheRealMenu(page: Page): Promise<void> {
   await safeNavigate(page, 'Menu');
-  await expect(page.getByRole('heading', { name: /^Menu$/i }).first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: /^Menu$/i }).first()).toBeVisible();
   await page.getByText(/Loading Menu/i).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => undefined);
   const menuSelect = page.locator('#admin-menu-select');
   if (await menuSelect.isVisible({ timeout: 10000 }).catch(() => false)) {
@@ -437,7 +437,7 @@ const editPencil = (page: Page, name: string) =>
 /** Read the name of the first menu item from its Edit pencil aria-label. */
 export async function firstMenuItemName(page: Page): Promise<string> {
   const editBtn = page.locator('#main-content').getByRole('button', { name: /^Edit\s+.+/i }).first();
-  await expect(editBtn).toBeVisible({ timeout: 15000 });
+  await expect(editBtn).toBeVisible();
   const label = (await editBtn.getAttribute('aria-label')) ?? '';
   const m = label.match(/^Edit\s+(.+?)(?:\s+menu item)?$/i);
   return m ? m[1].trim() : '';
@@ -445,9 +445,9 @@ export async function firstMenuItemName(page: Page): Promise<string> {
 
 async function openItemEdit(page: Page, name: string): Promise<void> {
   const btn = editPencil(page, name);
-  await expect(btn).toBeVisible({ timeout: 15000 });
+  await expect(btn).toBeVisible();
   await btn.click();
-  await expect(page.getByRole('dialog', { name: /Edit Menu Item/i })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('dialog', { name: /Edit Menu Item/i })).toBeVisible();
 }
 
 /**
@@ -518,7 +518,7 @@ export async function editMenuItem(
     }
   }
   await page.getByRole('button', { name: /Update menu item|Update Menu Item|^Update$|^Save$/i }).first().click();
-  await expect(page.getByRole('dialog', { name: /Edit Menu Item/i })).not.toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('dialog', { name: /Edit Menu Item/i })).not.toBeVisible();
 }
 
 /**
@@ -543,7 +543,7 @@ export async function findSyncableItemRow(page: Page, name: string): Promise<Loc
 
   // No sleep: the row assertion below waits for the filtered list.
   const row = page.locator(LIST_ROW_SELECTOR).filter({ hasText: name }).first();
-  await expect(row).toBeVisible({ timeout: 15000 });
+  await expect(row).toBeVisible();
   return row;
 }
 
@@ -619,7 +619,7 @@ export async function resetLocalOverride(page: Page, name: string): Promise<bool
     .getByRole('dialog')
     .filter({ has: page.getByRole('heading', { name: /Reset Local Overrides/i }) })
     .first();
-  await expect(resetDialog).toBeVisible({ timeout: 10000 });
+  await expect(resetDialog).toBeVisible();
   await resetDialog.getByRole('button', { name: /Reset Overrides|^Reset$|^Confirm$/i }).last().click();
   // waitFor, not isVisible - isVisible returns at once, so its timeout never applied.
   await page

@@ -34,14 +34,14 @@ test.describe('Dashboard - Overview (Stats, Quick Actions, Filters)', () => {
   const qaSection = () => catering.locator('section[aria-label="Quick actions and account statistics"]');
 
   test('Dashboard - Filter controls render with default values and shortcut buttons work', async () => {
-    await expect(catering.getByRole('button', { name: 'Select time period filter' })).toBeVisible({ timeout: 15000 });
+    await expect(catering.getByRole('button', { name: 'Select time period filter' })).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Select status filter' })).toContainText('All Status');
     await expect(catering.getByRole('button', { name: 'Select statistics by date type' })).toContainText('Delivery Date');
 
     await catering.getByRole('button', { name: 'Scroll to calendar view' }).click();
-    await expect(catering.getByRole('region', { name: 'Calendar view and date-wise orders' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('region', { name: 'Calendar view and date-wise orders' })).toBeVisible();
     await catering.getByRole('button', { name: 'Scroll to trending chart' }).click();
-    await expect(catering.getByRole('region', { name: 'Trending data visualization' }).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('region', { name: 'Trending data visualization' }).first()).toBeVisible();
   });
 
   test('Dashboard - Time Period and Status dropdowns show all options and update filter label', async () => {
@@ -68,7 +68,7 @@ test.describe('Dashboard - Overview (Stats, Quick Actions, Filters)', () => {
     await statusButton.click();
     await catering.getByRole('option', { name: 'All Status' }).click();
 
-    await expect(statsRegion()).toBeVisible({ timeout: 15000 });
+    await expect(statsRegion()).toBeVisible();
     await expect(statsRegion().getByRole('region', { name: /^Total Orders/i })).toBeVisible();
     await expect(statsRegion().getByRole('region', { name: /^Total Revenue/i })).toBeVisible();
     await expect(statsRegion().getByRole('region', { name: /^Pending Orders/i })).toBeVisible();
@@ -85,11 +85,11 @@ test.describe('Dashboard - Overview (Stats, Quick Actions, Filters)', () => {
     const advancedButton = catering.getByRole('button', { name: 'Advanced view' });
     await advancedButton.click();
     await expect(advancedButton).toHaveAttribute('aria-pressed', 'true');
-    await expect(statsRegion().getByRole('region', { name: /^Total Orders/i })).toBeVisible({ timeout: 10000 });
+    await expect(statsRegion().getByRole('region', { name: /^Total Orders/i })).toBeVisible();
   });
 
   test('Dashboard - Quick Actions section renders all buttons and navigates correctly', async () => {
-    await expect(qaSection()).toBeVisible({ timeout: 15000 });
+    await expect(qaSection()).toBeVisible();
     await expect(qaSection().getByRole('heading', { name: 'Quick Actions' })).toBeVisible();
     await expect(qaSection().getByRole('heading', { name: 'Account Statistics' })).toBeVisible();
 
@@ -100,10 +100,10 @@ test.describe('Dashboard - Overview (Stats, Quick Actions, Filters)', () => {
     ];
     for (const action of actions) {
       await qaSection().getByRole('button', { name: action.buttonName }).click();
-      await expect(catering).toHaveURL(action.urlPattern, { timeout: 15000 });
+      await expect(catering).toHaveURL(action.urlPattern);
       await navigateK12CateringMenu(catering, 'Dashboard');
       await catering.waitForLoadState('domcontentloaded');
-      await expect(qaSection()).toBeVisible({ timeout: 15000 });
+      await expect(qaSection()).toBeVisible();
     }
   });
 });

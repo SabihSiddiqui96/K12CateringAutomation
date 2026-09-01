@@ -33,7 +33,7 @@ test('Catering - User Feedback - feedback widget: expand, flyouts, validation, s
   await ensureInK12CateringApp(c);
 
   // AC1: the lightbulb feedback FAB is present (every authenticated page).
-  await expect(c.getByRole('button', { name: /Open feedback menu/i })).toBeVisible({ timeout: 15000 });
+  await expect(c.getByRole('button', { name: /Open feedback menu/i })).toBeVisible();
 
   // AC2: clicking it reveals the four labelled action buttons.
   await openMenu(c);
@@ -93,6 +93,6 @@ test('Catering - User Feedback - feedback widget: expand, flyouts, validation, s
   await c.getByText('Share an idea').first().click();
   await c.locator('textarea:visible').first().fill(`QA automation ${Date.now()}`);
   await c.getByRole('button', { name: /^Submit idea$/i }).click();
-  await expect(c.getByText(/Thank you for your feedback/i).first()).toBeVisible({ timeout: 10000 });
+  await expect(c.getByText(/Thank you for your feedback/i).first()).toBeVisible();
   await expect(c.getByRole('button', { name: /Open feedback menu/i })).toBeVisible({ timeout: 8000 });
 });

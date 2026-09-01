@@ -39,7 +39,7 @@ test.describe('Dashboard Revenue Calculation', () => {
     const statusFilter = catering.getByRole('button', {
       name: /Select status filter/i,
     });
-    await expect(statusFilter).toBeVisible({ timeout: 10000 });
+    await expect(statusFilter).toBeVisible();
 
     const revenueWidget = catering.getByText(/\$[\d,]+\.\d{2}/).first();
     await expect(revenueWidget).toBeVisible();
@@ -89,7 +89,7 @@ test.describe('Reports Status Filter', () => {
     await catering.waitForLoadState('networkidle');
 
     const salesFilter = catering.getByRole('button', { name: /Select.*status/i });
-    await expect(salesFilter).toBeVisible({ timeout: 10000 });
+    await expect(salesFilter).toBeVisible();
     await expect(salesFilter).toContainText(/Delivered/i);
 
     await salesFilter.click();
@@ -106,12 +106,12 @@ test.describe('Reports Status Filter', () => {
       .getByRole('button', { name: /Financial Summary/i })
       .or(catering.getByRole('link', { name: /Financial Summary/i }))
       .first();
-    await expect(financialSummaryBtn).toBeVisible({ timeout: 15000 });
+    await expect(financialSummaryBtn).toBeVisible();
     await financialSummaryBtn.click();
     await catering.waitForLoadState('networkidle');
 
     const financialFilter = catering.getByRole('button', { name: /Select.*status/i });
-    await expect(financialFilter).toBeVisible({ timeout: 10000 });
+    await expect(financialFilter).toBeVisible();
     await expect(financialFilter).toContainText(/Delivered/i);
 
     await financialFilter.click();
@@ -128,13 +128,13 @@ test.describe('Reports Status Filter', () => {
       .getByRole('button', { name: /Revenue by Customer/i })
       .or(catering.getByRole('link', { name: /Revenue by Customer/i }))
       .first();
-    await expect(revenueByCustomerBtn).toBeVisible({ timeout: 15000 });
+    await expect(revenueByCustomerBtn).toBeVisible();
     await revenueByCustomerBtn.scrollIntoViewIfNeeded();
     await revenueByCustomerBtn.click();
     await catering.waitForLoadState('networkidle');
 
     const customerFilter = catering.getByRole('button', { name: /Select.*status/i });
-    await expect(customerFilter).toBeVisible({ timeout: 10000 });
+    await expect(customerFilter).toBeVisible();
     await expect(customerFilter).toContainText(/Delivered/i);
   });
 
@@ -144,7 +144,7 @@ test.describe('Reports Status Filter', () => {
       .click();
     await catering.waitForLoadState('networkidle');
     const salesFilter = catering.getByRole('button', { name: /Select.*status/i });
-    await expect(salesFilter).toBeVisible({ timeout: 10000 });
+    await expect(salesFilter).toBeVisible();
     await salesFilter.click();
     await catering.getByRole('option', { name: /All/i }).first().click();
     await catering.waitForLoadState('networkidle');
@@ -155,7 +155,7 @@ test.describe('Reports Status Filter', () => {
     await catering.getByRole('button', { name: /Financial Summary/i }).click();
     await catering.waitForLoadState('networkidle');
     const financialFilter = catering.getByRole('button', { name: /Select.*status/i });
-    await expect(financialFilter).toBeVisible({ timeout: 10000 });
+    await expect(financialFilter).toBeVisible();
     await financialFilter.click();
     await catering.getByRole('option', { name: /All/i }).first().click();
     await catering.waitForLoadState('networkidle');
@@ -168,7 +168,7 @@ test.describe('Reports Status Filter', () => {
     await revenueBtn.click();
     await catering.waitForLoadState('networkidle');
     const customerFilter = catering.getByRole('button', { name: /Select.*status/i });
-    await expect(customerFilter).toBeVisible({ timeout: 10000 });
+    await expect(customerFilter).toBeVisible();
   });
 });
 
@@ -199,7 +199,7 @@ async function closeChangePasswordModal(catering: Page) {
   } else {
     await catering.keyboard.press('Escape');
   }
-  await expect(dialog).toBeHidden({ timeout: 10000 });
+  await expect(dialog).toBeHidden();
 }
 
 async function openChangePasswordModal(catering: Page) {
@@ -215,7 +215,7 @@ async function openChangePasswordModal(catering: Page) {
   const searchBox = catering.getByRole('textbox', {
     name: /Search accounts by name, username, or email/i,
   });
-  await expect(searchBox).toBeVisible({ timeout: 10000 });
+  await expect(searchBox).toBeVisible();
   await searchBox.fill(CUSTOMER_EMAIL);
   // Let the filtered account list settle before opening the kebab menu — the
   // list re-renders after the search and can detach the menu mid-click.
@@ -256,7 +256,7 @@ async function openChangePasswordModal(catering: Page) {
     await catering.waitForTimeout(600);
   }
 
-  await expect(dialog).toBeVisible({ timeout: 10000 });
+  await expect(dialog).toBeVisible();
   return dialog;
 }
 
@@ -326,7 +326,7 @@ test.describe('Accounts Change Password', () => {
     await expect(
       catering.getByText(/password.*changed|updated successfully|success/i).first(),
     ).toBeVisible({ timeout: 8000 });
-    await expect(getChangePasswordDialog(catering)).toBeHidden({ timeout: 10000 });
+    await expect(getChangePasswordDialog(catering)).toBeHidden();
 
     await catering.getByRole('button', { name: /User account menu/i }).click();
     await catering.waitForTimeout(400);
@@ -339,16 +339,16 @@ test.describe('Accounts Change Password', () => {
 
     const emailInput = catering.getByRole('textbox', { name: /Email/i });
     const passwordInput = catering.getByRole('textbox', { name: /Password/i });
-    await expect(emailInput).toBeVisible({ timeout: 10000 });
-    await expect(passwordInput).toBeVisible({ timeout: 10000 });
+    await expect(emailInput).toBeVisible();
+    await expect(passwordInput).toBeVisible();
     await emailInput.fill(CUSTOMER_EMAIL);
     await catering.getByRole('textbox', { name: /Password/i }).fill(NEW_PASSWORD);
     await catering.getByRole('button', { name: /Sign in/i }).click();
     await catering.waitForLoadState('networkidle');
-    await expect(catering).not.toHaveURL(/login/, { timeout: 10000 });
+    await expect(catering).not.toHaveURL(/login/);
     await expect(
       catering.getByRole('button', { name: 'Go to home page' }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     await catering.getByRole('button', { name: /User account menu/i }).click();
     await catering.waitForTimeout(400);
@@ -478,7 +478,7 @@ async function addFirstMenuItemToCart(page: Page, navigateToMenu = true) {
     .getByRole('button', { name: /Add to Cart/i })
     .first();
   await cardAddToCart.scrollIntoViewIfNeeded();
-  await expect(cardAddToCart).toBeVisible({ timeout: 10000 });
+  await expect(cardAddToCart).toBeVisible();
   await cardAddToCart.click();
 
   const addToCartModal = getAddToCartModal(page);
@@ -486,14 +486,14 @@ async function addFirstMenuItemToCart(page: Page, navigateToMenu = true) {
     const modalAddToCart = addToCartModal.getByRole('button', {
       name: /^Add to Cart$/i,
     });
-    await expect(modalAddToCart).toBeVisible({ timeout: 10000 });
-    await expect(modalAddToCart).toBeEnabled({ timeout: 10000 });
+    await expect(modalAddToCart).toBeVisible();
+    await expect(modalAddToCart).toBeEnabled();
     await modalAddToCart.click();
-    await expect(addToCartModal).toBeHidden({ timeout: 10000 });
+    await expect(addToCartModal).toBeHidden();
   } else {
     const modalAddToCart = page.getByRole('button', { name: /^Add to Cart$/i }).last();
     if (await modalAddToCart.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(modalAddToCart).toBeEnabled({ timeout: 10000 });
+      await expect(modalAddToCart).toBeEnabled();
       await modalAddToCart.click();
     }
   }
@@ -555,7 +555,7 @@ async function proceedToCheckout(page: Page) {
   });
 
   const attemptCheckout = async () => {
-    await expect(proceedToCheckoutButton).toBeVisible({ timeout: 10000 });
+    await expect(proceedToCheckoutButton).toBeVisible();
     await proceedToCheckoutButton.click();
     return page
       .waitForURL(/\/checkout/i, { timeout: 5000 })
@@ -581,7 +581,7 @@ async function proceedToCheckout(page: Page) {
     }
   }
 
-  await expect(page).toHaveURL(/\/checkout/i, { timeout: 15000 });
+  await expect(page).toHaveURL(/\/checkout/i);
 }
 
 async function addFirstMenuItemAndProceedToCheckout(page: Page) {
@@ -597,7 +597,7 @@ async function openCheckoutDatePicker(page: Page) {
   await datePickerButton.click();
   await expect(
     page.getByRole('button', { name: /Previous month/i }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function navigateDatePickerToDate(page: Page, targetDate: Date) {
@@ -612,8 +612,8 @@ async function navigateDatePickerToDate(page: Page, targetDate: Date) {
 
   const previousMonthButton = page.getByRole('button', { name: /Previous month/i });
   const nextMonthButton = page.getByRole('button', { name: /Next month/i });
-  await expect(previousMonthButton).toBeVisible({ timeout: 10000 });
-  await expect(nextMonthButton).toBeVisible({ timeout: 10000 });
+  await expect(previousMonthButton).toBeVisible();
+  await expect(nextMonthButton).toBeVisible();
 
   for (let i = 0; i < 24; i++) {
     if (await targetMonthHeading.isVisible().catch(() => false)) {
@@ -635,7 +635,7 @@ async function navigateDatePickerToDate(page: Page, targetDate: Date) {
 
 async function getVisibleDatePickerMonth(page: Page) {
   const dialog = getSelectDateDialog(page);
-  await expect(dialog).toBeVisible({ timeout: 10000 });
+  await expect(dialog).toBeVisible();
 
   const headings = dialog.getByRole('heading');
   const headingCount = await headings.count();
@@ -672,7 +672,7 @@ async function expectCalendarDateRestricted(page: Page, targetDate: Date) {
     getSelectDateDialog(page)
       .getByText(String(targetDate.getDate()), { exact: true })
       .first(),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function readOrderLeadTimeDays(page: Page) {
@@ -699,7 +699,7 @@ test.describe('Settings Order Lead Time', () => {
 
     await expect(
       catering.getByRole('heading', { name: /Order Lead Time/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     await expect(
       catering.getByRole('button', { name: /Edit order lead time/i }),
     ).toBeVisible();
@@ -717,8 +717,8 @@ test.describe('Settings Order Lead Time', () => {
     await navigateDatePickerToDate(catering, adminBypassDate);
 
     const adminBypassDateButton = getCalendarDateButton(catering, adminBypassDate);
-    await expect(adminBypassDateButton).toBeVisible({ timeout: 10000 });
-    await expect(adminBypassDateButton).toBeEnabled({ timeout: 10000 });
+    await expect(adminBypassDateButton).toBeVisible();
+    await expect(adminBypassDateButton).toBeEnabled();
     await adminBypassDateButton.click();
     await catering.waitForTimeout(300);
 
@@ -755,13 +755,13 @@ test.describe('Minimum Order Amount', () => {
 
     await expect(
       catering.getByRole('heading', { name: 'Minimum Order Amount', exact: true }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     // The heading + Edit button confirm the section. The displayed value varies
     // ("$X minimum" when set, nothing/unset in a fresh district like Alief ISD on
     // UAT), and the test sets the value next — so don't assert on it here.
     await expect(
       catering.getByRole('button', { name: /Edit minimum order amount/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     // ── Step 4: Open edit modal and verify helper text ──
     await catering
@@ -817,7 +817,7 @@ test.describe('Minimum Order Amount', () => {
         .fill(ORIGINAL_PASSWORD);
       await nonAdminPage1.getByRole('button', { name: /Sign in/i }).click();
       await nonAdminPage1.waitForLoadState('networkidle');
-      await expect(nonAdminPage1).not.toHaveURL(/login/, { timeout: 15000 });
+      await expect(nonAdminPage1).not.toHaveURL(/login/);
 
       await nonAdminPage1
         .getByRole('listitem', { name: /Navigate to Menu/i })
@@ -853,7 +853,7 @@ test.describe('Minimum Order Amount', () => {
         .fill(ORIGINAL_PASSWORD);
       await nonAdminPage2.getByRole('button', { name: /Sign in/i }).click();
       await nonAdminPage2.waitForLoadState('networkidle');
-      await expect(nonAdminPage2).not.toHaveURL(/login/, { timeout: 15000 });
+      await expect(nonAdminPage2).not.toHaveURL(/login/);
 
       await nonAdminPage2
         .getByRole('listitem', { name: /Navigate to Menu/i })
@@ -922,8 +922,8 @@ test.describe('Checkout Backdate Order', () => {
     ).toBeVisible({ timeout: 5000 });
 
     const targetDateButton = getCalendarDateButton(catering, selectableDate);
-    await expect(targetDateButton).toBeVisible({ timeout: 10000 });
-    await expect(targetDateButton).toBeEnabled({ timeout: 10000 });
+    await expect(targetDateButton).toBeVisible();
+    await expect(targetDateButton).toBeEnabled();
     await targetDateButton.click();
     await catering.waitForTimeout(300);
     await expect(catering.getByRole('button', { name: /^Next$/i })).toBeEnabled();
@@ -943,7 +943,7 @@ test.describe('Checkout Backdate Order', () => {
     ).toBeVisible({ timeout: 5000 });
 
     const disabledDateButton = getCalendarDateButton(catering, disabledDate);
-    await expect(disabledDateButton).toBeVisible({ timeout: 10000 });
+    await expect(disabledDateButton).toBeVisible();
     await expect(disabledDateButton).toBeDisabled();
 
     // ── Close the date picker before finishing ──
@@ -998,7 +998,7 @@ test.describe('Checkout Backdate Order', () => {
       await nonAdminPage.getByRole('textbox', { name: /Password/i }).fill(customerPassword);
       await nonAdminPage.getByRole('button', { name: /Sign in/i }).click();
       await nonAdminPage.waitForLoadState('networkidle');
-      await expect(nonAdminPage).not.toHaveURL(/login/, { timeout: 15000 });
+      await expect(nonAdminPage).not.toHaveURL(/login/);
 
       await nonAdminPage.getByRole('listitem', { name: /Navigate to Menu/i }).click();
       await nonAdminPage.waitForLoadState('domcontentloaded');
@@ -1079,46 +1079,46 @@ test.describe('Districts - New District Visibility', () => {
 
     // ── Click Add New District ──
     const addDistrictBtn = catering.getByRole('button', { name: /Add new district/i });
-    await expect(addDistrictBtn).toBeVisible({ timeout: 10000 });
+    await expect(addDistrictBtn).toBeVisible();
     await addDistrictBtn.click();
     await catering.waitForTimeout(500);
 
     // ── Fill District Name ──
     const districtNameInput = catering.getByRole('textbox', { name: /District Name/i });
-    await expect(districtNameInput).toBeVisible({ timeout: 10000 });
+    await expect(districtNameInput).toBeVisible();
     await districtNameInput.fill(districtName);
 
     // ── Select Environment — QA (PrimeroEdge) ──
     const enciDropdown = catering.locator('#add-environment-select');
-    await expect(enciDropdown).toBeVisible({ timeout: 10000 });
+    await expect(enciDropdown).toBeVisible();
     await enciDropdown.selectOption({ label: getEnvVar('ENVIRONMENT_LABEL', { required: false }) || 'QA (PrimeroEdge)' });
 
     // ── Fill Region ID ──
     const regionIdInput = catering.locator('#add-region-id');
-    await expect(regionIdInput).toBeVisible({ timeout: 10000 });
+    await expect(regionIdInput).toBeVisible();
     await regionIdInput.fill('123');
 
     // ── Select Timezone — Eastern Time ──
     const timezoneDropdown = catering
       .getByRole('combobox', { name: /Select timezone|Eastern Time|Timezone/i })
       .first();
-    await expect(timezoneDropdown).toBeVisible({ timeout: 10000 });
+    await expect(timezoneDropdown).toBeVisible();
     await timezoneDropdown.selectOption({ value: '1' });
 
     // ── Scroll down and verify District Logo section is visible ──
     const districtLogoSection = catering.getByText(/District Logo/i).first();
     await districtLogoSection.scrollIntoViewIfNeeded();
-    await expect(districtLogoSection).toBeVisible({ timeout: 10000 });
+    await expect(districtLogoSection).toBeVisible();
 
     // ── Click Add District button ──
     const submitBtn = catering.getByRole('button', { name: /Add District/i }).last();
-    await expect(submitBtn).toBeVisible({ timeout: 10000 });
+    await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
     // ── Verify district created success toast ──
     await expect(
       catering.getByText(/district.*created|created.*successfully|success/i).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     // ── Switch to the newly created district. switchDistrict opens the switch
     //    dialog, searches (falling back to Browse-by-Letter when the district
@@ -1140,20 +1140,20 @@ test.describe('Districts - New District Visibility', () => {
 
     // ── Search for the newly created district ──
     const searchInput = catering.getByRole('textbox', { name: /Search districts/i });
-    await expect(searchInput).toBeVisible({ timeout: 10000 });
+    await expect(searchInput).toBeVisible();
     await searchInput.fill(districtName);
     await catering.waitForTimeout(600);
 
     // ── Verify district appears in search results ──
     await expect(
       catering.getByText(districtName).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     // ── Click Delete button for the district ──
     const deleteBtn = catering.getByRole('button', {
       name: new RegExp(`Delete district ${districtName}`, 'i'),
     });
-    await expect(deleteBtn).toBeVisible({ timeout: 10000 });
+    await expect(deleteBtn).toBeVisible();
     await deleteBtn.click();
     await catering.waitForTimeout(500);
 
@@ -1168,7 +1168,7 @@ test.describe('Districts - New District Visibility', () => {
     // ── Verify deletion success toast ──
     await expect(
       catering.getByText(/deleted|district.*deleted|removed.*successfully|success/i).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     // ── Verify district no longer appears in list ──
     await expect(

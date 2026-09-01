@@ -49,7 +49,7 @@ test.describe('Settings', () => {
 
 
   test('Settings - Page heading and all major sections are visible', async () => {
-    await expect(catering.locator('h1')).toContainText('Settings', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('Settings');
     await expect(catering.getByRole('region', { name: /Business settings/i })).toBeVisible();
     await expect(catering.getByRole('region', { name: /Operation schedule settings/i })).toBeVisible();
     await expect(catering.getByRole('heading', { name: /Hours of Operation/i })).toBeVisible();
@@ -68,10 +68,10 @@ test.describe('Settings', () => {
   });
 
   test('Settings - Order Lead Time shows current value and modal with Save/Cancel', async () => {
-    await expect(catering.getByText(/\d+ Days?/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(/\d+ Days?/i).first()).toBeVisible();
     await openModal(/Edit order lead time/i);
     const input = catering.getByRole('spinbutton').or(catering.getByRole('textbox', { name: /lead time/i })).first();
-    await expect(input).toBeVisible({ timeout: 10000 });
+    await expect(input).toBeVisible();
     await expect(catering.getByRole('button', { name: /Save/i })).toBeVisible();
     await input.clear();
     await input.fill('99');
@@ -81,13 +81,13 @@ test.describe('Settings', () => {
 
   test('Settings - Minimum Order Amount modal shows helper text and Save button', async () => {
     await openModal(/Edit minimum order amount/i);
-    await expect(catering.getByText(/Set to \$0 to disable/i)).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(/Set to \$0 to disable/i)).toBeVisible();
     await expect(catering.getByRole('button', { name: /Save/i })).toBeVisible();
     await closeModal();
   });
 
   test('Settings - Short URL section shows URL value and action buttons', async () => {
-    await expect(catering.getByRole('heading', { name: /Short URL/i })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: /Short URL/i })).toBeVisible();
     await expect(catering.getByText(/https:\/\/.*\/GUEST\//i)).toBeVisible();
     await expect(catering.getByRole('button', { name: /Open Short URL in new tab/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /Copy Short URL to clipboard/i })).toBeVisible();
@@ -95,7 +95,7 @@ test.describe('Settings', () => {
   });
 
   test('Settings - Holiday Schedule section shows heading, year filter and Add Holiday button', async () => {
-    await expect(catering.getByRole('region', { name: /Holiday schedule settings/i })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('region', { name: /Holiday schedule settings/i })).toBeVisible();
     await expect(catering.getByRole('heading', { name: /Holiday Schedule/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /Add new holiday/i })).toBeVisible();
     await expect(catering.getByText(/Filter holidays by year/i)).toBeVisible();
@@ -104,7 +104,7 @@ test.describe('Settings', () => {
   });
 
   test('Settings - District Contacts section shows existing contacts with edit/delete buttons', async () => {
-    await expect(catering.getByRole('heading', { name: /District Contacts/i })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: /District Contacts/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /Add\s+(new\s+)?contact/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /^Edit .+$/i }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: /^Delete .+$/i }).first()).toBeVisible();

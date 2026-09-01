@@ -96,13 +96,13 @@ test('Catering - Orders - Editing an order records an Order Edited entry in Orde
     }
     await expect(
       catering.getByRole('heading', { name: 'Order Activity' }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     const before = await catering.getByText(orderEditedActivity).count();
 
     // Open the editor and change only the special-instructions text (a unique
     // value, so the edit always registers without altering order pricing).
     await catering.getByRole('button', { name: 'Edit Order' }).click();
-    await expect(catering).toHaveURL(/\/orders\/edit/, { timeout: 15000 });
+    await expect(catering).toHaveURL(/\/orders\/edit/);
     await reauthIfLauncher(catering);
     await catering
       .getByRole('button', { name: /Guest count and special instructions/i })
@@ -110,13 +110,13 @@ test('Catering - Orders - Editing an order records an Order Edited entry in Orde
     const specialInstructions = catering.locator(
       '#edit-special-instructions-textarea',
     );
-    await expect(specialInstructions).toBeVisible({ timeout: 10000 });
+    await expect(specialInstructions).toBeVisible();
     await specialInstructions.fill(`QA regression edit ${Date.now()}`);
     await catering.getByRole('button', { name: /^Next$/i }).click();
     const confirmButton = catering.getByRole('button', {
       name: /Confirm Changes/i,
     });
-    await expect(confirmButton).toBeVisible({ timeout: 10000 });
+    await expect(confirmButton).toBeVisible();
     await confirmButton.click();
 
     // Back on the detail page (recover through the launcher if it fired on save).
@@ -128,7 +128,7 @@ test('Catering - Orders - Editing an order records an Order Edited entry in Orde
     }
     await expect(
       catering.getByRole('heading', { name: 'Order Activity' }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     const after = await catering.getByText(orderEditedActivity).count();
     expect(after).toBeGreaterThan(before);
   }).toPass({ timeout: 360000, intervals: [5000, 8000, 12000] });

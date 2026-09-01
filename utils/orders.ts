@@ -36,11 +36,11 @@ export async function pickTimeAndConfirm(page: Page, inputSelector: string): Pro
 
 export async function selectFirstContactCardInSection(page: Page, sectionHeading: RegExp | string): Promise<void> {
   const heading = page.getByRole('heading', { name: sectionHeading }).first();
-  await expect(heading).toBeVisible({ timeout: 10000 });
+  await expect(heading).toBeVisible();
   const section = heading.locator('xpath=ancestor::div[contains(@class,"space-y-3")][1]');
   const contactCard = section.locator('article').first();
   await contactCard.scrollIntoViewIfNeeded();
-  await expect(contactCard).toBeVisible({ timeout: 10000 });
+  await expect(contactCard).toBeVisible();
   await contactCard.click();
 }
 
@@ -106,7 +106,7 @@ export async function downloadInvoiceWithOptions(
   const dialog = page.locator('[role="dialog"]').first();
   await expect(
     dialog.getByRole('heading', { name: /Download Invoice Options/i }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 
   const optionBox = (key: string) =>
     page.locator(`input[aria-describedby="export-option-desc-include${key}"]`);
@@ -159,7 +159,7 @@ export async function startOrderToAdditionalDetails(page: Page): Promise<string>
   await page.waitForLoadState('domcontentloaded');
 
   const firstAddToCart = page.getByRole('button', { name: ORDER.addToCartBtn }).first();
-  await expect(firstAddToCart).toBeVisible({ timeout: 15000 });
+  await expect(firstAddToCart).toBeVisible();
   await firstAddToCart.click();
 
   const addToCartModal = page
@@ -188,7 +188,7 @@ export async function startOrderToAdditionalDetails(page: Page): Promise<string>
   await clickNext(page);
 
   // Now on the Additional Details step.
-  await expect(page.locator(ORDER.numGuestsInput)).toBeVisible({ timeout: 15000 });
+  await expect(page.locator(ORDER.numGuestsInput)).toBeVisible();
   return eventDate;
 }
 
@@ -198,7 +198,7 @@ export async function startOrderToAdditionalDetails(page: Page): Promise<string>
  * types), skip the optional payment contact, and continue to Review.
  */
 export async function selectPaymentAndContinue(page: Page): Promise<void> {
-  await expect(page.getByRole('heading', { name: /Payment Information/i }).first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: /Payment Information/i }).first()).toBeVisible();
   const firstType = page.locator('#payment-method-group button').first();
   await firstType.scrollIntoViewIfNeeded();
   await firstType.click();
@@ -244,7 +244,7 @@ export async function placeOrderWithEventName(page: Page, eventName: string): Pr
  */
 export async function exportOrdersCsvText(page: Page, dateStr: string): Promise<string> {
   await page.getByRole('button', { name: /Export Orders/i }).first().click();
-  await expect(page.getByRole('heading', { name: /Export Orders/i })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('heading', { name: /Export Orders/i })).toBeVisible();
 
   async function pickInCalendar(): Promise<void> {
     const target = page.locator(`button[aria-label*="${dateStr}"]:not([disabled])`).first();

@@ -66,7 +66,7 @@ async function resetToStep1(page: Page): Promise<void> {
 async function pickFirstAvailableDate(page: Page): Promise<void> {
   await resetToStep1(page);
   const datePickerBtn = page.getByRole('button', { name: /Select Event Date/i });
-  await expect(datePickerBtn).toBeVisible({ timeout: 10000 });
+  await expect(datePickerBtn).toBeVisible();
   await datePickerBtn.click();
   await expect(page.getByRole('button', { name: /Previous month/i })).toBeVisible({ timeout: 5000 });
 
@@ -214,39 +214,39 @@ test.describe('Check Availability', () => {
   // ── Layout ──
 
   test('Check Availability - Page heading is displayed', async () => {
-    await expect(catering.locator('h1')).toContainText('Check Availability', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('Check Availability');
   });
 
   test('Check Availability - Event Details section heading is visible', async () => {
     await expect(
       catering.getByRole('heading', { name: /Event Details/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Select Event Date button is visible', async () => {
     await expect(
       catering.getByRole('button', { name: /Select Event Date/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Check section heading is visible', async () => {
     await expect(
       catering.getByRole('heading', { name: /^Check$/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Select Event Date label heading is visible', async () => {
     await expect(
       catering.getByRole('heading', { name: /Select Event Date/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Page loads without errors', async () => {
     // The absence of an error string alone would also pass on a blank page.
-    await expect(catering.locator('h1')).toContainText('Check Availability', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('Check Availability');
     await expect(
       catering.getByRole('button', { name: /Select Event Date/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     await expect(catering.getByText(/Error Code: 404|something went wrong/i)).not.toBeVisible();
   });
 
@@ -257,7 +257,7 @@ test.describe('Check Availability', () => {
 
     await expect(
       catering.getByRole('button', { name: /Previous month/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     const cancelBtn = catering.getByRole('button', { name: /Cancel/i });
     if (await cancelBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -287,21 +287,21 @@ test.describe('Check Availability', () => {
     await pickFirstAvailableDate(catering);
     await expect(
       catering.getByRole('button', { name: /Continue to time selection/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Time step shows Select Event Setup Time heading', async () => {
     await proceedToTimeStep(catering);
     await expect(
       catering.getByRole('heading', { name: /Select Event Setup Time/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Time step shows time slot buttons', async () => {
     await proceedToTimeStep(catering);
     await expect(
       catering.getByRole('button', { name: /Select .+ for event setup/i }).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Back button at time step returns to date step', async () => {
@@ -313,7 +313,7 @@ test.describe('Check Availability', () => {
         .getByRole('button', { name: /Continue to time selection/i })
         .or(catering.getByRole('button', { name: /Select Event Date/i }))
         .first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   // ── Flow: Step 2 → Step 3 ──
@@ -322,7 +322,7 @@ test.describe('Check Availability', () => {
     await proceedToResultStep(catering);
     await expect(
       catering.getByRole('heading', { name: /It's Available/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Result step shows event date and time details', async () => {
@@ -343,7 +343,7 @@ test.describe('Check Availability', () => {
     // that button once the cart has items — covered by the "with cart" test below.
     await expect(
       await resultStep(browser, /Browse available menu items/i),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Back button at result step returns to time step', async () => {
@@ -352,13 +352,13 @@ test.describe('Check Availability', () => {
 
     await expect(
       catering.getByRole('heading', { name: /Select Event Setup Time/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('Check Availability - Browse Menu navigates to the menu page', async () => {
     await proceedToResultStep(catering);
     await catering.getByRole('button', { name: /Browse available menu items/i }).click();
-    await expect(catering).toHaveURL(/\/menu/i, { timeout: 10000 });
+    await expect(catering).toHaveURL(/\/menu/i);
   });
 
   test('Check Availability - Proceed to Checkout is not offered without a cart', async () => {
@@ -371,7 +371,7 @@ test.describe('Check Availability', () => {
       catering.getByRole('button', {
         name: /Proceed to checkout with selected date and time/i,
       }),
-    ).toBeHidden({ timeout: 10000 });
+    ).toBeHidden();
   });
 
   // ── Flow: Cart + Checkout ──
@@ -385,13 +385,13 @@ test.describe('Check Availability', () => {
       .locator('#main-content')
       .getByRole('button', { name: 'Add to Cart' })
       .first();
-    await expect(cardAddToCart).toBeVisible({ timeout: 10000 });
+    await expect(cardAddToCart).toBeVisible();
     await cardAddToCart.click();
 
     const modal = catering.locator('div.fixed.inset-0');
-    await expect(catering.getByRole('heading', { name: 'Add to Cart' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: 'Add to Cart' })).toBeVisible();
     await modal.getByRole('button', { name: 'Add to Cart' }).click();
-    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    await expect(modal).not.toBeVisible();
 
     // Navigate to Check Availability and complete the date → time → result flow
     await navigateK12CateringMenu(catering, 'Check Availability');
@@ -401,6 +401,6 @@ test.describe('Check Availability', () => {
 
     // With cart, Proceed to Checkout goes to /checkout
     await (await resultStepControl(catering, /Proceed to checkout with selected date and time/i)).click();
-    await expect(catering).toHaveURL(/\/checkout/, { timeout: 15000 });
+    await expect(catering).toHaveURL(/\/checkout/);
   });
 });

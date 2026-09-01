@@ -72,7 +72,7 @@ test.describe('Orders - Event Name & Payment Status [ADO 117619]', () => {
       await test.step('1) Checkout: Event Name required → Review shows it → Place Order', async () => {
         eventDate = await startOrderToAdditionalDetails(cat);
         const evName = cat.locator('#event-name-input');
-        await expect(evName).toBeVisible({ timeout: 10000 });
+        await expect(evName).toBeVisible();
         await cat.locator('#num-guests-input').fill('2');
         const nextBtn = cat.getByRole('button', { name: 'Next' });
         await expect(nextBtn).toBeDisabled(); // Event Name required
@@ -81,7 +81,7 @@ test.describe('Orders - Event Name & Payment Status [ADO 117619]', () => {
         await expect(nextBtn).toBeEnabled({ timeout: 6000 });
         await clickNext(cat);
         await selectPaymentAndContinue(cat);
-        await expect(cat.getByText(new RegExp(escapeRegExp(eventName), 'i')).first()).toBeVisible({ timeout: 10000 }); // Review shows it
+        await expect(cat.getByText(new RegExp(escapeRegExp(eventName), 'i')).first()).toBeVisible(); // Review shows it
         await reviewAndPlaceOrder(cat);
       });
 
@@ -89,15 +89,15 @@ test.describe('Orders - Event Name & Payment Status [ADO 117619]', () => {
         await ensureInK12CateringApp(cat);
         await navigateK12CateringMenu(cat, 'Orders');
         await cat.waitForTimeout(2500);
-        await expect(cat.getByText(/Payment Status/i).first()).toBeVisible({ timeout: 15000 });
+        await expect(cat.getByText(/Payment Status/i).first()).toBeVisible();
         await expect(cat.getByText(eventName, { exact: false }).first()).toBeVisible({ timeout: 20000 });
       });
 
       await test.step('3) Order Details: Payment Information + Event Name + Payment Pending', async () => {
         await openOurOrderDetails();
-        await expect(cat.getByText(/Payment Information/i).first()).toBeVisible({ timeout: 10000 });
-        await expect(cat.getByText(eventName, { exact: false }).first()).toBeVisible({ timeout: 10000 });
-        await expect(cat.getByText(/Payment Pending/i).first()).toBeVisible({ timeout: 10000 });
+        await expect(cat.getByText(/Payment Information/i).first()).toBeVisible();
+        await expect(cat.getByText(eventName, { exact: false }).first()).toBeVisible();
+        await expect(cat.getByText(/Payment Pending/i).first()).toBeVisible();
       });
 
       await test.step('4) Mark As Delivered doesn\'t change payment; Mark as Paid → Payment Accepted', async () => {
@@ -110,12 +110,12 @@ test.describe('Orders - Event Name & Payment Status [ADO 117619]', () => {
         if (canDeliver) {
           await adminAction(/mark.*delivered/i);
           await openOurOrderDetails();
-          await expect(cat.getByText(/Payment Pending/i).first()).toBeVisible({ timeout: 10000 });
+          await expect(cat.getByText(/Payment Pending/i).first()).toBeVisible();
         }
         await openOurOrderDetails();
         await adminAction(/mark.*paid/i, /Payment Accepted/i);
         await openOurOrderDetails();
-        await expect(cat.getByText(/Payment Accepted/i).first()).toBeVisible({ timeout: 10000 });
+        await expect(cat.getByText(/Payment Accepted/i).first()).toBeVisible();
       });
 
       await test.step('5) Orders Export (CSV) for the event date contains the Event Name', async () => {
@@ -132,7 +132,7 @@ test.describe('Orders - Event Name & Payment Status [ADO 117619]', () => {
         await navigateK12CateringMenu(cat, 'Orders');
         await cat.waitForTimeout(2000);
         const payFilter = cat.getByRole('button').filter({ hasText: /All Payments/i }).first();
-        await expect(payFilter).toBeVisible({ timeout: 10000 });
+        await expect(payFilter).toBeVisible();
         await payFilter.click();
         await cat.waitForTimeout(700);
         const statusOption = cat

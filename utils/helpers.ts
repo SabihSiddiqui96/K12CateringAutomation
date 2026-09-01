@@ -438,11 +438,11 @@ export async function navigateK12CateringMenu(
 ): Promise<void> {
   const sidebar = page.locator('aside[aria-label="Main navigation"]');
 
-  await expect(sidebar).toBeVisible({ timeout: 10000 });
+  await expect(sidebar).toBeVisible();
 
   const menuButton = sidebar.getByLabel(`Navigate to ${menuItem}`);
 
-  await expect(menuButton).toBeVisible({ timeout: 10000 });
+  await expect(menuButton).toBeVisible();
   await menuButton.click();
 }
 

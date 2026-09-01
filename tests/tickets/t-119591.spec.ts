@@ -105,7 +105,7 @@ async function appears(locator: Locator, timeout = 15000): Promise<boolean> {
 
 async function openFeedbackMenu(c: Page): Promise<void> {
   await c.getByRole('button', { name: OPEN_FEEDBACK }).first().click();
-  await expect(c.getByRole('button', { name: OPT_ISSUE }).first()).toBeVisible({ timeout: 10000 });
+  await expect(c.getByRole('button', { name: OPT_ISSUE }).first()).toBeVisible();
 }
 
 /**
@@ -128,15 +128,15 @@ async function closeFeedbackWidget(c: Page): Promise<void> {
   if (await appears(close, 3000)) {
     await close.click().catch(() => undefined);
   }
-  await expect(c.locator(FB_COMMENT)).toBeHidden({ timeout: 10000 });
-  await expect(c.getByRole('button', { name: OPT_ISSUE }).first()).toBeHidden({ timeout: 10000 });
+  await expect(c.locator(FB_COMMENT)).toBeHidden();
+  await expect(c.getByRole('button', { name: OPT_ISSUE }).first()).toBeHidden();
 }
 
 /** Open the feedback menu and pick one option, leaving the form on screen. */
 async function openFeedbackForm(c: Page, option: RegExp): Promise<void> {
   await openFeedbackMenu(c);
   await c.getByRole('button', { name: option }).first().click();
-  await expect(c.locator(FB_COMMENT)).toBeVisible({ timeout: 10000 });
+  await expect(c.locator(FB_COMMENT)).toBeVisible();
 }
 
 /** Submit one piece of feedback through the widget and close it. */
@@ -183,7 +183,7 @@ async function goToUserFeedback(c: Page): Promise<void> {
     await navigateK12CateringMenu(c, 'User Feedback').catch(() => undefined);
     await c.waitForLoadState('domcontentloaded').catch(() => undefined);
     if (await appears(c.getByRole('heading', { name: INBOX_HEADING }).first(), 20000)) {
-      await expect(c.locator('h1')).toContainText('User Feedback', { timeout: 15000 });
+      await expect(c.locator('h1')).toContainText('User Feedback');
       // The inbox renders its controls a beat after the heading; "In Progress" is
       // the only status pill whose text cannot collide with a per-item badge.
       await expect(statusPill(c, 'In Progress').first()).toBeVisible({ timeout: 25000 });
@@ -212,7 +212,7 @@ test.describe('T-119591', () => {
 
     // The three options, with the retired wording gone.
     for (const option of [OPT_QUESTIONS, OPT_ISSUE, OPT_IDEA]) {
-      await expect(c.getByRole('button', { name: option }).first()).toBeVisible({ timeout: 10000 });
+      await expect(c.getByRole('button', { name: option }).first()).toBeVisible();
     }
     for (const old of OLD_LABELS) {
       await expect(c.getByText(old)).toHaveCount(0);
@@ -220,7 +220,7 @@ test.describe('T-119591', () => {
 
     // "I have questions" replaced "Something's Off / Confusing".
     await c.getByRole('button', { name: OPT_QUESTIONS }).first().click();
-    await expect(c.locator(FB_COMMENT)).toBeVisible({ timeout: 10000 });
+    await expect(c.locator(FB_COMMENT)).toBeVisible();
     for (const old of OLD_LABELS) {
       await expect(c.getByText(old)).toHaveCount(0);
     }
@@ -233,7 +233,7 @@ test.describe('T-119591', () => {
       /What happened\? What did you expect to happen\?/i,
     );
     await expect(c.locator(FB_ATTACHMENT)).toHaveCount(1);
-    await expect(c.getByText(/Attach a file \(optional\)/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(c.getByText(/Attach a file \(optional\)/i).first()).toBeVisible();
 
     // Only the extensions the ticket allows.
     const accept = await c.locator(FB_ATTACHMENT).getAttribute('accept');
@@ -268,7 +268,7 @@ test.describe('T-119591', () => {
       await expect(
         c.getByText(UNSUPPORTED_TYPE_ERROR).first(),
         'a .txt is rejected by type',
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
       await closeFeedbackWidget(c);
     });
 
@@ -279,7 +279,7 @@ test.describe('T-119591', () => {
       await expect(
         c.getByText(/5\s*MB|too large|exceeds/i).first(),
         `a file over ${MAX_ATTACHMENT_MB} MB is rejected`,
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible();
       await closeFeedbackWidget(c);
     });
 
@@ -332,7 +332,7 @@ test.describe('T-119591', () => {
       await expect(
         c.locator('[role="dialog"], div.fixed').filter({ hasText: /qa-attachment\.png/i }).last(),
         'clicking the attachment opens its preview',
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible();
       await c.keyboard.press('Escape').catch(() => undefined);
     });
 
@@ -395,7 +395,7 @@ test.describe('T-119591', () => {
     await expect(
       inbox(c).getByText(/Resolved by/i).first(),
       'the resolver username is recorded',
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
 
     // The ticket says an Unresolve is "not needed", but the control is a plain
     // status picker: a Resolved item still lists New and In Progress, both
@@ -423,7 +423,7 @@ test.describe('T-119591', () => {
       inbox(c).getByText(marker, { exact: false }).first(),
       'the resolved status persisted across a reload',
     ).toBeVisible({ timeout: 25000 });
-    await expect(inbox(c).getByText(/Resolved by/i).first()).toBeVisible({ timeout: 15000 });
+    await expect(inbox(c).getByText(/Resolved by/i).first()).toBeVisible();
   });
 
   test('In Progress moves an item out of New, and the type filters and export still work', async ({
@@ -488,7 +488,7 @@ test.describe('T-119591', () => {
       await c.waitForTimeout(1500);
       for (const type of ['Ratings', 'Positive', 'Questions', 'Issues', 'Ideas']) {
         const pill = inbox(c).locator('button').filter({ hasText: type }).first();
-        await expect(pill, `the ${type} type filter is present`).toBeVisible({ timeout: 15000 });
+        await expect(pill, `the ${type} type filter is present`).toBeVisible();
         await pill.click();
         await c.waitForTimeout(1200);
       }

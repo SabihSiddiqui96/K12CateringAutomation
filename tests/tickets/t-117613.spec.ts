@@ -26,7 +26,7 @@ async function goToDistricts(page: Page): Promise<void> {
   await dismissReauthInterstitial(page);
   await expect(
     page.getByRole('heading', { name: /District Management/i }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 }
 
 async function deleteDistrictByName(page: Page, name: string): Promise<void> {
@@ -34,7 +34,7 @@ async function deleteDistrictByName(page: Page, name: string): Promise<void> {
   await goToDistricts(page);
 
   const search = page.getByRole('textbox', { name: /Search districts/i });
-  await expect(search).toBeVisible({ timeout: 10000 });
+  await expect(search).toBeVisible();
   await search.fill(name);
   await page.waitForTimeout(800);
 
@@ -73,7 +73,7 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
   await dismissReauthInterstitial(catering);
   await expect(
     catering.getByRole('heading', { name: /District Management/i }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 
   try {
     // ── Add District ──────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
 
     // The District Group select is disabled until Multi-Tenant is enabled.
     const groupSelect = catering.locator('#add-district-group');
-    await expect(groupSelect).toBeEnabled({ timeout: 10000 });
+    await expect(groupSelect).toBeEnabled();
     // Pick an existing group dynamically — group data on UAT changes, so a
     // hardcoded name (e.g. "DBurksGroup1") goes stale. The specific group is
     // incidental to what this test verifies.
@@ -113,7 +113,7 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
       catering
         .getByText(/district.*created|created.*successfully|success/i)
         .first(),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
     districtCreated = true;
 
     // ── Edit the District Group the district was added to ─────────────────
@@ -123,11 +123,11 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
       })
       .first();
     await scrollUntilVisible(catering, { target: editGroupBtn }).catch(() => {});
-    await expect(editGroupBtn).toBeVisible({ timeout: 10000 });
+    await expect(editGroupBtn).toBeVisible();
     await editGroupBtn.click();
 
     const dialog = catering.getByRole('dialog').first();
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
     await expect(dialog.locator('#district-group-name-input')).toHaveValue(
       groupName as string,
       { timeout: 10000 },
@@ -135,7 +135,7 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
 
     // ── Primary District dropdown lists the newly added district ──────────
     const primarySelect = dialog.locator('#district-group-primary-select');
-    await expect(primarySelect).toBeVisible({ timeout: 10000 });
+    await expect(primarySelect).toBeVisible();
 
     await expect
       .poll(

@@ -57,15 +57,15 @@ test('Catering - User Feedback - Cybersoft Admin dashboard: cards, charts, inbox
   // AC2: the "User Feedback" item is in the left nav for a Cybersoft Admin.
   await expect(
     c.locator('aside[aria-label="Main navigation"]').getByLabel('Navigate to User Feedback'),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 
   // AC1: open it -> /admin/feedback with the "Cybersoft Admin Only" badge.
   await openDashboard(c);
-  await expect(c.getByText(/Cybersoft Admin Only/i).first()).toBeVisible({ timeout: 10000 });
+  await expect(c.getByText(/Cybersoft Admin Only/i).first()).toBeVisible();
 
   // AC3: four summary metric cards.
   for (const card of [/Total Responses/i, /Positive Sentiment/i, /Issues Reported/i, /Ideas Submitted/i]) {
-    await expect(c.getByRole('button', { name: card }).first()).toBeVisible({ timeout: 10000 });
+    await expect(c.getByRole('button', { name: card }).first()).toBeVisible();
   }
 
   // AC4 / AC5: the charts are present.
@@ -153,7 +153,7 @@ test('Catering - User Feedback - Cybersoft Admin dashboard: cards, charts, inbox
   await c.getByText('This is helpful').first().click();
   await c.locator('textarea:visible').first().fill(marker);
   await c.getByRole('button', { name: /^Send feedback$/i }).click();
-  await expect(c.getByText(/Thank you for your feedback/i).first()).toBeVisible({ timeout: 10000 });
+  await expect(c.getByText(/Thank you for your feedback/i).first()).toBeVisible();
   await c.getByRole('button', { name: /^Refresh$/i }).first().click().catch(() => { });
   await c.waitForTimeout(1500);
 
@@ -195,7 +195,7 @@ test('Catering - User Feedback - a non-Cybersoft-Admin cannot see or access the 
     await cust.locator('#password-input').fill(CUSTOMER_PASSWORD);
     await cust.getByRole('button', { name: /^Sign In$/i }).click();
     await cust.waitForLoadState('networkidle');
-    await expect(cust).not.toHaveURL(/login/i, { timeout: 15000 });
+    await expect(cust).not.toHaveURL(/login/i);
 
     // AC2: a non-Cybersoft-Admin must NOT see the "User Feedback" nav item.
     await expect(cust.getByLabel('Navigate to User Feedback')).toHaveCount(0);

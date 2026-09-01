@@ -21,7 +21,7 @@ test.describe("What's New", () => {
   });
 
   test("What's New - Page heading and tabs are visible", async () => {
-    await expect(catering.locator('h1')).toContainText("What's New", { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText("What's New");
     await expect(catering.getByRole('tab', { name: /Release Notes/i })).toBeVisible();
     await expect(catering.getByRole('tab', { name: /Resources/i })).toBeVisible();
     await expect(catering.getByText(/Error Code: 404|something went wrong/i)).not.toBeVisible();
@@ -64,8 +64,8 @@ test.describe("What's New", () => {
   test("What's New - Resources tab switches content and sidebar sections are visible", async () => {
     await catering.getByRole('tab', { name: /Resources/i }).click();
     await catering.waitForTimeout(500);
-    await expect(catering.locator('main, [role="main"], #main-content').first()).toBeVisible({ timeout: 10000 });
-    await expect(catering.getByRole('heading', { name: /^Resources$/i })).toBeVisible({ timeout: 10000 });
+    await expect(catering.locator('main, [role="main"], #main-content').first()).toBeVisible();
+    await expect(catering.getByRole('heading', { name: /^Resources$/i })).toBeVisible();
     await expect(catering.getByText(/Quick reference guides and documentation/i)).toBeVisible();
     await expect(catering.getByText(/Customer Quick Reference/i).first()).toBeVisible();
     await expect(catering.getByText(/Latest/i).first()).toBeVisible();

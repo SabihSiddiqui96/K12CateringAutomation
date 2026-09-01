@@ -36,7 +36,7 @@ async function goToSettings(page: Page): Promise<void> {
   await ensureInK12CateringApp(page);
   await navigateK12CateringMenu(page, 'Settings');
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('h1')).toContainText('Settings', { timeout: 15000 });
+  await expect(page.locator('h1')).toContainText('Settings');
 }
 
 async function goToReports(page: Page): Promise<void> {
@@ -47,12 +47,12 @@ async function goToReports(page: Page): Promise<void> {
     await page.waitForLoadState('domcontentloaded');
   }
   const sidebar = page.locator('aside[aria-label="Main navigation"]');
-  await expect(sidebar).toBeVisible({ timeout: 10000 });
+  await expect(sidebar).toBeVisible();
   const reportsButton = sidebar.getByLabel('Navigate to Reports', { exact: true });
-  await expect(reportsButton).toBeVisible({ timeout: 10000 });
+  await expect(reportsButton).toBeVisible();
   await reportsButton.scrollIntoViewIfNeeded();
   await reportsButton.click();
-  await expect(page.locator('h1')).toContainText('Reports', { timeout: 15000 });
+  await expect(page.locator('h1')).toContainText('Reports');
   await page.waitForLoadState('domcontentloaded');
 }
 
@@ -64,7 +64,7 @@ async function goToPaymentAnalysis(page: Page): Promise<void> {
     .or(page.getByRole('link', { name: /Payment Analysis/i }))
     .first();
   await scrollUntilVisible(page, { target: tile });
-  await expect(tile).toBeVisible({ timeout: 15000 });
+  await expect(tile).toBeVisible();
   await tile.scrollIntoViewIfNeeded();
   await tile.click();
   await page.waitForLoadState('domcontentloaded');
@@ -103,7 +103,7 @@ async function setPaymentDisplayLabel(page: Page, label: string): Promise<string
     .click();
 
   const input = page.locator(paymentDisplayLabelInputId);
-  await expect(input).toBeVisible({ timeout: 10000 });
+  await expect(input).toBeVisible();
   const previous = await getInputValueFromLocator(page, paymentDisplayLabelInputId);
 
   await input.fill('');
@@ -111,7 +111,7 @@ async function setPaymentDisplayLabel(page: Page, label: string): Promise<string
   await page.getByRole('button', { name: /Save Changes/i }).click();
 
   const toast = page.getByRole('alert');
-  await expect(toast).toBeVisible({ timeout: 10000 });
+  await expect(toast).toBeVisible();
   await expect(toast).toContainText(/Payment display label saved/i);
   await page.waitForTimeout(1000);
   await expect(toast).not.toBeVisible({ timeout: 30000 });
@@ -126,7 +126,7 @@ test('Catering - Reports - Payment Analysis reflects the Payment Display Label i
 
   const catering = await loginToK12Catering(page, { navigateTo: 'Reports' });
   await catering.waitForLoadState('domcontentloaded');
-  await expect(catering.locator('h1')).toContainText('Reports', { timeout: 15000 });
+  await expect(catering.locator('h1')).toContainText('Reports');
 
   // ── Step 1-2: Reports → Payment Analysis ──
   await goToPaymentAnalysis(catering);
@@ -134,18 +134,18 @@ test('Catering - Reports - Payment Analysis reflects the Payment Display Label i
   // ── Step 3: Payment Method Usage title + table are displayed ──
   await expect(
     catering.getByRole('heading', { name: /Payment Method Usage/i }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
   const usageTable = paymentMethodUsageTable(catering);
-  await expect(usageTable.first()).toBeVisible({ timeout: 15000 });
+  await expect(usageTable.first()).toBeVisible();
 
   // ── Step 4: Outstanding Payments table shows the accounting-string label in
   //    its Payment Method column. Capture the current label to confirm it later
   //    changes in both tables. ──
   await expect(
     catering.getByRole('heading', { name: /Outstanding Payments/i }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
   const outstandingTable = outstandingPaymentsTable(catering);
-  await expect(outstandingTable.first()).toBeVisible({ timeout: 15000 });
+  await expect(outstandingTable.first()).toBeVisible();
   await expect(
     outstandingTable.locator('th', { hasText: /Payment Method/i }).first(),
   ).toBeVisible();
@@ -164,16 +164,16 @@ test('Catering - Reports - Payment Analysis reflects the Payment Display Label i
     await goToPaymentAnalysis(catering);
 
     const usageAfter = paymentMethodUsageTable(catering);
-    await expect(usageAfter.first()).toBeVisible({ timeout: 15000 });
+    await expect(usageAfter.first()).toBeVisible();
     await expect(
       usageAfter.getByRole('cell', { name: updatedLabel, exact: true }).first(),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
 
     const outstandingAfter = outstandingPaymentsTable(catering);
-    await expect(outstandingAfter.first()).toBeVisible({ timeout: 15000 });
+    await expect(outstandingAfter.first()).toBeVisible();
     await expect(
       outstandingAfter.getByRole('cell', { name: updatedLabel, exact: true }).first(),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   } finally {
     // Restore the original label so the shared QA setting isn't left mutated.
     if (previousLabel) {

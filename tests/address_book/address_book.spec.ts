@@ -21,7 +21,7 @@ test.describe('Address Book', () => {
   });
 
   test('Address Book - Page heading, subtitle, count and Add button are visible', async () => {
-    await expect(catering.locator('h1')).toContainText('Address Book', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('Address Book');
     await expect(catering.getByText(/Manage your saved locations and contact information/i)).toBeVisible();
     await expect(catering.getByRole('heading', { name: /^\d+$/ }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: /Add a new location to your address book/i })).toBeVisible();
@@ -45,7 +45,7 @@ test.describe('Address Book', () => {
     const hasFields = await catering.getByRole('textbox').first().isVisible({ timeout: 5000 }).catch(() => false);
     expect(hasFields).toBe(true);
 
-    await expect(catering.getByRole('button', { name: /Save|Add|Create|Submit/i }).last()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('button', { name: /Save|Add|Create|Submit/i }).last()).toBeVisible();
     await catering.getByRole('button', { name: /Save|Add|Create|Submit/i }).last().click();
     await expect(catering.getByText(/required|must not be empty|please enter/i).first()).toBeVisible({ timeout: 5000 });
 

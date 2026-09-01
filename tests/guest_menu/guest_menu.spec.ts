@@ -38,7 +38,7 @@ test.describe('Guest Menu', () => {
     // heading. On shared UAT the active district can differ from the env value,
     // so assert a non-empty district heading rather than a hardcoded name.
     const districtHeading = catering.locator('header').first().getByRole('heading', { level: 2 }).first();
-    await expect(districtHeading).toBeVisible({ timeout: 10000 });
+    await expect(districtHeading).toBeVisible();
     await expect(districtHeading).not.toHaveText(/^\s*$/);
     await expect(catering.getByText(/\d+ menu items available/i)).toBeVisible();
     await expect(catering.locator('header').first().getByRole('button', { name: 'Return to menu page' })).toBeVisible();
@@ -46,15 +46,15 @@ test.describe('Guest Menu', () => {
   });
 
   test('Guest Menu - Catalog banner shows Menu Catalog heading, item and category counts', async () => {
-    await expect(catering.getByRole('heading', { name: 'Menu Catalog' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: 'Menu Catalog' })).toBeVisible();
     await expect(catering.getByText('Discover our carefully crafted menu items')).toBeVisible();
     await expect(banner(catering).getByText(/\d+ items/)).toBeVisible();
     await expect(banner(catering).getByText(/\d+ categories/)).toBeVisible();
   });
 
   test('Guest Menu - Category sidebar shows categories and filtering works', async () => {
-    await expect(catering.getByRole('complementary').getByRole('heading', { name: /categories/i })).toBeVisible({ timeout: 10000 });
-    await expect(categoryButtons(catering).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('complementary').getByRole('heading', { name: /categories/i })).toBeVisible();
+    await expect(categoryButtons(catering).first()).toBeVisible();
 
     const labels = (await categoryButtons(catering).allTextContents())
       .map((text) => text.replace(/\s+/g, ' ').trim())
@@ -82,7 +82,7 @@ test.describe('Guest Menu', () => {
 
   test('Guest Menu - Item cards show name, allergens, serves, price and Guest viewing badge', async () => {
     const firstItemCard = itemCards(catering).first();
-    await expect(firstItemCard).toBeVisible({ timeout: 10000 });
+    await expect(firstItemCard).toBeVisible();
     await expect(firstItemCard.locator('h2, h3, h4').first()).toBeVisible();
     await expect(firstItemCard.getByText(/Allergens:/i)).toBeVisible();
     await expect(firstItemCard.getByText(/Serves:/i)).toBeVisible();
@@ -100,18 +100,18 @@ test.describe('Guest Menu', () => {
     await catering.getByPlaceholder(/search/i).fill(secondaryDistrict.split(' ')[0]);
     await catering.getByText(secondaryDistrict).click();
     await catering.waitForLoadState('networkidle');
-    await expect(banner(catering).getByText(/\d+ items/)).toBeVisible({ timeout: 10000 });
+    await expect(banner(catering).getByText(/\d+ items/)).toBeVisible();
   });
 
   test('Guest Menu - Back to Menu button navigates to /menu page', async () => {
     await catering.locator('header').first().getByRole('button', { name: 'Return to menu page' }).click();
     await catering.waitForLoadState('networkidle');
     await expect(catering).toHaveURL(/\/menu/);
-    await expect(catering.getByRole('heading', { name: /^menu$/i })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: /^menu$/i })).toBeVisible();
   });
 
   test('Guest Menu - Download PDF button is visible and triggers file download', async () => {
-    await expect(catering.getByRole('button', { name: 'Download menu as PDF' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('button', { name: 'Download menu as PDF' })).toBeVisible();
     const downloadPromise = catering.waitForEvent('download', { timeout: 15000 });
     await catering.getByRole('button', { name: 'Download menu as PDF' }).click();
     const download = await downloadPromise;

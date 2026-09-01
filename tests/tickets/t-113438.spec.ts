@@ -49,7 +49,7 @@ const SYNC_TRIGGERED_BY =
 async function waitForDistrictsPageReady(page: Page): Promise<void> {
   await expect(
     page.getByRole('heading', { name: /District Management/i }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 
   // Let the panels finish loading, then wait for the group panel's own button.
   await waitForListSettled(page);
@@ -89,7 +89,7 @@ async function openViewDistrictsInGroupDialog(page: Page): Promise<void> {
     page
       .getByRole('dialog')
       .or(page.getByRole('heading', { name: /Districts in (this )?Group/i })),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function setPrimaryDistrict(
@@ -106,14 +106,14 @@ async function setPrimaryDistrict(
     .getByRole('button', { name: /Edit (district )?group/i })
     .first();
   await scrollUntilVisible(page, { target: editGroupBtn });
-  await expect(editGroupBtn).toBeVisible({ timeout: 10000 });
+  await expect(editGroupBtn).toBeVisible();
   await editGroupBtn.click();
 
   const primaryDistrictControl = page
     .getByRole('combobox', { name: /Primary District/i })
     .or(page.getByLabel(/Primary District/i))
     .first();
-  await expect(primaryDistrictControl).toBeVisible({ timeout: 10000 });
+  await expect(primaryDistrictControl).toBeVisible();
 
   // Read the current primary's label so we can pick a *different* option
   // first to trigger the warning, then switch to the desired one.
@@ -162,7 +162,7 @@ async function setPrimaryDistrict(
       page.getByText(
         /Warning:\s*Changing the primary district will affect data sync for all districts in this group\.?/i,
       ),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   }
 
   // Now select the desired option (resolved to its on-screen label).
@@ -188,7 +188,7 @@ async function setPrimaryDistrict(
   const saveBtn = page
     .getByRole('button', { name: /Save Changes|^Save$|^Update$/i })
     .last();
-  await expect(saveBtn).toBeVisible({ timeout: 10000 });
+  await expect(saveBtn).toBeVisible();
   await saveBtn.click();
 
   // Confirmation dialog
@@ -206,14 +206,14 @@ async function setPrimaryDistrict(
           .filter({ hasText: /^\s*Continue\s*$/i }),
       )
       .last();
-    await expect(continueBtn).toBeVisible({ timeout: 10000 });
+    await expect(continueBtn).toBeVisible();
     await continueBtn.click({ force: true });
-    await expect(changePrimaryHeading).toBeHidden({ timeout: 10000 });
+    await expect(changePrimaryHeading).toBeHidden();
   }
 
   await expect(
     page.getByText(/updated|saved|success/i).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 
   return desiredOption;
 }
@@ -233,14 +233,14 @@ async function togglePrimaryDistrict(
     .getByRole('button', { name: /Edit (district )?group/i })
     .first();
   await scrollUntilVisible(page, { target: editGroupBtn });
-  await expect(editGroupBtn).toBeVisible({ timeout: 10000 });
+  await expect(editGroupBtn).toBeVisible();
   await editGroupBtn.click();
 
   const primaryDistrictControl = page
     .getByRole('combobox', { name: /Primary District/i })
     .or(page.getByLabel(/Primary District/i))
     .first();
-  await expect(primaryDistrictControl).toBeVisible({ timeout: 10000 });
+  await expect(primaryDistrictControl).toBeVisible();
 
   // Read the current primary's *label* (not its value attribute)
   const previousValue = (
@@ -299,11 +299,11 @@ async function toggleTargetDistrictOptIn(
     .or(page.getByRole('link', { name: /^Manage$/i }))
     .first();
   await scrollUntilVisible(page, { target: manageBtn }).catch(() => undefined);
-  await expect(manageBtn).toBeVisible({ timeout: 10000 });
+  await expect(manageBtn).toBeVisible();
   await manageBtn.click();
 
   const dialog = page.getByRole('dialog').first();
-  await expect(dialog).toBeVisible({ timeout: 10000 });
+  await expect(dialog).toBeVisible();
 
   // The toggle is a <button role="switch"> with an aria-label that flips
   // between "Opt out <District> for data sync" (when currently on) and
@@ -324,7 +324,7 @@ async function toggleTargetDistrictOptIn(
       ),
     )
     .first();
-  await expect(toggle).toBeVisible({ timeout: 10000 });
+  await expect(toggle).toBeVisible();
 
   // aria-checked = "true" when opted in, "false" when opted out
   const isOn =
@@ -350,11 +350,11 @@ async function getTargetDistrictsFromManageDialog(
     .or(page.getByRole('link', { name: /^Manage$/i }))
     .first();
   await scrollUntilVisible(page, { target: manageBtn }).catch(() => undefined);
-  await expect(manageBtn).toBeVisible({ timeout: 10000 });
+  await expect(manageBtn).toBeVisible();
   await manageBtn.click();
 
   const dialog = page.getByRole('dialog').first();
-  await expect(dialog).toBeVisible({ timeout: 10000 });
+  await expect(dialog).toBeVisible();
 
   // If not all districts are opted in, "Opt in all" is enabled — click it and confirm
   const optInAllBtn = dialog.getByRole('button', { name: /opt\s*in\s*all/i }).first();
@@ -362,12 +362,12 @@ async function getTargetDistrictsFromManageDialog(
   if (!optInAllDisabled) {
     await optInAllBtn.click();
     const confirmDialog = page.getByRole('dialog').last();
-    await expect(confirmDialog).toBeVisible({ timeout: 10000 });
+    await expect(confirmDialog).toBeVisible();
     await confirmDialog
       .getByRole('button', { name: /yes,?\s*opt\s*in\s*all/i })
       .first()
       .click();
-    await expect(optInAllBtn).toBeDisabled({ timeout: 15000 });
+    await expect(optInAllBtn).toBeDisabled();
   }
 
   // The dialog renders rows like:
@@ -443,7 +443,7 @@ async function resetAllLocalOverrides(page: Page): Promise<void> {
         .getByRole('dialog')
         .filter({ has: page.getByRole('heading', { name: /Reset Local Overrides/i }) })
         .first();
-      await expect(resetDlg).toBeVisible({ timeout: 10000 });
+      await expect(resetDlg).toBeVisible();
       await resetDlg
         .getByRole('button', { name: /Reset Overrides|^Reset$|^Confirm$/i })
         .last()
@@ -492,11 +492,11 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     // ── Step 1-2: Districts → View Districts in this Group ──
     await openViewDistrictsInGroupDialog(catering);
     const groupDialog = catering.getByRole('dialog').first();
-    await expect(groupDialog).toBeVisible({ timeout: 10000 });
+    await expect(groupDialog).toBeVisible();
     // Verify at least one district is listed inside the group dialog
     await expect(
       groupDialog.locator('li, tr, [role="listitem"]').first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     await closeOpenDialog(catering);
   });
@@ -520,7 +520,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       )
       .filter({ hasText: new RegExp(escapeRegExp(chosenPrimary), 'i') })
       .first();
-    await expect(primaryRow).toBeVisible({ timeout: 10000 });
+    await expect(primaryRow).toBeVisible();
     await expect(primaryRow).toContainText(/Primary/i);
     await closeOpenDialog(catering);
 
@@ -551,7 +551,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
           'i',
         ),
       ),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     // Auto-sync toggle (label uses a hyphen in the UI)
     const autoSyncToggle = catering
@@ -559,7 +559,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .or(catering.getByRole('checkbox', { name: /Auto[\s-]?sync/i }))
       .or(catering.getByLabel(/Auto[\s-]?sync/i))
       .first();
-    await expect(autoSyncToggle).toBeVisible({ timeout: 10000 });
+    await expect(autoSyncToggle).toBeVisible();
 
     // Sync frequency dropdown — verify both day-based and weekly options
     // produce the right scheduled-time text below the dropdown
@@ -567,7 +567,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .getByRole('combobox', { name: /Sync\s*frequency/i })
       .or(catering.getByLabel(/Sync\s*frequency/i))
       .first();
-    await expect(frequencySelect).toBeVisible({ timeout: 10000 });
+    await expect(frequencySelect).toBeVisible();
 
     // The frequency dropdown is disabled while Auto-sync is off. Enable Auto-sync
     // (if needed) and wait for it to become enabled. The PrimeroEdge launcher
@@ -603,7 +603,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
             /\d{1,2}:\d{2}\s*(AM|PM)\s*[A-Z]{2,4}\s*(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)/i,
           )
           .first(),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
     }
 
     // The "daily" option is sometimes labelled Daily, Nightly, etc — pick any
@@ -617,7 +617,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
         catering
           .getByText(/\d{1,2}:\d{2}\s*(AM|PM)\s*[A-Z]{2,4}\s*daily/i)
           .first(),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
     }
 
     // Target Districts → Manage dialog shows districts
@@ -655,7 +655,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
         .getByRole('dialog')
         .getByRole('heading', { name: /Sync Log/i })
         .first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     await closeOpenDialog(catering);
 
     // Push sync now → opens confirmation dialog → click Cancel (the actual
@@ -667,21 +667,21 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
         .locator('div')
         .filter({ hasText: /^Push sync now\?$/ })
         .first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     await catering.getByRole('button', { name: /^Cancel$/i }).first().click();
     await expect(
       catering
         .locator('div')
         .filter({ hasText: /^Push sync now\?$/ })
         .first(),
-    ).toBeHidden({ timeout: 10000 });
+    ).toBeHidden();
 
     // Local-overrides explanatory label (case-insensitive, slight word variants)
     await expect(
       catering.getByText(
         /Local overrides in a target district prevent that record from being updated by data sync for that district\. Use Reset [Ll]ocal [Oo]verrides on an item to allow sync to overwrite it again\./i,
       ),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   await test.step('Step 6 — Syncable items: filters, pagination, row toggle and details', async () => {
@@ -692,19 +692,19 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     await scrollUntilVisible(catering, { target: syncableHeading }).catch(
       () => undefined,
     );
-    await expect(syncableHeading).toBeVisible({ timeout: 10000 });
+    await expect(syncableHeading).toBeVisible();
 
     // Total count rendered next to heading: "Syncable items — 128 items"
     await expect(
       catering.getByText(/\d+\s*items/i).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     // Search field — placeholder "Search items..." in the screenshot
     const syncSearch = catering
       .getByRole('textbox', { name: /Search/i })
       .or(catering.getByPlaceholder(/Search items/i))
       .first();
-    await expect(syncSearch).toBeVisible({ timeout: 10000 });
+    await expect(syncSearch).toBeVisible();
 
     // All types dropdown — it's a native <select aria-label="Filter by item
     // type">. Verify it's visible and that "Holiday" is one of its options
@@ -713,7 +713,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .getByRole('combobox', { name: /Filter by item type|All types|Type/i })
       .or(catering.locator('select[aria-label*="item type" i]'))
       .first();
-    await expect(allTypes).toBeVisible({ timeout: 10000 });
+    await expect(allTypes).toBeVisible();
     const allTypesOptions = (
       await allTypes.locator('option').allTextContents()
     ).map((o) => o.trim());
@@ -727,7 +727,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .getByRole('combobox', { name: /All statuses|All status|Status/i })
       .or(catering.getByRole('button', { name: /All statuses/i }))
       .first();
-    await expect(allStatus).toBeVisible({ timeout: 10000 });
+    await expect(allStatus).toBeVisible();
 
     // Pagination control — current value text is "20 / page"
     const paginationCombo = catering
@@ -735,7 +735,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .or(catering.getByRole('button', { name: /\d+\s*\/\s*page/i }))
       .or(catering.locator('select').filter({ hasText: /\d+\s*\/\s*page/i }))
       .first();
-    await expect(paginationCombo).toBeVisible({ timeout: 10000 });
+    await expect(paginationCombo).toBeVisible();
 
     // Toggle one item, then open its details. Both were `if (isVisible)` guards,
     // so whenever the session dropped here - several minutes into one PrimeroEdge
@@ -759,7 +759,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       if (!(await itemToggle().isVisible({ timeout: 3000 }).catch(() => false))) {
         await goToDataSync(catering).catch(() => undefined);
       }
-      await expect(itemToggle()).toBeVisible({ timeout: 10000 });
+      await expect(itemToggle()).toBeVisible();
 
       // Only the disable direction is reported by the status column. This used to
       // assert "Synced" when the row started disabled, which cannot pass -
@@ -772,20 +772,20 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       // That also repairs an item a previous run left half-toggled.
       if (!(await itemToggle().isChecked().catch(() => false))) {
         await itemToggle().click();
-        await expect(itemToggle()).toBeChecked({ timeout: 10000 });
+        await expect(itemToggle()).toBeChecked();
       }
       await itemToggle().click();
-      await expect(itemToggle()).not.toBeChecked({ timeout: 10000 });
-      await expect(itemRow()).toContainText(/Disabled/i, { timeout: 10000 });
+      await expect(itemToggle()).not.toBeChecked();
+      await expect(itemRow()).toContainText(/Disabled/i);
       await itemToggle().click();
-      await expect(itemToggle()).toBeChecked({ timeout: 10000 });
+      await expect(itemToggle()).toBeChecked();
 
       await itemRow().getByRole('button', { name: /^Details$/i }).first().click();
       // Assert the dialog itself rather than a heading named "Item Details": the
       // dialog carries no such heading, so this could never pass, and it burned the
       // full 180s toPass budget every run looking for it. Step 12 below opens the
       // very same dialog and checks getByRole('dialog') — match that.
-      await expect(catering.getByRole('dialog').first()).toBeVisible({ timeout: 10000 });
+      await expect(catering.getByRole('dialog').first()).toBeVisible();
       await closeOpenDialog(catering);
     }).toPass({ timeout: 180000, intervals: [2000, 5000, 8000] });
   });
@@ -820,7 +820,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     await safeNavigate(catering, 'Menu');
     await expect(
       catering.getByRole('heading', { name: /^Menu$/i }).first(),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
     await catering
       .getByText(/Loading Menu/i)
       .waitFor({ state: 'hidden', timeout: 30000 })
@@ -854,7 +854,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     const targetEditBtns = catering
       .locator('#main-content')
       .getByRole('button', { name: /^Edit\s+\S/i });
-    await expect(targetEditBtns.first()).toBeVisible({ timeout: 15000 });
+    await expect(targetEditBtns.first()).toBeVisible();
     const targetEditLabels = await targetEditBtns.evaluateAll((els) =>
       els.map((e) => e.getAttribute('aria-label') || ''),
     );
@@ -886,7 +886,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     const nameInput = catering
       .getByRole('textbox', { name: /Menu Item Name|Item Name|^Name$/i })
       .first();
-    await expect(nameInput).toBeVisible({ timeout: 10000 });
+    await expect(nameInput).toBeVisible();
     await nameInput.fill('');
     await nameInput.fill(RENAMED_MENU_ITEM);
 
@@ -896,7 +896,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .click();
     await expect(
       catering.getByText(/updated|saved|success/i).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     // Switch back to the home district (Mercer)
     await switchDistrict(catering, homeDistrict);
@@ -937,7 +937,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     const overridesBadge = overrideRow
       .getByText(/^Overrides$/i)
       .first();
-    await expect(overridesBadge).toBeVisible({ timeout: 10000 });
+    await expect(overridesBadge).toBeVisible();
 
     // ── Step 8a: Opt the target district OUT via Manage → push sync →
     // verify Overrides badge disappears (no target opted in = no override).
@@ -949,7 +949,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     // undoes the opt-out we just made.
     const pushedWithTargetOut = await runPushSyncNow(catering, { ensureTargetOptedIn: false });
     if (pushedWithTargetOut) {
-      await expect(syncSearch2).toBeVisible({ timeout: 10000 });
+      await expect(syncSearch2).toBeVisible();
       await syncSearch2.fill('');
       await syncSearch2.fill(originalMenuItemName);
       await waitForListSettled(catering);
@@ -972,30 +972,30 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     // Open Item Details
     await overrideRow.getByRole('button', { name: /^Details$/i }).first().click();
     const itemDetailsDialog = catering.getByRole('dialog').first();
-    await expect(itemDetailsDialog).toBeVisible({ timeout: 10000 });
+    await expect(itemDetailsDialog).toBeVisible();
     // The dialog renders these as two separate elements: a "Local overrides"
     // section header and an "Overrides detected in 1 target district." line
     // (with the count in a nested span). Verify both independently.
     await expect(
       itemDetailsDialog.getByText(/^Local overrides$/i).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     await expect(
       itemDetailsDialog.getByText(
         /Overrides detected in\s+1\s+target district/i,
       ),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     const resetLocalOverridesBtn = itemDetailsDialog
       .getByRole('button', { name: /Reset Local Overrides/i })
       .first();
-    await expect(resetLocalOverridesBtn).toBeVisible({ timeout: 10000 });
+    await expect(resetLocalOverridesBtn).toBeVisible();
     await resetLocalOverridesBtn.click();
 
     const resetDialog = catering
       .getByRole('dialog')
       .filter({ has: catering.getByRole('heading', { name: /Reset Local Overrides/i }) })
       .first();
-    await expect(resetDialog).toBeVisible({ timeout: 10000 });
+    await expect(resetDialog).toBeVisible();
 
     // The dialog has an "Opted-in target districts" section listing the
     // districts where the override exists — verify the target we edited is
@@ -1012,12 +1012,12 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
 
     await expect(
       catering.getByText(/Local overrides reset \(1 row updated\)/i),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
 
     await closeOpenDialog(catering);
     await expect(
       overrideRow.getByText(/^Overrides$/i),
-    ).not.toBeVisible({ timeout: 10000 });
+    ).not.toBeVisible();
   });
 
   await test.step('Step 9 — Push Sync Now and verify the Sync Log entry', async () => {
@@ -1048,7 +1048,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .getByRole('dialog')
       .filter({ has: catering.getByRole('heading', { name: /Sync Log/i }) })
       .first();
-    await expect(syncLogDialog).toBeVisible({ timeout: 10000 });
+    await expect(syncLogDialog).toBeVisible();
 
     // The Sync Log table's first <tr> is the header row
     // ("StartedTriggered ByStatusSyncedSkippedDurationNotes"). Scope to the
@@ -1056,7 +1056,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     const topEntry = syncLogDialog
       .locator('tbody tr, li, [role="row"]:not(:has(th)), article')
       .first();
-    await expect(topEntry).toBeVisible({ timeout: 10000 });
+    await expect(topEntry).toBeVisible();
 
     // The toast says "Sync complete — 89 items synced, 0 skipped." but the
     // top Sync Log row is a table row with columns
@@ -1103,7 +1103,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     await safeNavigate(catering, 'Menu');
     await expect(
       catering.getByRole('heading', { name: /^Menu$/i }).first(),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
     await catering
       .getByText(/Loading Menu/i)
       .waitFor({ state: 'hidden', timeout: 30000 })
@@ -1136,7 +1136,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       catering
         .getByText(new RegExp(escapeRegExp(originalMenuItemName), 'i'))
         .first(),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
     await expect(
       catering.getByText(new RegExp(escapeRegExp(RENAMED_MENU_ITEM), 'i')),
     ).not.toBeVisible({ timeout: 5000 });
@@ -1177,7 +1177,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       await customerPage.getByRole('button', { name: /Sign in/i }).click();
 
       // The URL leaving /login is the sign-in signal.
-      await expect(customerPage).not.toHaveURL(/login/, { timeout: 15000 });
+      await expect(customerPage).not.toHaveURL(/login/);
 
       const customerSidebar = customerPage.locator(
         'aside[aria-label="Main navigation"]',

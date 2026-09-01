@@ -30,7 +30,7 @@ async function openAddLocationForm(page: Page): Promise<void> {
       }),
     );
 
-  await expect(addLocationButton.first()).toBeVisible({ timeout: 10000 });
+  await expect(addLocationButton.first()).toBeVisible();
   await addLocationButton.first().click();
 
   await expect(page.locator('#firstName-input')).toBeVisible({
@@ -59,7 +59,7 @@ async function addTestLocation(page: Page): Promise<void> {
       .getByText(/saving location/i)
       .or(page.getByText(/location.*saved|saved.*location|success/i))
       .first(),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 
   await expect(page.locator('h1')).toContainText('Address Book', {
     timeout: 15000,
@@ -137,7 +137,7 @@ async function deleteFirstLocation(page: Page, targetName?: string): Promise<str
   const confirmDeleteButton = page
     .getByRole('dialog', { name: /Delete Location/i })
     .getByRole('button', { name: 'Delete', exact: true });
-  await expect(confirmDeleteButton).toBeVisible({ timeout: 10000 });
+  await expect(confirmDeleteButton).toBeVisible();
   await confirmDeleteButton.click();
 
   // Success: a toast may show; the authoritative check is the count dropping below.

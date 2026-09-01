@@ -24,7 +24,7 @@ test.describe('Menu - Advanced Filters', () => {
 
   async function openAdvancedFilters() {
     await catering.getByRole('button', { name: 'Show advanced filters' }).click();
-    await expect(catering.locator('h2', { hasText: 'Advanced Filters' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.locator('h2', { hasText: 'Advanced Filters' })).toBeVisible();
   }
 
   test('Menu - Advanced Filters panel reveals all controls', async () => {
@@ -43,13 +43,13 @@ test.describe('Menu - Advanced Filters', () => {
 
     await catering.locator('#serves-select').selectOption({ value: '1' });
     await catering.waitForTimeout(400);
-    await expect(catering.getByRole('heading', { name: 'Menu', exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: 'Menu', exact: true })).toBeVisible();
 
     await catering.locator('#sort-select').selectOption({ value: 'name' });
     await catering.waitForTimeout(400);
     await catering.locator('#sort-select').selectOption({ value: 'price' });
     await catering.waitForTimeout(400);
-    await expect(catering.getByRole('heading', { name: 'Menu', exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: 'Menu', exact: true })).toBeVisible();
 
     await catering.locator('#sort-order-select').selectOption({ value: 'desc' });
     await catering.waitForTimeout(400);
@@ -58,6 +58,6 @@ test.describe('Menu - Advanced Filters', () => {
     await catering.waitForTimeout(400);
 
     const cards = catering.locator('#main-content div.group.rounded-xl');
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    await expect(cards.first()).toBeVisible();
   });
 });

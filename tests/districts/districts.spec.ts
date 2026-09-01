@@ -5,6 +5,7 @@ import {
   getDistrictName,
   getDistrictNameRegex,
 } from '../../utils/helpers';
+import { safeNavigate } from '../../utils/dataSync';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -17,20 +18,22 @@ test.describe('Districts', () => {
     catering = await loginToK12Catering(page);
   });
 
+  // safeNavigate, not a bare navigate: these five tests share one login and the
+  // token refresh parks the page on the SSO interstitial part-way through, which
+  // then reads as a missing control several lines later.
   test.beforeEach(async () => {
-    await navigateK12CateringMenu(catering, 'Districts');
-    await catering.waitForLoadState('domcontentloaded');
+    await safeNavigate(catering, 'Districts');
   });
 
   test('Districts - Page heading, search, Add and Switch buttons are visible', async () => {
-    await expect(catering.getByRole('heading', { name: /Districts/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: /Districts/i }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: /Add new district/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /Switch district/i })).toBeVisible();
     await expect(catering.getByRole('textbox', { name: /Search districts/i })).toBeVisible();
   });
 
   test('Districts - District is listed with edit/delete actions', async () => {
-    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible();
 
     const editBtn = catering.getByRole('button', { name: /Edit district/i }).or(catering.getByRole('button', { name: /Edit/i }).first()).first();
     const deleteBtn = catering.getByRole('button', { name: /Delete district/i }).or(catering.getByRole('button', { name: /Delete/i }).first()).first();
@@ -42,7 +45,7 @@ test.describe('Districts', () => {
     // probes silently returned false and this reported "no edit/delete actions"
     // — a lost session dressed up as a missing feature. toBeVisible() retries,
     // which lets the handler dismiss the interstitial and the assertion recover.
-    await expect(editBtn.or(deleteBtn).first()).toBeVisible({ timeout: 15000 });
+    await expect(editBtn.or(deleteBtn).first()).toBeVisible();
   });
 
   test('Districts - Search filters and clearing search restores list', async () => {
@@ -51,7 +54,7 @@ test.describe('Districts', () => {
     // R-7") so a straight-vs-curly apostrophe can't break the server-side match.
     await searchInput.fill(getDistrictName().split(/[\s'‘’]/)[0]);
     await catering.waitForTimeout(600);
-    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible();
 
     await searchInput.fill('ZZZNoMatchXXX12345');
     await catering.waitForTimeout(600);
@@ -61,13 +64,13 @@ test.describe('Districts', () => {
 
     await searchInput.clear();
     await catering.waitForTimeout(600);
-    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible();
   });
 
   test('Districts - Switch District opens list showing current district', async () => {
     await catering.getByRole('button', { name: /Switch district/i }).click();
     await catering.waitForLoadState('domcontentloaded');
-    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible();
 
     const cancelBtn = catering.getByRole('button', { name: /Cancel|Back/i }).first();
     if (await cancelBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -81,7 +84,7 @@ test.describe('Districts', () => {
     await catering.getByRole('button', { name: /Add new district/i }).click();
     await catering.waitForTimeout(500);
 
-    await expect(catering.getByRole('textbox', { name: /District Name/i })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('textbox', { name: /District Name/i })).toBeVisible();
     const envDropdown = catering.locator('#add-environment-select, select[name*="environment"]').first();
     expect(await envDropdown.isVisible({ timeout: 5000 }).catch(() => false)).toBe(true);
     await expect(catering.getByRole('button', { name: /Add District/i }).last()).toBeVisible();

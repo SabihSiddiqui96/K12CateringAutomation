@@ -21,7 +21,7 @@ test.describe('Reports', () => {
   });
 
   test('Reports - Page heading, count, search and filter controls are visible', async () => {
-    await expect(catering.locator('h1')).toContainText('Reports', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('Reports');
     await expect(catering.getByRole('heading', { name: /^\d+$/ }).first()).toBeVisible();
     await expect(catering.getByRole('textbox', { name: /Search reports/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /Select time period/i })).toBeVisible();
@@ -29,7 +29,7 @@ test.describe('Reports', () => {
   });
 
   test('Reports - All report categories and key report buttons are visible', async () => {
-    await expect(catering.getByRole('heading', { name: /Sales & Revenue/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: /Sales & Revenue/i }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: /Sales & Revenue Dashboard/i }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: /Financial Summary/i }).first()).toBeVisible();
     await expect(catering.getByRole('heading', { name: /^Orders$/i }).first()).toBeVisible();
@@ -44,7 +44,7 @@ test.describe('Reports', () => {
     const searchInput = catering.getByRole('textbox', { name: /Search reports/i });
     await searchInput.fill('Revenue');
     await catering.waitForTimeout(600);
-    await expect(catering.getByRole('button', { name: /Revenue by Customer/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('button', { name: /Revenue by Customer/i }).first()).toBeVisible();
 
     await searchInput.fill('ZZZNoMatchXXX99999');
     await catering.waitForTimeout(600);
@@ -52,27 +52,27 @@ test.describe('Reports', () => {
 
     await searchInput.clear();
     await catering.waitForTimeout(400);
-    await expect(catering.getByRole('button', { name: /Order Status Summary/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('button', { name: /Order Status Summary/i }).first()).toBeVisible();
   });
 
   test('Reports - Sales & Revenue Dashboard opens with Delivered default and Back button', async () => {
     await catering.getByRole('button', { name: /Sales & Revenue Dashboard/i }).first().click();
     await catering.waitForLoadState('networkidle');
-    await expect(catering.getByRole('heading', { name: /Sales & Revenue Dashboard/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: /Sales & Revenue Dashboard/i }).first()).toBeVisible();
     const statusFilter = catering.getByRole('button', { name: /Select.*status/i });
     await expect(statusFilter).toContainText(/Delivered/i);
     await expect(catering.getByRole('button', { name: /Back to reports list/i })).toBeVisible();
     await catering.getByRole('button', { name: /Back to reports list/i }).click();
     await catering.waitForLoadState('domcontentloaded');
-    await expect(catering.getByRole('button', { name: /Sales & Revenue Dashboard/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('button', { name: /Sales & Revenue Dashboard/i }).first()).toBeVisible();
   });
 
   test('Reports - Financial Summary and Revenue by Customer default to Delivered status', async () => {
     const financialBtn = catering.getByRole('button', { name: /Financial Summary/i }).first();
-    await expect(financialBtn).toBeVisible({ timeout: 15000 });
+    await expect(financialBtn).toBeVisible();
     await financialBtn.click();
     await catering.waitForLoadState('networkidle');
-    await expect(catering.getByRole('button', { name: /Select.*status/i })).toContainText(/Delivered/i, { timeout: 10000 });
+    await expect(catering.getByRole('button', { name: /Select.*status/i })).toContainText(/Delivered/i);
     await catering.getByRole('button', { name: /Back to reports list/i }).click();
     await catering.waitForLoadState('domcontentloaded');
 
@@ -80,7 +80,7 @@ test.describe('Reports', () => {
     await revenueBtn.scrollIntoViewIfNeeded();
     await revenueBtn.click();
     await catering.waitForLoadState('networkidle');
-    await expect(catering.getByRole('button', { name: /Select.*status/i })).toContainText(/Delivered/i, { timeout: 10000 });
+    await expect(catering.getByRole('button', { name: /Select.*status/i })).toContainText(/Delivered/i);
     await expect(catering.getByRole('button', { name: /Back to reports list/i })).toBeVisible();
   });
 });

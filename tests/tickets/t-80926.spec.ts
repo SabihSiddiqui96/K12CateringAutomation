@@ -244,7 +244,7 @@ async function saveAccountingStringRequirementsRule(
   await saveBtn.click();
 
   const toast = page.getByRole('alert');
-  await expect(toast).toBeVisible({ timeout: 10000 });
+  await expect(toast).toBeVisible();
   await expect(toast).toContainText(updateRequirementsSuccessTitle);
   await expect(toast).toContainText(updateRequirementsSuccessBody);
 }
@@ -314,7 +314,7 @@ async function selectFirstContactCardInSection(
   sectionHeading: RegExp | string,
 ) {
   const heading = page.getByRole('heading', { name: sectionHeading }).first();
-  await expect(heading).toBeVisible({ timeout: 10000 });
+  await expect(heading).toBeVisible();
 
   const section = heading.locator(
     'xpath=ancestor::div[contains(@class,"space-y-3")][1]',
@@ -322,7 +322,7 @@ async function selectFirstContactCardInSection(
   const contactCard = section.locator('article').first();
 
   await contactCard.scrollIntoViewIfNeeded();
-  await expect(contactCard).toBeVisible({ timeout: 10000 });
+  await expect(contactCard).toBeVisible();
   await contactCard.click();
 }
 
@@ -432,7 +432,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
     await catering.getByRole('button', { name: saveChangesBtn }).click();
 
     const descriptionToast = catering.getByRole('alert');
-    await expect(descriptionToast).toBeVisible({ timeout: 10000 });
+    await expect(descriptionToast).toBeVisible();
     await expect(descriptionToast).toContainText(updateDescriptionSuccessTitle);
     await expect(descriptionToast).toContainText(updateDescriptionSuccessBody);
     await catering.waitForTimeout(1000);
@@ -535,7 +535,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
     await saveButton.click();
 
     const requirementsToast = catering.getByRole('alert');
-    await expect(requirementsToast).toBeVisible({ timeout: 10000 });
+    await expect(requirementsToast).toBeVisible();
     await expect(requirementsToast).toContainText(updateRequirementsSuccessTitle);
     await expect(requirementsToast).toContainText(updateRequirementsSuccessBody);
     await catering.waitForTimeout(1000);
@@ -709,7 +709,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
 
     await expect(
       catering.getByRole('heading', { name: /Order Management/i }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
     await catering.waitForLoadState('domcontentloaded');
     await catering.waitForTimeout(2000);
 

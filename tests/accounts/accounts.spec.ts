@@ -41,7 +41,7 @@ test.describe('Accounts', () => {
     }).first();
 
   test('Accounts - Page heading, stat cards and list are visible', async () => {
-    await expect(catering.locator('h1')).toContainText('Account Management', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('Account Management');
     await expect(catering.getByText('Manage user accounts and permissions')).toBeVisible();
     await expect(catering.getByRole('button', { name: /Total accounts:.*Click to show all accounts/i })).toBeVisible();
     await expect(catering.getByRole('region', { name: /^Pending accounts:/ })).toBeVisible();
@@ -54,8 +54,8 @@ test.describe('Accounts', () => {
 
   test('Accounts - Account cards display details, actions and pagination', async () => {
     const firstCard = accountCards().first();
-    await expect(firstCard).toBeVisible({ timeout: 10000 });
-    await expect(firstCard.getByText('Role')).toBeVisible({ timeout: 10000 });
+    await expect(firstCard).toBeVisible();
+    await expect(firstCard.getByText('Role')).toBeVisible();
     await expect(firstCard.getByText('Email')).toBeVisible();
     await expect(firstCard.getByRole('button', { name: /View details for/i })).toBeVisible();
     await expect(actionableCard().getByRole('button', { name: /Actions for/i })).toBeVisible();
@@ -66,7 +66,7 @@ test.describe('Accounts', () => {
 
   test('Accounts - Search and filter dropdowns work correctly', async () => {
     const searchBox = catering.getByRole('textbox', { name: 'Search accounts by name, username, or email' });
-    await expect(searchBox).toBeVisible({ timeout: 10000 });
+    await expect(searchBox).toBeVisible();
     await searchBox.fill('demo');
     await expect(searchBox).toHaveValue('demo');
 
@@ -96,7 +96,7 @@ test.describe('Accounts', () => {
     await actionableCard()
       .getByRole('button', { name: /View details for/i })
       .click();
-    await expect(catering.getByRole('heading', { name: 'Account Details' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: 'Account Details' })).toBeVisible();
     await expect(catering.getByText('Manage user information and permissions')).toBeVisible();
     await expect(catering.getByRole('heading', { name: 'Basic Information' })).toBeVisible();
     await expect(catering.locator('#firstName-input')).toBeVisible();

@@ -27,23 +27,23 @@ test.describe('Orders', () => {
     });
 
   test('Orders - Page heading, stat cards (Total, Status, Revenue) are displayed', async () => {
-    await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible();
     await expect(catering.getByText('Track and manage all your orders')).toBeVisible();
     // A bare digit match would pass on a card rendering "0 undefined".
     const totalCard = catering.getByRole('button', { name: /Total orders:/i });
-    await expect(totalCard).toBeVisible({ timeout: 10000 });
+    await expect(totalCard).toBeVisible();
     const totalLabel = (await totalCard.getAttribute('aria-label')) ?? '';
     const totalMatch = totalLabel.match(/Total orders:\s*([\d,]+)/i);
     expect(totalMatch, `Total orders card had no count: "${totalLabel}"`).not.toBeNull();
     const totalOrders = Number(totalMatch![1].replace(/,/g, ''));
     expect(Number.isInteger(totalOrders) && totalOrders >= 0).toBeTruthy();
-    await expect(catering.getByRole('button', { name: /Accepted orders:/i })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('button', { name: /Accepted orders:/i })).toBeVisible();
     await expect(
       catering.getByRole('button', { name: /Completed orders/i })
         .or(catering.getByText(/Completed orders/i).locator('..').filter({ has: catering.getByRole('button') }).first()),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     const revenueCard = catering.getByRole('button', { name: /Total Revenue:/i });
-    await expect(revenueCard).toBeVisible({ timeout: 10000 });
+    await expect(revenueCard).toBeVisible();
     const revenueLabel = (await revenueCard.getAttribute('aria-label')) ?? '';
     const revenueMatch = revenueLabel.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
     expect(revenueMatch, `Total Revenue card had no amount: "${revenueLabel}"`).not.toBeNull();
@@ -53,7 +53,7 @@ test.describe('Orders', () => {
 
   test('Orders - Order list shows cards with required fields, status badge, and pagination', async () => {
     const firstOrderCard = orderCards().first();
-    await expect(firstOrderCard).toBeVisible({ timeout: 10000 });
+    await expect(firstOrderCard).toBeVisible();
     await expect(
       firstOrderCard.getByRole('button', { name: /View details for order/i }),
     ).toBeVisible();
@@ -64,7 +64,7 @@ test.describe('Orders', () => {
         /accepted|completed|delivered|cancelled|pending|processing/i,
       ).first(),
     ).toBeVisible();
-    await expect(catering.getByText(/\d+-\d+ of \d+/).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(/\d+-\d+ of \d+/).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Page 1' }).first()).toBeVisible();
     const nextPageBtn = catering.getByRole('button', { name: 'Next page' }).first();
     await expect(nextPageBtn).toBeVisible();
@@ -78,14 +78,14 @@ test.describe('Orders', () => {
   });
 
   test('Orders - Search, Status, Sort dropdowns and Date Range filter work', async () => {
-    await expect(catering.getByRole('textbox', { name: 'Search orders by ID or status' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('textbox', { name: 'Search orders by ID or status' })).toBeVisible();
 
     await catering.getByRole('button', { name: 'Filter orders by status' }).click();
     await expect(catering.getByRole('option', { name: 'All Status' })).toBeVisible({ timeout: 5000 });
     await expect(catering.getByRole('option', { name: 'Accepted' })).toBeVisible();
     await catering.getByRole('option', { name: 'Accepted' }).click();
     await catering.waitForLoadState('domcontentloaded');
-    await expect(catering.locator('main').getByText('accepted').first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.locator('main').getByText('accepted').first()).toBeVisible();
 
     await catering.getByRole('button', { name: 'Toggle date range filter' }).click();
     await expect(catering.getByText('Start Date')).toBeVisible({ timeout: 5000 });
@@ -110,17 +110,17 @@ test.describe('Orders', () => {
         catering.getByRole('heading', {
           name: new RegExp(`Order\\s*#?\\s*${escapeRegExp(orderId)}`, 'i'),
         }),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
     } else {
       await expect(
         catering.getByRole('heading', { name: /Order #/i }),
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible();
     }
   });
 
   test('Orders - Detail page shows all sections and Back button returns to list', async () => {
     await catering.getByRole('button', { name: /View details for order/i }).first().click();
-    await expect(catering).toHaveURL(/\/orders\/details/, { timeout: 15000 });
+    await expect(catering).toHaveURL(/\/orders\/details/);
     await catering.getByText(/Loading order details/i).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
 
     const detailPage = catering.locator('main').filter({
@@ -144,7 +144,7 @@ test.describe('Orders', () => {
     // help.
     await expect(
       catering.getByRole('heading', { name: /\(Order #/i }).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     await expect(
       catering.locator('h2').filter({ hasText: /^\$\d/ }).first(),
     ).toBeVisible();
@@ -170,7 +170,7 @@ test.describe('Orders', () => {
     // burns its whole timeout and fails.
     await expect(
       markDeliveredButton.or(approveOrderButton).or(noActionsMessage).first(),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
 
     if (await markDeliveredButton.isVisible().catch(() => false)) {
       await expect(cancelOrderButton).toBeVisible();
@@ -186,15 +186,15 @@ test.describe('Orders', () => {
     await expect(detailPage.getByRole('heading', { name: 'Order Activity' })).toBeVisible();
 
     await catering.getByRole('button', { name: 'Back to orders' }).click();
-    await expect(catering).toHaveURL(/\/orders$/, { timeout: 15000 });
-    await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible({ timeout: 10000 });
+    await expect(catering).toHaveURL(/\/orders$/);
+    await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible();
   });
 
   test('Orders - Shopping List page shows stat cards, day toggles, items table and action buttons', async () => {
     await catering.getByRole('button', { name: 'View shopping list for upcoming orders' }).click();
     await catering.waitForLoadState('domcontentloaded');
 
-    await expect(catering.locator('h1')).toContainText('Shopping List', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('Shopping List');
     await expect(catering.getByText('Upcoming 7 days inventory planning')).toBeVisible();
     await expect(catering.getByText('Total Items')).toBeVisible();
     await expect(catering.getByText('Total Quantity')).toBeVisible();
@@ -204,12 +204,12 @@ test.describe('Orders', () => {
     await catering.getByRole('button', { name: 'Filter for 14 days' }).click();
     await expect(catering.getByRole('button', { name: 'Filter for 14 days' })).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
 
-    await expect(catering.locator('h3', { hasText: 'Shopping List Items' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.locator('h3', { hasText: 'Shopping List Items' })).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Print shopping list' })).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Download shopping list as CSV' })).toBeVisible();
 
     await catering.getByRole('button', { name: 'View all orders' }).click();
     await catering.waitForLoadState('domcontentloaded');
-    await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('heading', { name: 'Order Management' })).toBeVisible();
   });
 });

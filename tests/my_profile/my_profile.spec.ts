@@ -21,7 +21,7 @@ test.describe('My Profile', () => {
   });
 
   test('My Profile - Page heading and all main sections are visible', async () => {
-    await expect(catering.locator('h1')).toContainText('My Profile', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('My Profile');
     await expect(catering.getByRole('region', { name: /Personal information section/i })).toBeVisible();
     await expect(catering.getByRole('region', { name: /Account status information/i })).toBeVisible();
     await expect(catering.getByRole('region', { name: /Quick actions and settings/i })).toBeVisible();
@@ -59,7 +59,7 @@ test.describe('My Profile', () => {
     const prefs = catering.getByRole('region', { name: /User preferences/i });
     const themeSelect = prefs.getByLabel(/Theme/i);
 
-    await expect(prefs.getByRole('heading', { name: /Theme/i })).toBeVisible({ timeout: 10000 });
+    await expect(prefs.getByRole('heading', { name: /Theme/i })).toBeVisible();
     await expect(themeSelect).toBeVisible();
     await expect(themeSelect.locator('option[value="light"]')).toHaveText(/Light/i);
     await expect(themeSelect.locator('option[value="dark"]')).toHaveText(/Dark/i);
@@ -75,7 +75,7 @@ test.describe('My Profile', () => {
 
     await expect(
       catering.getByRole('textbox', { name: /First Name/i }).or(catering.getByLabel(/First Name/i)).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     await expect(
       catering.getByRole('textbox', { name: /Last Name/i }).or(catering.getByLabel(/Last Name/i)).first(),
     ).toBeVisible();
@@ -87,6 +87,6 @@ test.describe('My Profile', () => {
     } else {
       await catering.keyboard.press('Escape');
     }
-    await expect(catering.getByRole('button', { name: /Edit Profile/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('button', { name: /Edit Profile/i }).first()).toBeVisible();
   });
 });

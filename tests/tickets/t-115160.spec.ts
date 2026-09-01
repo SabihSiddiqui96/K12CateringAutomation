@@ -52,7 +52,7 @@ async function updatePaymentDisplayLabel(
     .click();
 
   const descriptionInput = page.locator(paymentDisplayLabelInputId);
-  await expect(descriptionInput).toBeVisible({ timeout: 10000 });
+  await expect(descriptionInput).toBeVisible();
   const previousLabel = await getInputValueFromLocator(
     page,
     paymentDisplayLabelInputId,
@@ -64,7 +64,7 @@ async function updatePaymentDisplayLabel(
   await page.getByRole('button', { name: /Save Changes/i }).click();
 
   const toast = page.getByRole('alert');
-  await expect(toast).toBeVisible({ timeout: 10000 });
+  await expect(toast).toBeVisible();
   await expect(toast).toContainText(/Payment display label saved/i);
   await page.waitForTimeout(1000);
   await expect(toast).not.toBeVisible({ timeout: 30000 });
@@ -91,10 +91,10 @@ async function setPaymentFieldFormatRuleToAllowAnyText(
     page.getByRole('heading', {
       name: /Edit (Accounting String )?requirements|Edit format requirements/i,
     }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 
   const requirementsSelect = page.locator(formatRuleDropdown);
-  await expect(requirementsSelect).toBeVisible({ timeout: 10000 });
+  await expect(requirementsSelect).toBeVisible();
   await requirementsSelect.selectOption({ label: 'Allow any text' });
 
   const saveBtn = page.getByRole('button', { name: /Save Changes/i });
@@ -131,7 +131,7 @@ async function goToK12Settings(page: Page): Promise<void> {
   await ensureInK12CateringApp(page);
   await navigateK12CateringMenu(page, 'Settings');
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('h1')).toContainText('Settings', { timeout: 15000 });
+  await expect(page.locator('h1')).toContainText('Settings');
 }
 
 async function setMaxEventDateToTwoMonths(page: Page): Promise<void> {
@@ -139,7 +139,7 @@ async function setMaxEventDateToTwoMonths(page: Page): Promise<void> {
 
   const heading = page.getByRole('heading', { name: /Max Event Date/i }).first();
   await scrollUntilVisible(page, { target: heading });
-  await expect(heading).toBeVisible({ timeout: 10000 });
+  await expect(heading).toBeVisible();
 
   // Try several reasonable variants of the edit button name
   const editBtn = page
@@ -155,7 +155,7 @@ async function setMaxEventDateToTwoMonths(page: Page): Promise<void> {
       ),
     )
     .first();
-  await expect(editBtn).toBeVisible({ timeout: 10000 });
+  await expect(editBtn).toBeVisible();
   await editBtn.scrollIntoViewIfNeeded();
   await editBtn.click();
   await page.waitForTimeout(500);
@@ -164,7 +164,7 @@ async function setMaxEventDateToTwoMonths(page: Page): Promise<void> {
     .getByRole('spinbutton')
     .or(page.getByRole('textbox', { name: /max(imum)?\s*(value|event)/i }))
     .first();
-  await expect(valueInput).toBeVisible({ timeout: 10000 });
+  await expect(valueInput).toBeVisible();
   await valueInput.click();
   await valueInput.fill('');
   await valueInput.fill('2');
@@ -173,7 +173,7 @@ async function setMaxEventDateToTwoMonths(page: Page): Promise<void> {
     .getByRole('combobox', { name: /time\s*unit/i })
     .or(page.locator('select').last())
     .first();
-  await expect(timeUnitSelect).toBeVisible({ timeout: 10000 });
+  await expect(timeUnitSelect).toBeVisible();
   await timeUnitSelect.selectOption({ label: 'Months' });
 
   const saveBtn = page.getByRole('button', { name: /Save Changes|^Save$/i });
@@ -198,7 +198,7 @@ function getAddToCartModal(page: Page) {
 async function clickNext(page: Page): Promise<void> {
   const nextBtn = page.getByRole('button', { name: /^Next$/i });
   await nextBtn.scrollIntoViewIfNeeded();
-  await expect(nextBtn).toBeEnabled({ timeout: 10000 });
+  await expect(nextBtn).toBeEnabled();
   await nextBtn.click();
 }
 
@@ -220,7 +220,7 @@ async function selectFirstContactCardInSection(
   sectionHeading: RegExp,
 ): Promise<void> {
   const heading = page.getByRole('heading', { name: sectionHeading }).first();
-  await expect(heading).toBeVisible({ timeout: 10000 });
+  await expect(heading).toBeVisible();
 
   const section = heading.locator(
     'xpath=ancestor::div[contains(@class,"space-y-3")][1]',
@@ -237,10 +237,10 @@ async function selectEventDateOneMonthAhead(page: Page): Promise<void> {
 
   await expect(
     page.getByRole('button', { name: /Previous month/i }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 
   const nextMonthButton = page.getByRole('button', { name: /Next month/i });
-  await expect(nextMonthButton).toBeVisible({ timeout: 10000 });
+  await expect(nextMonthButton).toBeVisible();
 
   // Advance the picker exactly one month forward
   await nextMonthButton.click();
@@ -306,18 +306,18 @@ async function placeOrderUsingDisplayLabel(
     .getByRole('button', { name: /^Add to Cart$/i })
     .first();
   await cardAddToCart.scrollIntoViewIfNeeded();
-  await expect(cardAddToCart).toBeVisible({ timeout: 15000 });
+  await expect(cardAddToCart).toBeVisible();
   await cardAddToCart.click();
 
   const modal = getAddToCartModal(page);
-  await expect(modal).toBeVisible({ timeout: 10000 });
+  await expect(modal).toBeVisible();
   const modalAddToCart = modal.getByRole('button', { name: /^Add to Cart$/i });
-  await expect(modalAddToCart).toBeEnabled({ timeout: 10000 });
+  await expect(modalAddToCart).toBeEnabled();
   await modalAddToCart.click();
-  await expect(modal).toBeHidden({ timeout: 10000 });
+  await expect(modal).toBeHidden();
 
   await page.getByRole('button', { name: /Proceed to Checkout/i }).click();
-  await expect(page).toHaveURL(/\/checkout/i, { timeout: 15000 });
+  await expect(page).toHaveURL(/\/checkout/i);
 
   await selectEventDateOneMonthAhead(page);
   await clickNext(page);
@@ -367,12 +367,12 @@ async function placeOrderUsingDisplayLabel(
     .locator('span.font-medium')
     .filter({ hasText: displayLabel })
     .first();
-  await expect(paymentMethodLabel).toBeVisible({ timeout: 10000 });
+  await expect(paymentMethodLabel).toBeVisible();
   await paymentMethodLabel.locator('xpath=ancestor::button[1]').click();
 
   const programNameInput = page.locator(checkoutProgramNameInput);
   await programNameInput.scrollIntoViewIfNeeded();
-  await expect(programNameInput).toBeVisible({ timeout: 10000 });
+  await expect(programNameInput).toBeVisible();
   await programNameInput.fill(PROGRAM_NAME);
 
   const accountingStringInput = page.locator(checkoutAccountingStringInput);
@@ -401,7 +401,7 @@ async function placeOrderUsingDisplayLabel(
 
   const placeOrderBtn = page.getByRole('button', { name: /Place Order/i });
   await placeOrderBtn.scrollIntoViewIfNeeded();
-  await expect(placeOrderBtn).toBeEnabled({ timeout: 10000 });
+  await expect(placeOrderBtn).toBeEnabled();
   await placeOrderBtn.click();
 
   await Promise.race([
@@ -424,7 +424,7 @@ async function placeOrderUsingDisplayLabel(
   const detailsBtn = page
     .getByRole('button', { name: /View details for order/i })
     .first();
-  await expect(detailsBtn).toBeVisible({ timeout: 15000 });
+  await expect(detailsBtn).toBeVisible();
   const detailsLabel = (await detailsBtn.getAttribute('aria-label')) ?? '';
   const orderId = detailsLabel.replace(/^View details for order\s*/i, '').trim();
   if (!orderId) {
@@ -454,7 +454,7 @@ async function getVisibleCalendarMonth(page: Page): Promise<Date> {
     })
     .first();
 
-  await expect(monthHeading).toBeVisible({ timeout: 10000 });
+  await expect(monthHeading).toBeVisible();
   const text = (await monthHeading.textContent())?.trim() ?? '';
   const [monthName, yearStr] = text.split(/\s+/);
   return new Date(`${monthName} 1, ${yearStr}`);
@@ -509,8 +509,8 @@ async function pickDateFromCalendar(page: Page, target: Date): Promise<void> {
     )
     .first();
 
-  await expect(dayBtn).toBeVisible({ timeout: 10000 });
-  await expect(dayBtn).toBeEnabled({ timeout: 10000 });
+  await expect(dayBtn).toBeVisible();
+  await expect(dayBtn).toBeEnabled();
   await dayBtn.click();
   await page.waitForTimeout(200);
 
@@ -528,12 +528,12 @@ async function pickDateForButton(
   target: Date,
 ): Promise<void> {
   const trigger = page.locator(buttonId);
-  await expect(trigger).toBeVisible({ timeout: 10000 });
+  await expect(trigger).toBeVisible();
   await trigger.click();
 
   await expect(
     page.getByRole('button', { name: /Previous month/i }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 
   await pickDateFromCalendar(page, target);
 }
@@ -560,18 +560,18 @@ async function navigateToReportsFromAnywhere(page: Page): Promise<void> {
 
   // Click the Reports sidebar item explicitly and wait for the Reports page
   const sidebar = page.locator('aside[aria-label="Main navigation"]');
-  await expect(sidebar).toBeVisible({ timeout: 10000 });
+  await expect(sidebar).toBeVisible();
 
   const reportsButton = sidebar.getByLabel('Navigate to Reports', {
     exact: true,
   });
-  await expect(reportsButton).toBeVisible({ timeout: 10000 });
+  await expect(reportsButton).toBeVisible();
   await reportsButton.scrollIntoViewIfNeeded();
   await reportsButton.click();
 
   // Confirm we actually landed on the Reports page (not Orders)
-  await expect(page.locator('h1')).toContainText('Reports', { timeout: 15000 });
-  await expect(page).toHaveURL(/\/reports/i, { timeout: 15000 });
+  await expect(page.locator('h1')).toContainText('Reports');
+  await expect(page).toHaveURL(/\/reports/i);
   await page.waitForLoadState('domcontentloaded');
 }
 
@@ -585,14 +585,14 @@ async function exportOrderExportsCsv(page: Page): Promise<string> {
     .first();
 
   await scrollUntilVisible(page, { target: orderExportsBtn });
-  await expect(orderExportsBtn).toBeVisible({ timeout: 15000 });
+  await expect(orderExportsBtn).toBeVisible();
   await orderExportsBtn.scrollIntoViewIfNeeded();
   await orderExportsBtn.click();
   await page.waitForLoadState('domcontentloaded');
 
   await expect(
     page.getByRole('heading', { name: /Orders?\s+Exports?/i }).first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 
   const today = new Date();
   const startDate = new Date(today);
@@ -618,7 +618,7 @@ async function exportOrderExportsCsv(page: Page): Promise<string> {
     .or(page.getByRole('button', { name: /^Accepted$/i }))
     .or(page.getByLabel(/^Accepted$/i))
     .first();
-  await expect(acceptedToggle).toBeVisible({ timeout: 10000 });
+  await expect(acceptedToggle).toBeVisible();
   const isCheckable = await acceptedToggle
     .evaluate((el) => (el as HTMLInputElement).type === 'checkbox')
     .catch(() => false);
@@ -634,8 +634,8 @@ async function exportOrderExportsCsv(page: Page): Promise<string> {
   const exportBtn = page
     .getByRole('button', { name: /Export.*CSV|CSV.*Export|Download.*CSV/i })
     .first();
-  await expect(exportBtn).toBeVisible({ timeout: 10000 });
-  await expect(exportBtn).toBeEnabled({ timeout: 10000 });
+  await expect(exportBtn).toBeVisible();
+  await expect(exportBtn).toBeEnabled();
 
   const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
   await exportBtn.click();
@@ -666,13 +666,13 @@ async function cancelOrderById(page: Page, orderId: string): Promise<void> {
   await navigateK12CateringMenu(page, 'Orders');
   await page.waitForLoadState('domcontentloaded');
   await ensureInK12CateringApp(page);
-  await expect(page.locator('h1')).toContainText(/Order/i, { timeout: 15000 });
+  await expect(page.locator('h1')).toContainText(/Order/i);
 
   // Search by the captured order ID
   const searchBox = page
     .getByRole('textbox', { name: /Search orders/i })
     .first();
-  await expect(searchBox).toBeVisible({ timeout: 10000 });
+  await expect(searchBox).toBeVisible();
   await searchBox.fill(orderId);
   await page.waitForTimeout(800);
 
@@ -684,7 +684,7 @@ async function cancelOrderById(page: Page, orderId: string): Promise<void> {
       ),
     })
     .first();
-  await expect(detailsBtn).toBeVisible({ timeout: 10000 });
+  await expect(detailsBtn).toBeVisible();
   await detailsBtn.click();
   await page.waitForLoadState('domcontentloaded');
   await ensureInK12CateringApp(page);
@@ -694,14 +694,14 @@ async function cancelOrderById(page: Page, orderId: string): Promise<void> {
     page.getByRole('heading', {
       name: new RegExp(`Order\\s*#?\\s*${escapeRegExp(orderId)}`, 'i'),
     }),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 
   // Click "Cancel this order" on the order details page
   const cancelOrderBtn = page
     .getByRole('button', { name: /Cancel this order/i })
     .or(page.getByRole('button', { name: /^Cancel Order$/i }))
     .first();
-  await expect(cancelOrderBtn).toBeVisible({ timeout: 15000 });
+  await expect(cancelOrderBtn).toBeVisible();
   await cancelOrderBtn.scrollIntoViewIfNeeded();
   await cancelOrderBtn.click();
 
@@ -715,7 +715,7 @@ async function cancelOrderById(page: Page, orderId: string): Promise<void> {
     .getByRole('button', { name: /^Cancel Order$/i })
     .last();
   const confirmCancelBtn = dialogConfirm.or(fallbackConfirm).first();
-  await expect(confirmCancelBtn).toBeVisible({ timeout: 10000 });
+  await expect(confirmCancelBtn).toBeVisible();
   await confirmCancelBtn.click();
   await ensureInK12CateringApp(page);
 
@@ -724,7 +724,7 @@ async function cancelOrderById(page: Page, orderId: string): Promise<void> {
     page
       .getByText(/order.*cancel(l)?ed|cancel(l)?ed successfully|cancel(l)?ed/i)
       .first(),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 }
 
 function parseCsv(csv: string): string[][] {

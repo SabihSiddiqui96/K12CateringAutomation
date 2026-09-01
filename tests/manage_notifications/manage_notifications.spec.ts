@@ -21,7 +21,7 @@ test.describe('Manage Notifications', () => {
   });
 
   test('Manage Notifications - Page heading and controls are visible', async () => {
-    await expect(catering.locator('h1')).toContainText('Manage Notifications', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('Manage Notifications');
     await expect(catering.getByRole('heading', { name: /Notification Management/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /Create new notification/i })).toBeVisible();
     await expect(catering.getByRole('textbox', { name: /Search notifications/i })).toBeVisible();
@@ -54,7 +54,7 @@ test.describe('Manage Notifications', () => {
     const hasInput = await catering.getByRole('textbox', { name: /Title|Message|Notification/i }).first().isVisible({ timeout: 5000 }).catch(() => false);
     expect(hasDialog || hasInput).toBe(true);
 
-    await expect(catering.getByRole('button', { name: /Save|Submit|Create|Publish/i }).last()).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByRole('button', { name: /Save|Submit|Create|Publish/i }).last()).toBeVisible();
     await catering.getByRole('button', { name: /Save|Submit|Create|Publish/i }).last().click();
     await expect(catering.getByText(/required|must not be empty|please enter/i).first()).toBeVisible({ timeout: 5000 });
 

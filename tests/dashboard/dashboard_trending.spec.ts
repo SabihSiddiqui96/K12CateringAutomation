@@ -35,7 +35,7 @@ test.describe('Dashboard - Trending Chart', () => {
     await expect(catering.getByRole('button', { name: 'Filter by Last 7 Days' })).toHaveAttribute('aria-pressed', 'true');
     await catering.getByRole('button', { name: 'Switch to Bar Chart view' }).click();
     await catering.getByRole('textbox', { name: 'Search trending items' }).clear();
-    await expect(trendingSection()).toBeVisible({ timeout: 15000 });
+    await expect(trendingSection()).toBeVisible();
   }
 
   async function ensureTrendingData(): Promise<void> {
@@ -57,7 +57,7 @@ test.describe('Dashboard - Trending Chart', () => {
   });
 
   test('Trending - Section loads with heading, day filters, chart toggles and search input', async () => {
-    await expect(trendingSection()).toBeVisible({ timeout: 15000 });
+    await expect(trendingSection()).toBeVisible();
     await expect(trendingSection().getByRole('heading', { name: "What's Trending?" })).toBeVisible();
     await expect(trendingSection().getByRole('button', { name: 'Filter by Last 7 Days' })).toBeVisible();
     await expect(trendingSection().getByRole('button', { name: 'Filter by 14 Days' })).toBeVisible();
@@ -79,14 +79,14 @@ test.describe('Dashboard - Trending Chart', () => {
     await expect(trendingSection().getByRole('button', { name: 'Switch to Pie Chart view' })).toHaveAttribute('aria-pressed', 'true');
 
     await trendingSection().getByRole('button', { name: 'Switch to Details view' }).click();
-    await expect(trendingSection().getByRole('table')).toBeVisible({ timeout: 10000 });
+    await expect(trendingSection().getByRole('table')).toBeVisible();
     await expect(trendingSection().getByRole('columnheader', { name: 'Menu Item' })).toBeVisible();
     await expect(trendingSection().getByRole('columnheader', { name: 'Quantity' })).toBeVisible();
   });
 
   test('Trending - Search filters items in Details view; no-match shows empty state', async () => {
     await trendingSection().getByRole('button', { name: 'Switch to Details view' }).click();
-    await expect(trendingSection().getByRole('table')).toBeVisible({ timeout: 10000 });
+    await expect(trendingSection().getByRole('table')).toBeVisible();
 
     const firstItem = (await trendingSection()
       .getByRole('row')
@@ -98,10 +98,10 @@ test.describe('Dashboard - Trending Chart', () => {
 
     const searchInput = catering.getByRole('textbox', { name: 'Search trending items' });
     await searchInput.fill(firstItem!.split(/\s+/)[0]);
-    await expect(trendingSection()).toContainText(firstItem!, { timeout: 10000 });
+    await expect(trendingSection()).toContainText(firstItem!);
 
     await searchInput.clear();
     await searchInput.fill('zzznomatch');
-    await expect(trendingSection()).toContainText('No Items Found', { timeout: 10000 });
+    await expect(trendingSection()).toContainText('No Items Found');
   });
 });

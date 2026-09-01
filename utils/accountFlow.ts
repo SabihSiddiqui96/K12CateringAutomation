@@ -19,7 +19,7 @@ async function closeChangePasswordDialog(page: Page): Promise<void> {
     await page.keyboard.press('Escape');
   }
 
-  await expect(dialog).toBeHidden({ timeout: 10000 });
+  await expect(dialog).toBeHidden();
 }
 
 async function openChangePasswordDialog(
@@ -39,7 +39,7 @@ async function openChangePasswordDialog(
   const searchBox = page.getByRole('textbox', {
     name: /Search accounts by name, username, or email/i,
   });
-  await expect(searchBox).toBeVisible({ timeout: 10000 });
+  await expect(searchBox).toBeVisible();
   await searchBox.fill(customerEmail);
   await page.waitForLoadState('networkidle').catch(() => undefined);
   await page.waitForTimeout(600);
@@ -47,7 +47,7 @@ async function openChangePasswordDialog(
   const accountCard = page.getByRole('listitem').filter({
     hasText: customerEmail,
   }).first();
-  await expect(accountCard).toBeVisible({ timeout: 10000 });
+  await expect(accountCard).toBeVisible();
 
   const actionsButton = accountCard.getByRole('button', { name: /Actions for/i });
   const changePasswordMenuItem = page.getByRole('menuitem', {
@@ -81,7 +81,7 @@ async function openChangePasswordDialog(
     await page.waitForTimeout(600);
   }
 
-  await expect(dialog).toBeVisible({ timeout: 10000 });
+  await expect(dialog).toBeVisible();
   return dialog;
 }
 
@@ -108,7 +108,7 @@ export async function resetCustomerPasswordFromAccounts(
     .catch(() => false);
 
   if (passwordUpdated) {
-    await expect(changePasswordDialog(page)).toBeHidden({ timeout: 10000 });
+    await expect(changePasswordDialog(page)).toBeHidden();
     return;
   }
 

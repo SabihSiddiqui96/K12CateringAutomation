@@ -25,5 +25,5 @@ test('Catering - User Feedback - the "Send Digest Now" manual-trigger button is 
 
   // The manual digest trigger is on the (Cybersoft-Admin-only) User Feedback
   // dashboard. We only assert its presence — clicking it sends a real email.
-  await expect(c.getByRole('button', { name: /Send Digest Now/i })).toBeVisible({ timeout: 10000 });
+  await expect(c.getByRole('button', { name: /Send Digest Now/i })).toBeVisible();
 });

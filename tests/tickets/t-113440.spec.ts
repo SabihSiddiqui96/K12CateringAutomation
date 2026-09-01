@@ -80,7 +80,7 @@ function randomThreeDigits(): number {
 }
 
 async function expectToast(page: Page, message: RegExp): Promise<void> {
-  await expect(page.getByText(message).first()).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(message).first()).toBeVisible();
 }
 
 async function createMenu(page: Page, menuName: string): Promise<void> {
@@ -101,7 +101,7 @@ async function createMenu(page: Page, menuName: string): Promise<void> {
 
   await expect(
     page.getByRole('button', { name: menuButtonName('Rename', menuName) }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function renameMenu(
@@ -114,7 +114,7 @@ async function renameMenu(
     .click();
 
   const renameInput = page.getByLabel(`Rename ${currentName}`);
-  await expect(renameInput).toBeVisible({ timeout: 10000 });
+  await expect(renameInput).toBeVisible();
   await renameInput.fill(nextName);
 
   await page
@@ -126,7 +126,7 @@ async function renameMenu(
   await expectToast(page, /Menu renamed|Menu updated|success/i);
   await expect(
     page.getByRole('button', { name: menuButtonName('Rename', nextName) }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function deactivateMenu(page: Page, menuName: string): Promise<void> {
@@ -142,7 +142,7 @@ async function deactivateMenu(page: Page, menuName: string): Promise<void> {
   await expectToast(page, /Menu deactivated|deactivated|success/i);
   await expect(
     page.getByRole('button', { name: menuButtonName('Activate', menuName) }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function activateMenu(page: Page, menuName: string): Promise<void> {
@@ -158,7 +158,7 @@ async function activateMenu(page: Page, menuName: string): Promise<void> {
   await expectToast(page, /Menu activated|activated|success/i);
   await expect(
     page.getByRole('button', { name: menuButtonName('Deactivate', menuName) }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function openManageItems(page: Page, menuName: string): Promise<void> {
@@ -169,7 +169,7 @@ async function openManageItems(page: Page, menuName: string): Promise<void> {
     .click();
   await expect(
     page.getByRole('heading', { name: `Items in "${menuName}"` }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function returnToManageMenus(page: Page): Promise<void> {
@@ -197,7 +197,7 @@ async function setMenuItems(
       name: itemName,
       exact: true,
     });
-    await expect(checkbox).toBeVisible({ timeout: 10000 });
+    await expect(checkbox).toBeVisible();
 
     if ((await checkbox.isChecked()) !== shouldBeChecked) {
       await checkbox.click();
@@ -262,10 +262,10 @@ async function expectMenuDropdownRenamed(
   await ensureMenuPage(page);
   await expect(
     page.getByRole('button', { name: /^Manage Menus$/i }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 
   const menuDropdown = page.locator('#admin-menu-select');
-  await expect(menuDropdown).toBeVisible({ timeout: 10000 });
+  await expect(menuDropdown).toBeVisible();
   await menuDropdown.click();
 
   await expect
@@ -332,7 +332,7 @@ async function verifyMenuItemsAsCustomer(
     await customerPage.getByRole('textbox', { name: /Password/i }).fill(password);
     await customerPage.getByRole('button', { name: /Sign in/i }).click();
     await customerPage.waitForLoadState('networkidle');
-    await expect(customerPage).not.toHaveURL(/login/, { timeout: 15000 });
+    await expect(customerPage).not.toHaveURL(/login/);
     // Dismiss the "Now Available" What's-New modal that blocks sidebar clicks.
     await registerReleaseNotificationHandler(customerPage);
 
@@ -342,7 +342,7 @@ async function verifyMenuItemsAsCustomer(
     for (const itemName of itemNames) {
       await expect(
         customerPage.locator('#main-content').getByText(itemName, { exact: true }).first(),
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible();
     }
   } finally {
     await customerContext.close();
@@ -364,7 +364,7 @@ async function openDeleteMenuDialog(
     page
       .getByText(`"${menuName}" is the only menu.`)
       .or(page.getByText(/Are you sure you want to delete this menu\?/i)),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function deactivateFromDeleteDialog(
@@ -388,7 +388,7 @@ async function deactivateFromDeleteDialog(
   await expectToast(page, /Menu deactivated|deactivated|success/i);
   await expect(
     page.getByRole('button', { name: menuButtonName('Activate', menuName) }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible();
 }
 
 async function deleteMenuAndExpectBlocked(
@@ -425,7 +425,7 @@ async function deleteMenuPermanently(
   await expectToast(page, /Menu deleted/i);
   await expect(
     page.getByRole('button', { name: menuButtonName('Rename', menuName) }),
-  ).not.toBeVisible({ timeout: 10000 });
+  ).not.toBeVisible();
 }
 
 // Guaranteed teardown: remove whatever "<num> - SabihTesting" menu THIS run
@@ -526,7 +526,7 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
     // changes over time — hardcoded names like "apple juice" go stale).
     await openManageItems(catering, renamedMenuName);
     const checkboxes = catering.getByRole('checkbox');
-    await expect(checkboxes.first()).toBeVisible({ timeout: 10000 });
+    await expect(checkboxes.first()).toBeVisible();
     const checkboxCount = await checkboxes.count();
     const itemNames: string[] = [];
     for (let i = 0; i < checkboxCount && itemNames.length < 2; i++) {
@@ -594,7 +594,7 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
 
     await expect(
       catering.getByRole('button', { name: renamedMenuName, exact: true }),
-    ).not.toBeVisible({ timeout: 10000 });
+    ).not.toBeVisible();
   } finally {
     // Always remove the menu this run created — covers the case where the test
     // failed before the happy-path delete above, so it never lingers under

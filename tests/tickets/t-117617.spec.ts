@@ -71,7 +71,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       .getByLabel('Navigate to Data Sync');
     if (!(await dataSyncNav.isVisible({ timeout: 5000 }).catch(() => false))) {
       await switchDistrict(catering, PRIMARY_DISTRICT);
-      await expect(dataSyncNav).toBeVisible({ timeout: 15000 });
+      await expect(dataSyncNav).toBeVisible();
     }
     await navigateK12CateringMenu(catering, 'Data Sync');
     await expect(catering.getByRole('heading', { name: /Data Sync/i }).first()).toBeVisible({ timeout: 20000 });
@@ -86,8 +86,8 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       .first()
       .click();
     const dialog = catering.getByRole('dialog').first();
-    await expect(dialog).toBeVisible({ timeout: 10000 });
-    await expect(dialog.getByText(/Menu Item Sync Attributes/i)).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Menu Item Sync Attributes/i)).toBeVisible();
     return dialog;
   }
 
@@ -106,7 +106,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
   const isOn = async (toggle: Locator) => (await toggle.getAttribute('aria-checked').catch(() => null)) === 'true';
   async function setToggle(dialog: Locator, name: string, on: boolean): Promise<void> {
     const t = attrToggle(dialog, name);
-    await expect(t).toBeVisible({ timeout: 10000 });
+    await expect(t).toBeVisible();
     if ((await isOn(t)) !== on) {
       await t.click();
       await catering.waitForTimeout(400);
@@ -150,7 +150,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
   test('global attribute toggles render, persist, and drive Push Sync Now', async () => {
     const dialog = await openManage();
     for (const name of ATTRS) {
-      await expect(attrToggle(dialog, name)).toBeVisible({ timeout: 10000 });
+      await expect(attrToggle(dialog, name)).toBeVisible();
     }
     const price = attrToggle(dialog, 'Sync Price');
     const original = await isOn(price);
@@ -165,17 +165,17 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
 
     await catering.getByRole('button', { name: /Push sync now/i }).first().click();
     const dlg = catering.getByRole('dialog').first();
-    await expect(dlg).toBeVisible({ timeout: 10000 });
-    await expect(dlg.getByText(/Push sync now\?/i)).toBeVisible({ timeout: 10000 });
-    await expect(dlg.getByText(/Menu item attributes/i)).toBeVisible({ timeout: 10000 });
+    await expect(dlg).toBeVisible();
+    await expect(dlg.getByText(/Push sync now\?/i)).toBeVisible();
+    await expect(dlg.getByText(/Menu item attributes/i)).toBeVisible();
     // The "...will not be synced (globally off)" notice lists ALL globally-off
     // attributes together (e.g. "Description, Price, Image will not be synced..."),
     // so the list varies run to run - assert Price is INCLUDED, plus the 2nd sentence.
-    await expect(dlg.getByText('Name', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await expect(dlg.getByText('Name', { exact: true }).first()).toBeVisible();
     const offNotice = dlg.getByText(/will not be synced \(globally off\)/i).first();
-    await expect(offNotice).toBeVisible({ timeout: 10000 });
+    await expect(offNotice).toBeVisible();
     await expect(offNotice).toContainText(/Price/i);
-    await expect(dlg.getByText(/Per-item overrides may differ/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(dlg.getByText(/Per-item overrides may differ/i).first()).toBeVisible();
     await dlg.getByRole('button', { name: /^Cancel$/i }).first().click();
     await closeDialog();
     const restore = await openManage();
@@ -253,7 +253,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       await editMenuItem(catering, uniqueName, { newPrice: PRICE_LOCAL });
       await switchDistrict(catering, HOME);
       const filtered = await findItemUnderLocalOverridesFilter(catering, uniqueName);
-      await expect(filtered.getByText(/^Overrides$/i).first()).toBeVisible({ timeout: 10000 });
+      await expect(filtered.getByText(/^Overrides$/i).first()).toBeVisible();
 
       // 16 — Sync Price ON globally but a local override present -> the target
       // keeps its own Price.
@@ -352,7 +352,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       // Back on HOME, confirm the item shows under the Local Overrides filter.
       await switchDistrict(catering, HOME);
       const filtered = await findItemUnderLocalOverridesFilter(catering, uniqueName);
-      await expect(filtered.getByText(/^Overrides$/i).first()).toBeVisible({ timeout: 10000 });
+      await expect(filtered.getByText(/^Overrides$/i).first()).toBeVisible();
 
       // Both attributes ON globally but a local override present -> the target keeps
       // its own (local) values.

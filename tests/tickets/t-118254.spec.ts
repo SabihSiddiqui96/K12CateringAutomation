@@ -160,7 +160,7 @@ async function deactivateComplimentaryItem(c: Page, name: string): Promise<void>
   await c.locator(`button[aria-label="Deactivate ${name}"]`).click();
   const confirm = c.locator('[role="dialog"]').getByRole('button', { name: /^Deactivate$/ });
   if (await appears(confirm, 4000)) await confirm.click();
-  await expect(c.locator(`button[aria-label="Deactivate ${name}"]`)).toBeHidden({ timeout: 15000 });
+  await expect(c.locator(`button[aria-label="Deactivate ${name}"]`)).toBeHidden();
 }
 
 /** Reactivate an item; same reasoning in reverse under the "Inactive" filter. */
@@ -168,7 +168,7 @@ async function activateComplimentaryItem(c: Page, name: string): Promise<void> {
   await c.locator(`button[aria-label="Activate ${name}"]`).click();
   const confirm = c.locator('[role="dialog"]').getByRole('button', { name: /^Activate$/ });
   if (await appears(confirm, 4000)) await confirm.click();
-  await expect(c.locator(`button[aria-label="Activate ${name}"]`)).toBeHidden({ timeout: 15000 });
+  await expect(c.locator(`button[aria-label="Activate ${name}"]`)).toBeHidden();
 }
 
 /**
@@ -195,15 +195,15 @@ async function setAmountSetting(
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     await c.getByLabel(opts.editLabel).click();
-    await expect(title).toBeVisible({ timeout: 10000 });
+    await expect(title).toBeVisible();
 
     const field = c.locator(opts.input);
-    await expect(field).toBeVisible({ timeout: 10000 });
+    await expect(field).toBeVisible();
     await field.fill(opts.value);
     await field.blur().catch(() => undefined);
 
     const save = c.locator('[role="dialog"]').getByRole('button', { name: /Save Changes/i });
-    await expect(save).toBeEnabled({ timeout: 10000 });
+    await expect(save).toBeEnabled();
     await save.click();
 
     if (await title.waitFor({ state: 'hidden', timeout: 10000 }).then(() => true, () => false)) {
@@ -244,7 +244,7 @@ const setMinimumOrderAmount = (c: Page, value: string) =>
 async function setOverallNote(c: Page, value: string): Promise<void> {
   await c.getByLabel(EDIT_NOTE_BTN).click();
   const box = c.locator(OVERALL_NOTE_TEXTAREA);
-  await expect(box).toBeVisible({ timeout: 10000 });
+  await expect(box).toBeVisible();
   await box.fill(value);
   await c.locator('[role="dialog"]').getByRole('button', { name: /Save Changes/i }).click();
   await expect(c.getByRole('heading', { name: /Edit Complimentary Items Note/i })).toBeHidden({
@@ -262,12 +262,12 @@ async function addComplimentaryItem(c: Page, name: string, note: string): Promis
   await c.locator(ITEM_NOTE_TEXTAREA).fill(note);
   // The submit button stays disabled until the name is non-empty.
   const addBtn = c.locator('[role="dialog"]').getByRole('button', { name: /^Add Item$/ });
-  await expect(addBtn).toBeEnabled({ timeout: 10000 });
+  await expect(addBtn).toBeEnabled();
   await addBtn.click();
   await expect(c.getByRole('heading', { name: /Add Complimentary Item/i })).toBeHidden({
     timeout: 15000,
   });
-  await expect(itemCard(c, name)).toBeVisible({ timeout: 15000 });
+  await expect(itemCard(c, name)).toBeVisible();
 }
 
 /**
@@ -308,14 +308,14 @@ async function editComplimentaryItemNote(c: Page, name: string, newNote: string)
  */
 async function deleteComplimentaryItem(c: Page, name: string): Promise<void> {
   const del = c.locator(`button[aria-label="Delete ${name}"]`);
-  await expect(del).toBeVisible({ timeout: 10000 });
+  await expect(del).toBeVisible();
   await del.click();
   const dialog = c.locator('[role="dialog"]');
   await expect(dialog.getByRole('heading', { name: /Delete Complimentary Item/i })).toBeVisible({
     timeout: 10000,
   });
   await dialog.getByRole('button', { name: 'Delete Item', exact: true }).click();
-  await expect(del).toBeHidden({ timeout: 15000 });
+  await expect(del).toBeHidden();
 }
 
 /**
@@ -341,7 +341,7 @@ async function removeComplimentaryItem(c: Page, name: string): Promise<void> {
   }
 
   const deactivate = c.locator(`button[aria-label="Deactivate ${name}"]`);
-  await expect(deactivate).toBeVisible({ timeout: 10000 });
+  await expect(deactivate).toBeVisible();
   await deactivate.click();
   const confirm = c.locator('[role="dialog"]').getByRole('button', { name: /^Deactivate$/ });
   if (await appears(confirm, 5000)) await confirm.click();
@@ -442,10 +442,10 @@ async function addOrderNote(c: Page, text: string): Promise<void> {
   await c.getByRole('button', { name: /^Add Note$/i }).first().click();
   const dialog = c.locator('[role="dialog"]');
   const box = dialog.locator('#note-textarea');
-  await expect(box).toBeVisible({ timeout: 10000 });
+  await expect(box).toBeVisible();
   await box.fill(text);
   await dialog.getByRole('button', { name: /^Add Note$/i }).click();
-  await expect(box).toBeHidden({ timeout: 15000 });
+  await expect(box).toBeHidden();
 }
 
 // ─── Checkout ────────────────────────────────────────────────────────────────
@@ -458,7 +458,7 @@ async function driveToReview(c: Page, eventName: string, notes: string): Promise
   await evName.fill(eventName);
   await evName.blur().catch(() => undefined);
   await c.locator(SPECIAL_INSTRUCTIONS).fill(notes);
-  await expect(c.getByRole('button', { name: ORDER.nextBtn })).toBeEnabled({ timeout: 10000 });
+  await expect(c.getByRole('button', { name: ORDER.nextBtn })).toBeEnabled();
   await clickNext(c);
   await selectPaymentAndContinue(c);
   await expect(c.getByRole('heading', { name: /Review Your Order/i }).first()).toBeVisible({
@@ -562,7 +562,7 @@ async function driveCustomerToReview(c: Page, eventName: string, instructions: s
   await evName.fill(eventName);
   await evName.blur().catch(() => undefined);
   await c.locator(SPECIAL_INSTRUCTIONS).fill(instructions);
-  await expect(c.getByRole('button', { name: ORDER.nextBtn })).toBeEnabled({ timeout: 10000 });
+  await expect(c.getByRole('button', { name: ORDER.nextBtn })).toBeEnabled();
   await clickNext(c);
   await selectPaymentAndContinue(c);
   await expect(c.getByRole('heading', { name: /Review Your Order/i }).first()).toBeVisible({
@@ -631,7 +631,7 @@ test.describe('T-118254', () => {
     try {
       // AC1 — the setting is a list: an Add control plus per-item cards, not one
       // large text field.
-      await expect(c.getByLabel(ADD_ITEM_BTN)).toBeVisible({ timeout: 10000 });
+      await expect(c.getByLabel(ADD_ITEM_BTN)).toBeVisible();
 
       // ── Round 2 (Daimien, 08/17) ──────────────────────────────────────────
       // The reworded section blurb.
@@ -641,11 +641,11 @@ test.describe('T-118254', () => {
       // was dropped as redundant with the blurb above.
       await c.getByLabel(ADD_ITEM_BTN).click();
       const addDialog = c.locator('[role="dialog"]');
-      await expect(addDialog.getByText(SHORT_DESCRIPTION_LABEL)).toBeVisible({ timeout: 10000 });
+      await expect(addDialog.getByText(SHORT_DESCRIPTION_LABEL)).toBeVisible();
       await expect(addDialog).not.toContainText('Item Note');
       await expect(addDialog).not.toContainText(REMOVED_HELPER_LINE);
       await addDialog.getByRole('button', { name: /^Cancel$/ }).click();
-      await expect(addDialog.getByText(SHORT_DESCRIPTION_LABEL)).toBeHidden({ timeout: 10000 });
+      await expect(addDialog.getByText(SHORT_DESCRIPTION_LABEL)).toBeHidden();
 
       await addComplimentaryItem(c, itemA, ITEM_NOTE);
       await addComplimentaryItem(c, itemB, ITEM_NOTE);
@@ -658,13 +658,13 @@ test.describe('T-118254', () => {
 
       // Search finds an item by name and by its short description.
       const search = c.locator(ITEMS_SEARCH);
-      await expect(search).toBeVisible({ timeout: 10000 });
+      await expect(search).toBeVisible();
       await search.fill(itemA);
-      await expect(itemCard(c, itemA)).toBeVisible({ timeout: 10000 });
-      await expect(c.locator(`button[aria-label="Edit ${itemB}"]`)).toBeHidden({ timeout: 10000 });
+      await expect(itemCard(c, itemA)).toBeVisible();
+      await expect(c.locator(`button[aria-label="Edit ${itemB}"]`)).toBeHidden();
       await search.fill(ITEM_NOTE);
-      await expect(itemCard(c, itemA)).toBeVisible({ timeout: 10000 });
-      await expect(itemCard(c, itemB)).toBeVisible({ timeout: 10000 });
+      await expect(itemCard(c, itemA)).toBeVisible();
+      await expect(itemCard(c, itemB)).toBeVisible();
       await search.fill('');
 
       // Deactivating moves an item out of Active and into Inactive, and the eye
@@ -672,12 +672,12 @@ test.describe('T-118254', () => {
       await itemsFilter(c, 'Active').click();
       const activeBefore = await itemsFilter(c, 'Active').innerText();
       await deactivateComplimentaryItem(c, itemB);
-      await expect(itemsFilter(c, 'Active')).not.toHaveText(activeBefore, { timeout: 10000 });
+      await expect(itemsFilter(c, 'Active')).not.toHaveText(activeBefore);
       await itemsFilter(c, 'Inactive').click();
       // The Inactive list is long enough to paginate, so a freshly deactivated item
       // is not necessarily on page 1 — search for it rather than assuming.
       await search.fill(itemB);
-      await expect(c.locator(`button[aria-label="Activate ${itemB}"]`)).toBeVisible({ timeout: 10000 });
+      await expect(c.locator(`button[aria-label="Activate ${itemB}"]`)).toBeVisible();
       await expect(itemCard(c, itemB)).toContainText(/Inactive/i);
       await activateComplimentaryItem(c, itemB);
       await search.fill('');
@@ -701,7 +701,7 @@ test.describe('T-118254', () => {
       }
       if (paginated && total > perPage) {
         for (const label of ['First page', 'Previous page', 'Next page', 'Last page']) {
-          await expect(compBlock(c).getByRole('button', { name: label })).toBeVisible({ timeout: 10000 });
+          await expect(compBlock(c).getByRole('button', { name: label })).toBeVisible();
         }
         const firstPageItems = await compBlock(c).locator('button[aria-label^="Edit "]').count();
         await compBlock(c).getByRole('button', { name: 'Next page' }).click();
@@ -776,7 +776,7 @@ test.describe('T-118254', () => {
     await expect(card.locator('div[class*="grid-cols"]').first()).toHaveClass(/lg:grid-cols-4/);
 
     const box = reviewItemCheckbox(c, SHARED_CHECKOUT_ITEM);
-    await expect(box).toBeVisible({ timeout: 10000 });
+    await expect(box).toBeVisible();
     await expect(box, 'complimentary items are unchecked by default').not.toBeChecked();
 
     // Selecting a complimentary item must not change what the order costs.
@@ -844,10 +844,10 @@ test.describe('T-118254', () => {
     await expect(
       card.getByText(/Staff override/i),
       'staff see the override badge when the order is below the minimum',
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     const box = reviewItemCheckbox(c, SHARED_CHECKOUT_ITEM);
-    await expect(box, 'the item is still selectable for staff').toBeEnabled({ timeout: 10000 });
+    await expect(box, 'the item is still selectable for staff').toBeEnabled();
     await expect(box).not.toBeChecked();
 
     // Place it so no stale cart is left behind for the next test.
@@ -876,7 +876,7 @@ test.describe('T-118254', () => {
       await driveCustomerToReview(c, `CustOrder ${stamp}`, instructions);
 
       const card = reviewCompCard(c);
-      await expect(card, 'the customer sees the complimentary card').toBeVisible({ timeout: 15000 });
+      await expect(card, 'the customer sees the complimentary card').toBeVisible();
       await card.scrollIntoViewIfNeeded();
 
       // The customer sees exactly what the admin configured.
@@ -892,7 +892,7 @@ test.describe('T-118254', () => {
       ).toHaveCount(0);
 
       const box = reviewItemCheckbox(c, SHARED_CHECKOUT_ITEM);
-      await expect(box).toBeVisible({ timeout: 10000 });
+      await expect(box).toBeVisible();
       await expect(box, 'unchecked by default for the customer too').not.toBeChecked();
 
       const totalBefore = await c.getByText(/\$\d[\d,]*\.\d{2}/).last().innerText();
@@ -941,7 +941,7 @@ test.describe('T-118254', () => {
       await driveCustomerToReview(c, `CustGate ${stamp}`, `Gate check ${stamp}`);
 
       const card = reviewCompCard(c);
-      await expect(card).toBeVisible({ timeout: 15000 });
+      await expect(card).toBeVisible();
       await card.scrollIntoViewIfNeeded();
 
       // A plain string, not a RegExp — "$" would be an end anchor and never match.

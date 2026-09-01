@@ -21,7 +21,7 @@ test.describe('Notifications', () => {
   });
 
   test('Notifications - Page heading, filter buttons and count badge are visible', async () => {
-    await expect(catering.locator('h1')).toContainText('Notifications', { timeout: 10000 });
+    await expect(catering.locator('h1')).toContainText('Notifications');
     await expect(catering.getByRole('heading', { name: /^\d+$/ }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: /Filter by all/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /Filter by unread/i })).toBeVisible();
@@ -30,7 +30,7 @@ test.describe('Notifications', () => {
   });
 
   test('Notifications - Notification list shows count summary and pagination', async () => {
-    await expect(catering.getByText(/Showing \d+ to \d+ of \d+ notification/i)).toBeVisible({ timeout: 10000 });
+    await expect(catering.getByText(/Showing \d+ to \d+ of \d+ notification/i)).toBeVisible();
     await expect(catering.getByRole('button', { name: /Previous page/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /Next page/i })).toBeVisible();
   });
@@ -40,20 +40,20 @@ test.describe('Notifications', () => {
     await catering.waitForTimeout(500);
     await expect(
       catering.getByText(/All caught up|Showing \d+ to \d+ of \d+/i).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     await catering.getByRole('button', { name: /Filter by read/i }).click();
     await catering.waitForTimeout(500);
     await expect(
       catering.getByText(/All caught up|Showing \d+ to \d+ of \d+|No notifications/i).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     await catering.getByRole('button', { name: /Filter by all/i }).click();
   });
 
   test('Notifications - Time Period and Type filter combos have expected options', async () => {
     const timePeriodSelect = catering.getByRole('combobox', { name: /Filter by time period/i });
-    await expect(timePeriodSelect).toBeVisible({ timeout: 10000 });
+    await expect(timePeriodSelect).toBeVisible();
     const timeOptions = await timePeriodSelect.locator('option').allTextContents();
     expect(timeOptions).toContain('Last 3 Months');
     expect(timeOptions).toContain('All Time');
@@ -76,7 +76,7 @@ test.describe('Notifications', () => {
 
     await expect(
       catering.getByText(/Showing \d+ to \d+ of \d+ notification/i).or(catering.getByText(/No notifications/i)).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     await catering.getByRole('button', { name: /Filter by all/i }).click();
     await typeSelect.selectOption({ label: 'All Types' });
