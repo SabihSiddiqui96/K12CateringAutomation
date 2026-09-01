@@ -313,11 +313,41 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
     'scripts/auto-rerun-hidden.vbs',
   ]);
 
+  // Paths that must NEVER exist in the shared repo. Unlike EXCLUDE, which leaves a
+  // file alone at the target, anything matching here is dropped from the source set
+  // AND left in the removal list, so a copy that is already over there gets deleted
+  // on the next sync.
+  //
+  // Two kinds: assistant/editor tooling that has no meaning outside this machine,
+  // and local scheduler scripts that drive it. This is a hard boundary rather than a
+  // .gitignore rule because .gitignore only stops a file being tracked - it does not
+  // stop one that somebody force-added from riding along into a shared repo.
+  const PURGE_PATTERNS = [
+    /(^|\/)CLAUDE\.md$/i,
+    /(^|\/)AGENTS\.md$/i,
+    /(^|\/)\.claude\//i,
+    /(^|\/)\.cursor\//i,
+    /(^|\/)\.aider/i,
+    /(^|\/)copilot[^/]*$/i,
+    // Hands the still-failing set to a headless assistant session; local-only, and
+    // it shells out to rerun-failed.js which is gitignored and absent from the mirror.
+    /^scripts\/auto-triage\.js$/,
+  ];
+  const isPurged = (f) => PURGE_PATTERNS.some((re) => re.test(f));
+
   if (EXCLUDE.size) {
     const dropped = sourceFiles.filter((f) => EXCLUDE.has(f));
     if (dropped.length) console.log(`Not mirrored (excluded): ${dropped.join(', ')}`);
   }
   sourceFiles = sourceFiles.filter((f) => !EXCLUDE.has(f));
+
+  const purged = sourceFiles.filter(isPurged);
+  if (purged.length) {
+    console.log(`Never mirrored (purged): ${purged.join(', ')}`);
+  }
+  // Dropped from the source set only. They stay in targetFiles below, so anything
+  // already in the shared repo is picked up as stale and deleted.
+  sourceFiles = sourceFiles.filter((f) => !isPurged(f));
 
   const targetFiles = git(TARGET_REPO, ['ls-files', PREFIX])
     .split('\n')
