@@ -235,7 +235,25 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     await selectTheRealMenu(catering);
     const origName = await firstMenuItemName(catering);
     await goToDataSync(catering);
-    await resetLocalOverride(catering, origName).catch(() => undefined);
+    const clearedLeftover = await resetLocalOverride(catering, origName).catch(() => false);
+
+    // If a leftover override WAS cleared, wait for that to land before doing anything
+    // else. resetLocalOverride returns as soon as its confirm is clicked, and an item
+    // still registered as overridden is skipped by a push - so the run's FIRST sync
+    // silently delivered nothing and the target looked like it never received the
+    // value. Driving the same push by hand always worked, because nothing had been
+    // reset immediately beforehand. Same guard as the reset step later in these tests.
+    if (clearedLeftover === true) {
+      await expect(async () => {
+        let stillOverridden = true;
+        try {
+          await findItemUnderLocalOverridesFilter(catering, origName, 1);
+        } catch {
+          stillOverridden = false;
+        }
+        expect(stillOverridden).toBe(false);
+      }).toPass({ timeout: 60000, intervals: [3000, 5000, 5000] });
+    }
 
     try {
       // 10 — on Mercer, rename the item + set a known price.
@@ -331,7 +349,25 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     const origAllergens = await readMenuItemAllergens(catering, origName);
     const origIngredients = await readMenuItemIngredients(catering, origName);
     await goToDataSync(catering);
-    await resetLocalOverride(catering, origName).catch(() => undefined);
+    const clearedLeftover = await resetLocalOverride(catering, origName).catch(() => false);
+
+    // If a leftover override WAS cleared, wait for that to land before doing anything
+    // else. resetLocalOverride returns as soon as its confirm is clicked, and an item
+    // still registered as overridden is skipped by a push - so the run's FIRST sync
+    // silently delivered nothing and the target looked like it never received the
+    // value. Driving the same push by hand always worked, because nothing had been
+    // reset immediately beforehand. Same guard as the reset step later in these tests.
+    if (clearedLeftover === true) {
+      await expect(async () => {
+        let stillOverridden = true;
+        try {
+          await findItemUnderLocalOverridesFilter(catering, origName, 1);
+        } catch {
+          stillOverridden = false;
+        }
+        expect(stillOverridden).toBe(false);
+      }).toPass({ timeout: 60000, intervals: [3000, 5000, 5000] });
+    }
 
     try {
       // Both attributes must sync globally for this flow (Test A/B leave them ON;
