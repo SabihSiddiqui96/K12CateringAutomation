@@ -1010,8 +1010,14 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .last()
       .click();
 
+    // Don't pin the row count. The toast reports how many rows the reset actually
+    // touched, and that depends on how many districts hold an override for this
+    // item at the time — which a previous run, or someone working in the app, can
+    // change. Asserting "(1 row updated)" made a passing reset look like a failure
+    // whenever the number was anything else. What matters here is that the reset
+    // reported success.
     await expect(
-      catering.getByText(/Local overrides reset \(1 row updated\)/i),
+      catering.getByText(/Local overrides reset/i).first(),
     ).toBeVisible();
 
     await closeOpenDialog(catering);
