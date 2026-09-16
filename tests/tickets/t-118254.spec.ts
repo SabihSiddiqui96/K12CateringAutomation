@@ -858,6 +858,12 @@ test.describe('T-118254', () => {
     page,
     browser,
   }) => {
+    // The longest test in the file: it does the admin's Settings setup AND a whole
+    // customer login, checkout wizard, order placement and two invoice downloads.
+    // It lands within a few seconds of the 90s default, so an ordinary slow moment
+    // anywhere in that chain tips it over and it reads as a broken feature.
+    test.slow();
+
     const stamp = Date.now();
     const instructions = `CustInstr ${stamp}`;
 
