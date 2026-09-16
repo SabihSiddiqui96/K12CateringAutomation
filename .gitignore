@@ -53,6 +53,7 @@ rerun-fails.txt
 .freshdesk-notify.paused
 .auto-rerun-notified.json
 .ticket-comment-queue.json
+.ticket-comment-draft.json
 .ticket-comment-posted.json
 .ticket-comment.log
 .auto-triage-done.json
