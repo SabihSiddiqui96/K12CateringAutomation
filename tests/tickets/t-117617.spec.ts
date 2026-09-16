@@ -14,8 +14,7 @@ import {
   firstMenuItemName,
   editMenuItem,
   readMenuItemPrice,
-  readMenuItemAllergens,
-  readMenuItemIngredients,
+  readMenuItemChips,
   resetLocalOverride,
   findItemUnderLocalOverridesFilter,
   escapeRegExp,
@@ -154,8 +153,8 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
   ): Promise<void> {
     await expect(async () => {
       await selectTheRealMenu(catering);
-      const gotAllergens = await readMenuItemAllergens(catering, name);
-      const gotIngredients = await readMenuItemIngredients(catering, name);
+      const { allergens: gotAllergens, ingredients: gotIngredients } =
+        await readMenuItemChips(catering, name);
       if (mode === 'contains') {
         expect(gotAllergens).toEqual(expect.arrayContaining(allergens));
         expect(gotIngredients).toEqual(expect.arrayContaining(ingredients));
@@ -164,6 +163,26 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
         expect(gotIngredients).toEqual(ingredients);
       }
     }).toPass(poll);
+  }
+
+  /**
+   * resetLocalOverride returns as soon as its confirm is clicked, so a push can go
+   * out while the item is still registered as overridden — and an overridden item is
+   * skipped, so the target receives nothing and it reads as "reset does not restore
+   * sync". Driving the same push by hand always worked, which is what pinned this on
+   * the timing rather than the app. The item dropping off the Local Overrides filter
+   * is the app telling us the reset is done.
+   */
+  async function expectNoLongerOverridden(name: string): Promise<void> {
+    await expect(async () => {
+      let stillOverridden = true;
+      try {
+        await findItemUnderLocalOverridesFilter(catering, name, 1);
+      } catch {
+        stillOverridden = false;
+      }
+      expect(stillOverridden).toBe(false);
+    }).toPass({ timeout: 60000, intervals: [3000, 5000, 5000] });
   }
 
   // ── Test A: toggles render + persist, then Push-sync reflects them ─────────────
@@ -333,40 +352,26 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
 
     const HOME = PRIMARY_DISTRICT;
     const TARGET = TARGET_DISTRICT;
+    // Stamped, so a chip left behind by an earlier run can never satisfy an
+    // assertion. Test B pins its item by renaming it; pinning by the values
+    // instead keeps this flow off Sync Name, which it never sets and so must not
+    // depend on — it runs on its own under `-g` during a re-run.
     const stamp = `${Date.now()}`.slice(-6);
-    const uniqueName = `AutoSyncAI ${stamp}`;
-    const ALLERGEN_SYNCED = 'AutoTestAllergenSynced';
-    const ALLERGEN_LOCAL = 'AutoTestAllergenLocal';
-    const INGREDIENT_SYNCED = 'AutoTestIngredientSynced';
-    const INGREDIENT_LOCAL = 'AutoTestIngredientLocal';
+    const ALLERGEN_SYNCED = `AutoAllergenSynced${stamp}`;
+    const ALLERGEN_LOCAL = `AutoAllergenLocal${stamp}`;
+    const INGREDIENT_SYNCED = `AutoIngredientSynced${stamp}`;
+    const INGREDIENT_LOCAL = `AutoIngredientLocal${stamp}`;
 
     setIntendedDistrict(catering, HOME);
 
     // Capture the first TheRealMenu item + its original Allergens/Ingredients (to
     // restore in cleanup), and clear any leftover override from a prior interrupted run.
     await selectTheRealMenu(catering);
-    const origName = await firstMenuItemName(catering);
-    const origAllergens = await readMenuItemAllergens(catering, origName);
-    const origIngredients = await readMenuItemIngredients(catering, origName);
+    const itemName = await firstMenuItemName(catering);
+    const orig = await readMenuItemChips(catering, itemName);
     await goToDataSync(catering);
-    const clearedLeftover = await resetLocalOverride(catering, origName).catch(() => false);
-
-    // If a leftover override WAS cleared, wait for that to land before doing anything
-    // else. resetLocalOverride returns as soon as its confirm is clicked, and an item
-    // still registered as overridden is skipped by a push - so the run's FIRST sync
-    // silently delivered nothing and the target looked like it never received the
-    // value. Driving the same push by hand always worked, because nothing had been
-    // reset immediately beforehand. Same guard as the reset step later in these tests.
-    if (clearedLeftover === true) {
-      await expect(async () => {
-        let stillOverridden = true;
-        try {
-          await findItemUnderLocalOverridesFilter(catering, origName, 1);
-        } catch {
-          stillOverridden = false;
-        }
-        expect(stillOverridden).toBe(false);
-      }).toPass({ timeout: 60000, intervals: [3000, 5000, 5000] });
+    if ((await resetLocalOverride(catering, itemName).catch(() => false)) === true) {
+      await expectNoLongerOverridden(itemName);
     }
 
     try {
@@ -375,10 +380,9 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       await setGlobalSyncToggle(catering, 'Sync Allergens', true);
       await setGlobalSyncToggle(catering, 'Sync Ingredients', true);
 
-      // On HOME, rename the item + set known Allergens/Ingredients, then push sync.
+      // On HOME, set known Allergens/Ingredients, then push sync.
       await selectTheRealMenu(catering);
-      await editMenuItem(catering, origName, {
-        newName: uniqueName,
+      await editMenuItem(catering, itemName, {
         newAllergens: [ALLERGEN_SYNCED],
         newIngredients: [INGREDIENT_SYNCED],
       });
@@ -387,75 +391,61 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       // stale chip survived here, the mismatch is this edit, not the sync. Asserting
       // it separates "the edit didn't replace" from "the sync didn't replace" instead
       // of blaming the target for state that was already wrong on the source.
-      expect(await readMenuItemAllergens(catering, uniqueName)).toEqual([ALLERGEN_SYNCED]);
-      expect(await readMenuItemIngredients(catering, uniqueName)).toEqual([INGREDIENT_SYNCED]);
+      expect(await readMenuItemChips(catering, itemName)).toEqual({
+        allergens: [ALLERGEN_SYNCED],
+        ingredients: [INGREDIENT_SYNCED],
+      });
       await goToDataSync(catering);
       await runPushSyncNow(catering);
 
-      // On the TARGET district, both attributes synced.
+      // On the TARGET district, both attributes synced. No separate existence check
+      // first — this polls the item's own dialog, so a missing item fails it anyway.
       await switchDistrict(catering, TARGET);
-      await expectItemOnTarget(uniqueName);
-      await expectAllergensIngredientsOnTarget(uniqueName, [ALLERGEN_SYNCED], [INGREDIENT_SYNCED], 'contains');
+      await expectAllergensIngredientsOnTarget(itemName, [ALLERGEN_SYNCED], [INGREDIENT_SYNCED], 'contains');
 
       // On the TARGET district, locally edit both attributes (creates a local override).
       await selectTheRealMenu(catering);
-      await editMenuItem(catering, uniqueName, {
+      await editMenuItem(catering, itemName, {
         newAllergens: [ALLERGEN_LOCAL],
         newIngredients: [INGREDIENT_LOCAL],
       });
 
       // Back on HOME, confirm the item shows under the Local Overrides filter.
       await switchDistrict(catering, HOME);
-      const filtered = await findItemUnderLocalOverridesFilter(catering, uniqueName);
+      const filtered = await findItemUnderLocalOverridesFilter(catering, itemName);
       await expect(filtered.getByText(/^Overrides$/i).first()).toBeVisible();
 
       // Both attributes ON globally but a local override present -> the target keeps
       // its own (local) values.
       await runPushSyncNow(catering);
       await switchDistrict(catering, TARGET);
-      await expectAllergensIngredientsOnTarget(uniqueName, [ALLERGEN_LOCAL], [INGREDIENT_LOCAL]);
+      await expectAllergensIngredientsOnTarget(itemName, [ALLERGEN_LOCAL], [INGREDIENT_LOCAL]);
 
       // Reset the local override, push again -> the target updates to HOME's values.
       await switchDistrict(catering, HOME);
       await goToDataSync(catering);
-      expect(await resetLocalOverride(catering, uniqueName)).toBe(true);
-
-      // Wait for the reset to actually land before pushing. resetLocalOverride
-      // returns as soon as the confirm is clicked, so the push could go out while
-      // the item was still registered as overridden - and an overridden item is
-      // skipped, so the target received nothing and it read as "reset does not
-      // restore sync". Done by hand the value comes through fine, which is what
-      // pinned this on the timing rather than the app. Waiting for the item to
-      // drop off the Local Overrides filter is the app telling us it is done.
-      await expect(async () => {
-        let stillOverridden = true;
-        try {
-          await findItemUnderLocalOverridesFilter(catering, uniqueName, 1);
-        } catch {
-          stillOverridden = false;
-        }
-        expect(stillOverridden).toBe(false);
-      }).toPass({ timeout: 60000, intervals: [3000, 5000, 5000] });
+      expect(await resetLocalOverride(catering, itemName)).toBe(true);
+      await expectNoLongerOverridden(itemName);
 
       await runPushSyncNow(catering);
       await switchDistrict(catering, TARGET);
-      await expectAllergensIngredientsOnTarget(uniqueName, [ALLERGEN_SYNCED], [INGREDIENT_SYNCED], 'contains',
+      await expectAllergensIngredientsOnTarget(itemName, [ALLERGEN_SYNCED], [INGREDIENT_SYNCED], 'contains',
         { timeout: 180000, intervals: [5000, 5000, 10000, 10000] });
     } finally {
       // Self-clean so the next run starts from a known state.
       try {
         await switchDistrict(catering, HOME);
         await goToDataSync(catering);
-        await resetLocalOverride(catering, uniqueName).catch(() => undefined);
+        await resetLocalOverride(catering, itemName).catch(() => undefined);
         await selectTheRealMenu(catering);
-        await editMenuItem(catering, uniqueName, {
-          newName: origName,
-          newAllergens: origAllergens,
-          newIngredients: origIngredients,
+        await editMenuItem(catering, itemName, {
+          newAllergens: orig.allergens,
+          newIngredients: orig.ingredients,
         }).catch(() => undefined);
       } catch {
         /* best-effort cleanup */
       } finally {
+        // Stop tracking so it can't affect later tests in this file.
         setIntendedDistrict(catering, null);
       }
     }

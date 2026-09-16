@@ -643,22 +643,22 @@ export async function readMenuItemPrice(page: Page, name: string): Promise<strin
   return Number.isFinite(num) ? String(num) : String(raw).trim();
 }
 
-/** Read a menu item's Allergens chips via the Edit dialog, then cancel (no override created). */
-export async function readMenuItemAllergens(page: Page, name: string): Promise<string[]> {
+/**
+ * Read a menu item's Allergens AND Ingredients from a SINGLE Edit-dialog open,
+ * then cancel (no override created). Both lists live in the same dialog, so
+ * reading them one at a time meant opening, reading, cancelling and waiting for
+ * the close twice over for one answer — and the sync tests do this inside poll
+ * loops, so it was most of their runtime for no extra coverage.
+ */
+export async function readMenuItemChips(
+  page: Page,
+  name: string,
+): Promise<{ allergens: string[]; ingredients: string[] }> {
   await openItemEdit(page, name);
-  const values = await readChips(page, 'allergen');
+  const allergens = await readChips(page, 'allergen');
+  const ingredients = await readChips(page, 'ingredient');
   await page.getByRole('button', { name: /Cancel and close modal|^Cancel$/i }).first().click().catch(() => undefined);
   await page.keyboard.press('Escape').catch(() => undefined);
   await page.getByRole('dialog', { name: /Edit Menu Item/i }).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => undefined);
-  return values;
-}
-
-/** Read a menu item's Ingredients chips via the Edit dialog, then cancel (no override created). */
-export async function readMenuItemIngredients(page: Page, name: string): Promise<string[]> {
-  await openItemEdit(page, name);
-  const values = await readChips(page, 'ingredient');
-  await page.getByRole('button', { name: /Cancel and close modal|^Cancel$/i }).first().click().catch(() => undefined);
-  await page.keyboard.press('Escape').catch(() => undefined);
-  await page.getByRole('dialog', { name: /Edit Menu Item/i }).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => undefined);
-  return values;
+  return { allergens, ingredients };
 }
