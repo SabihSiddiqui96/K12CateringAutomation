@@ -11,6 +11,10 @@ import {
   waitForListSettled,
 } from '../../utils/helpers';
 import { downloadInvoiceWithOptions } from '../../utils/orders';
+// The PrimeroEdge launcher's token refresh parks the page on the SSO interstitial
+// part-way through a run; safeNavigate re-enters the app instead of leaving the
+// test to read the interstitial as a missing control.
+import { safeNavigate } from '../../utils/dataSync';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -381,10 +385,16 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await waitForListSettled(catering);
 
   await test.step('Payment Display Label', async () => {
-
-    await scrollUntilVisible(catering, {
-      target: catering.getByText(paymentDisplayLabel, { exact: false }),
-    });
+    // First thing this test touches after login, so it is where a launcher hit
+    // lands. Re-enter the app and retry the whole find rather than failing on a
+    // label that is only missing because the app was never on screen.
+    await expect(async () => {
+      await safeNavigate(catering, 'Settings');
+      await waitForListSettled(catering);
+      await scrollUntilVisible(catering, {
+        target: catering.getByText(paymentDisplayLabel, { exact: false }),
+      });
+    }).toPass({ timeout: 90000, intervals: [2000, 3000, 5000] });
 
     await expect(
       catering.getByText(paymentDisplayLabel, { exact: false }),
