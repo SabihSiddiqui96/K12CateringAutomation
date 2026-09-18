@@ -74,9 +74,29 @@ stages:
           - script: npx playwright install --with-deps chrome
             displayName: Install Playwright browsers
 
+          # Gate the suite on the app actually being up - running 141 tests against a
+          # dead host posts a false "141 failed". But this was ONE curl with no retry,
+          # so a momentary blip took the whole nightly run with it: build 561334
+          # (2026-09-18 03:03) died here on curl exit 60, a transient TLS handshake
+          # failure, and published no results at all - which left nothing for the
+          # morning re-run to correct and read as "the build never ran".
           - script: |
-              echo "Checking ${{ parameters.targetEnv }} login reachability..."
-              curl -I --location --max-time 30 "$(BASE_URL)$(LOGIN_PATH)"
+              set +e
+              url="$(BASE_URL)$(LOGIN_PATH)"
+              echo "Checking ${{ parameters.targetEnv }} login reachability: $url"
+              for attempt in 1 2 3 4 5; do
+                curl -sS -o /dev/null -I --location --max-time 30 -w 'HTTP %{http_code}' "$url"
+                rc=$?   # must be captured before anything else runs, echo included
+                echo
+                if [ $rc -eq 0 ]; then
+                  echo "reachable on attempt $attempt"
+                  exit 0
+                fi
+                echo "attempt $attempt failed: curl exit $rc (60=TLS cert, 28=timeout, 6=DNS, 7=refused)"
+                [ $attempt -lt 5 ] && sleep 20
+              done
+              echo "##vso[task.logissue type=error]$url unreachable after 5 attempts over ~80s (last curl exit $rc)"
+              exit 1
             displayName: Check ${{ parameters.targetEnv }} login reachability
 
           - script: |

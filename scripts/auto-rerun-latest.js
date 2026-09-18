@@ -54,7 +54,14 @@ const APP_HOST = 'qa.primeroedge.co';
 const MAX_LOG_LINES = 1000;
 
 function log(msg) {
-  const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  // Local time, not UTC. toISOString() made the 8 AM scheduled run read as 13:00,
+  // so the log did not line up with Task Scheduler's own times or the clock on the
+  // machine, and a run that had happened looked like one that never fired.
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp =
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   const line = `${stamp} ${msg}`;
   console.log(line);
   try { fs.appendFileSync(LOG_FILE, line + '\n'); } catch {}
