@@ -3,15 +3,18 @@
  * Daily unattended re-run of the latest nightly build's failed tests.
  *
  * Finds the most recent test run, and if it had failures, hands the build id to
- * rerun-failed.js. Written for Task Scheduler (9 AM daily, retrying through the day and
- * catching up after the machine wakes), so it must never block on input and never post
+ * rerun-failed.js. Written for Task Scheduler (8 AM daily, catching up whenever the
+ * machine wakes), so it must never block on input and never post
  * anything misleading when the machine isn't in a fit state to run.
  *
- * THIS SCRIPT OWNS THE DAILY MESSAGE. The pipeline deliberately stays silent when a
- * build has failures (see azure-pipelines.yml) so the channel gets ONE message a day,
- * carrying post-re-run numbers — a real count, not a scary one that shrinks an hour
- * later. Anything left under "Confirmed failures" survived a re-run, so a genuine
- * defect stays visible daily instead of being lost among flakes.
+ * THE PIPELINE POSTS FIRST, THIS SCRIPT CORRECTS IT. Since 2026-09-08 the pipeline's
+ * Notify stage runs on always(), so the channel gets the raw 3am count pass or fail.
+ * That number still contains the flakes. This script re-runs only the failed set and
+ * posts the honest count after it, so a bad morning reads "10 failed" and then
+ * "1 failed" rather than going quiet until someone looks. It passes
+ * --no-start-webhook, so it adds exactly one message, not two. Anything left under
+ * "Confirmed failures" survived a re-run, so a genuine defect stays visible daily
+ * instead of being lost among flakes.
  *
  * Guards, in order, each of which exits rather than running:
  *   1. Nothing to do — the latest build had no failures (the pipeline announced it).
@@ -32,7 +35,7 @@
  * but not Build read, and /test/runs carries the build id anyway.
  *
  * Usage:
- *   node scripts/auto-rerun-latest.js            # what Task Scheduler runs
+ *   node scripts/auto-rerun-latest.js            # what Task Scheduler runs (8 AM daily)
  *   node scripts/auto-rerun-latest.js --dry-run  # decide and report, don't re-run
  */
 const fs = require('fs');
@@ -200,9 +203,7 @@ function alreadyInLedger(buildId) {
         `\u274c Failed:   ${run.failed} (${pct(run.failed)}%)\n` +
         `\u{1F4CA} Total:    ${run.total}\n` +
         '```\n\n' +
-        `\u26a0\ufe0f NOT re-run - ${APP_HOST} was unreachable (VPN down / machine offline), ` +
-        `so flaky failures have NOT been filtered out yet. The re-run will fire automatically ` +
-        `once this machine is back on the network, and an updated message will follow.\n\n` +
+        `\u26a0\ufe0f VPN not connected - will re-run automatically once it's back.\n\n` +
         `Original run: ${resultsUrl}`,
       );
       markFallbackPosted(run.buildId);
