@@ -95,17 +95,21 @@ stages:
                 if [ $rc -ne 0 ]; then
                   # 60 covers both an untrusted chain and an EXPIRED certificate.
                   echo "attempt $attempt: curl exit $rc (60=TLS cert invalid/expired, 35=TLS handshake, 28=timeout, 6=DNS, 7=refused)"
+                  reason="the environment is unreachable (curl exit $rc)"
                   sed 's/^/    /' /tmp/curlerr 2>/dev/null
                 else
                   # A 502/503 means something answered but the app is not up. curl
                   # exits 0 on any HTTP status, so without this the gate waves a dead
                   # host through and the suite posts a false "141 failed".
                   echo "attempt $attempt: HTTP $code - host answered but is not serving the login page"
+                  reason="the environment returned HTTP $code"
                 fi
                 [ $attempt -lt 5 ] && sleep 20
               done
+              echo "##vso[task.setvariable variable=abortReason;isOutput=true]$reason"
               echo "##vso[task.logissue type=error]$url not usable after 5 attempts over ~80s (last curl exit $rc, last HTTP $code). Tests were NOT run - this is the environment, not the suite."
               exit 1
+            name: loginCheck
             displayName: Check ${{ parameters.targetEnv }} login reachability
 
           - script: |
@@ -196,6 +200,7 @@ stages:
     condition: always()
     variables:
       RUN_PLAYWRIGHT_RESULT: $[ stageDependencies.Run_Playwright_QA.PlaywrightTests.result ]
+      ABORT_REASON: $[ stageDependencies.Run_Playwright_QA.PlaywrightTests.outputs['loginCheck.abortReason'] ]
     jobs:
       - job: SendWebhook
         displayName: Send RingCentral notification
@@ -288,11 +293,16 @@ stages:
               // channel can tell runs apart and the wording matches the start message.
               const runLabel = process.env.RUN_LABEL || 'Automation';
 
+              const abortReason = (process.env.ABORT_REASON || '').trim();
+
               let text;
-              if (runResult === 'canceled' || runResult === 'cancelled') {
-                text = 'K12Catering ' + runLabel + ' was canceled before test results were published.\n\nPipeline: ' + pipelineUrl;
-              } else if (total === 0) {
-                text = 'K12Catering ' + runLabel + ' ended before test results were published.\n\nPipeline: ' + pipelineUrl;
+              if (total === 0) {
+                const why = abortReason
+                  ? abortReason
+                  : (runResult === 'canceled' || runResult === 'cancelled')
+                    ? 'the run was canceled or hit its time limit'
+                    : 'an error before any tests ran';
+                text = 'K12Catering ' + runLabel + ' ended due to ' + why + '.\n\nPipeline: ' + pipelineUrl;
               } else {
                 text = 'K12Catering ' + runLabel + ' completed. See results below.\n\n'
                   + '✅ ' + 'Passed:'.padEnd(10) + passed + ' (' + pct(passed) + '%)\n'
@@ -341,4 +351,5 @@ stages:
               TEAM_PROJECT: $(System.TeamProject)
               BUILD_ID: $(Build.BuildId)
               RUN_PLAYWRIGHT_RESULT: $(RUN_PLAYWRIGHT_RESULT)
+              ABORT_REASON: $(ABORT_REASON)
               RUN_LABEL: $(RUN_LABEL)
