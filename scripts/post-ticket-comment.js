@@ -1,22 +1,5 @@
 #!/usr/bin/env node
-/**
- * Posts the day's "what we fixed" note on ADO Task 114690
- * (K12Catering - Automation Testing, PrimeroEdge Classic).
- *
- * The note is queued to .ticket-comment-queue.json when a fix lands rather than
- * posted there and then: it needs to come after the morning re-run webhook so the
- * ticket and the channel agree on the numbers, and a comment at the same minute
- * every day looks automated. Task Scheduler runs this at a random early-afternoon
- * time.
- *
- * Only fixes get a comment. An empty queue means there is nothing to say, which is
- * most days. One comment per day, tracked in .ticket-comment-posted.json.
- *
- * Usage:
- *   node scripts/post-ticket-comment.js              # the scheduled run
- *   node scripts/post-ticket-comment.js --dry-run    # print, do not post
- *   node scripts/post-ticket-comment.js --force      # ignore the daily guard
- */
+/** Posts the day's "what we fixed" note on ADO Task 114690 (K12Catering */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');

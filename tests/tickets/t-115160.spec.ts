@@ -1,4 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/115160
+// Test Link
 
 import { test, expect, Page } from '@playwright/test';
 import fs from 'fs';
@@ -353,8 +353,7 @@ async function placeOrderUsingDisplayLabel(
   if (await guestsInput.isVisible({ timeout: 5000 }).catch(() => false)) {
     await guestsInput.fill('2');
   }
-  // Event Name (or Nickname) is a new REQUIRED field at Additional Details (ADO 117619);
-  // without it the "Next" button stays disabled.
+  // Event Name (or Nickname) is a new REQUIRED field at Additional Details (ADO 117619)
   const eventNameInput = page.locator('#event-name-input');
   if (await eventNameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
     await eventNameInput.fill('Automation Event');
@@ -603,8 +602,7 @@ async function exportOrderExportsCsv(page: Page): Promise<string> {
   await pickDateForButton(page, '#start-date', startDate);
   await pickDateForButton(page, '#end-date', endDate);
 
-  // Deselect all order statuses then re-select only "Accepted" so the export
-  // contains a single, predictable row to validate
+  // Deselect all order statuses then re-select only "Accepted" so the export contains a single
   const deselectAllBtn = page
     .getByRole('button', { name: /Deselect All/i })
     .first();
@@ -705,8 +703,7 @@ async function cancelOrderById(page: Page, orderId: string): Promise<void> {
   await cancelOrderBtn.scrollIntoViewIfNeeded();
   await cancelOrderBtn.click();
 
-  // Confirm in the dialog (dialog role may not be set — fall back to a
-  // visible "Cancel Order" or "Confirm" / "Yes" button on the page)
+  // Confirm in the dialog (dialog role may not be set
   const dialogConfirm = page
     .getByRole('dialog')
     .getByRole('button', { name: /^Cancel Order$|^Confirm$|^Yes/i })
@@ -784,19 +781,16 @@ test('Catering - Reports - Order Exports CSV reflects Payment Display Label sett
   // Step 1-3: update Payment Display Label
   await updatePaymentDisplayLabel(catering, newDisplayLabel);
 
-  // Set Payment field format requirements → Allow any text so the
-  // accounting string entered at checkout is not blocked by a format rule
+  // Set Payment field format requirements → Allow any text so the accounting string entered at
   await setPaymentFieldFormatRuleToAllowAnyText(catering);
 
   // Set Max Event Date to 2 months so the next-month checkout date is allowed
   await setMaxEventDateToTwoMonths(catering);
 
-  // Step 4: place an order using the Payment Display Label payment type
-  // and capture its order ID for later cancellation
+  // Step 4: place an order using the Payment Display Label payment type and capture its order ID
   const orderId = await placeOrderUsingDisplayLabel(catering, newDisplayLabel);
 
-  // Step 5-6: navigate to Reports → Order Exports and export CSV across
-  // a past start date and a future end date (Accepted only)
+  // Step 5-6: navigate to Reports → Order Exports and export CSV across a past start date and a
   const csvText = await exportOrderExportsCsv(catering);
   const rows = parseCsv(csvText);
   expect(rows.length).toBeGreaterThan(1);
@@ -843,15 +837,13 @@ test('Catering - Reports - Order Exports CSV reflects Payment Display Label sett
     `Expected at least one Payment Method row to be "${newDisplayLabel}". Values: ${paymentMethodValues.join(' | ')}`,
   ).toBeTruthy();
 
-  // Sanity-check: typical export will also contain Credit Card entries —
-  // don't fail if the dataset has none, but log via the assertion message.
+  // Sanity-check: typical export will also contain Credit Card entries
   expect(
     hasCreditCard || hasDisplayLabelEntry,
     'Expected Payment Method to contain "Credit Card" or the Display Label.',
   ).toBeTruthy();
 
-  // Verify the row for our order is "[Program Name] - [Accounting String]"
-  // under the Payment Display Label column
+  // Verify the row for our order is "[Program Name]
   const expectedCombinedValue = `${PROGRAM_NAME} - ${ACCOUNTING_STRING}`;
   const hasCombinedValue = displayLabelColumnValues.some(
     (v) => v === expectedCombinedValue,
@@ -866,7 +858,6 @@ test('Catering - Reports - Order Exports CSV reflects Payment Display Label sett
     contentType: 'text/csv',
   });
 
-  // Step 7: navigate back to Orders, find the order we placed, view details,
-  // and cancel it from the dialog. Verify the cancellation succeeded.
+  // Step 7: navigate back to Orders
   await cancelOrderById(catering, orderId);
 });

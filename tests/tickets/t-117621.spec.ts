@@ -1,4 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/117621
+// Test Link
 
 import { test, expect, Page } from '@playwright/test';
 import { loginToK12Catering, getCustomerAccountEmail } from '../../utils/helpers';
@@ -16,11 +16,6 @@ test.use({ storageState: { cookies: [], origins: [] } });
 const EMAIL_RE = /[\w.+-]+@[\w.-]+\.\w+/g;
 
 // The inbox paginates at 25 items/page and prints a summary like "1–25 of 35".
-// That trailing total is the inbox's own declared item count for the current
-// filter, so it — not the rendered-row count — is what AC6 compares to the
-// "All (N)"/chip counts (otherwise any dataset >25 rows can never match).
-// Falls back to the rendered email-per-row count for small single-page sets
-// that render no pagination summary.
 const INBOX_TOTAL_RE = /\d+\s*[–-]\s*\d+\s+of\s+(\d+)/i;
 async function inboxItemCount(page: Page): Promise<number> {
   const txt = (await page.locator('main').first().innerText().catch(() => '')) ?? '';
@@ -29,9 +24,7 @@ async function inboxItemCount(page: Page): Promise<number> {
   return (txt.match(EMAIL_RE) || []).length;
 }
 
-// Parse the count a chip declares, e.g. "All (4)" -> 4, "🐛 Issues (1)" -> 1.
-// T-119591 renamed the "Bugs" chip to "Issues" and the "Bug Reports" card to
-// "Issues Reported".
+// Parse the count a chip declares, e.g.
 async function chipCount(page: Page, name: RegExp): Promise<number> {
   const label = (await page.getByRole('button', { name }).first().innerText().catch(() => '')) ?? '';
   const m = label.match(/\((\d+)\)/);
@@ -85,9 +78,6 @@ test('Catering - User Feedback - Cybersoft Admin dashboard: cards, charts, inbox
   await expect(c.getByRole('combobox', { name: /Select page limit/i })).toBeVisible();
 
   // AC6: inbox shows the same number of items as the "All (N)" chip declares.
-  // T-119591 added a New / In Progress / Resolved / All STATUS filter that
-  // defaults to New, so the type chips (which count every status) only match the
-  // rendered list once the status filter is set to All.
   const statusAll = c
     .locator('button')
     .filter({ hasText: /^In Progress$/ })
@@ -112,16 +102,13 @@ test('Catering - User Feedback - Cybersoft Admin dashboard: cards, charts, inbox
   await c.getByRole('button', { name: /^All \(\d+\)/i }).first().click();
   await expect.poll(() => inboxItemCount(c), { timeout: 10000 }).toBe(allCount);
 
-  // AC3: clicking the "Issues Reported" CARD filters the inbox like the Issues chip AND
-  // syncs the chip (its style changes to active). Clicking the card again clears it.
+  // AC3: clicking the "Issues Reported" CARD filters the inbox like the Issues chip AND syncs
   const bugsChip = c.getByRole('button', { name: /Issues \(\d+\)/i }).first();
   const chipClassBefore = await bugsChip.getAttribute('class');
   await c.getByRole('button', { name: /Issues Reported/i }).first().click();
   await expect.poll(() => inboxItemCount(c), { timeout: 10000 }).toBe(bugsCount);
   await expect.poll(async () => (await bugsChip.getAttribute('class')) !== chipClassBefore).toBe(true);
-  // Clear the filter via the All chip. (Per AC3 the card filters the inbox and
-  // syncs the chip; clearing is done with the All chip — the "click the active
-  // card again to clear" requirement was dropped from the AC.)
+  // Clear the filter via the All chip.
   await c.getByRole('button', { name: /^All \(\d+\)/i }).first().click();
   await expect.poll(() => inboxItemCount(c), { timeout: 10000 }).toBe(allCount);
 
@@ -135,8 +122,7 @@ test('Catering - User Feedback - Cybersoft Admin dashboard: cards, charts, inbox
     await pageFilter.selectOption({ index: 0 }); // back to All pages
   }
 
-  // "Send Digest Now" -> confirm the reworded confirmation dialog body, then Cancel
-  // (do NOT confirm — "Send Now" would email all Cybersoft Admins). ADO 117622 reword.
+  // "Send Digest Now" -> confirm the reworded confirmation dialog body
   await c.getByRole('button', { name: /Send Digest Now/i }).click();
   const digestDialog = c.getByRole('dialog').first();
   await expect(digestDialog).toContainText(
@@ -145,9 +131,7 @@ test('Catering - User Feedback - Cybersoft Admin dashboard: cards, charts, inbox
   await digestDialog.getByRole('button', { name: /^Cancel$/i }).click();
   await expect(digestDialog).toBeHidden({ timeout: 8000 });
 
-  // AC7 + the "today's feedback" fix: submit a uniquely-marked feedback via the
-  // widget, Refresh, then Export CSV and confirm it downloads with the right columns
-  // AND includes the just-submitted (current-day) feedback row.
+  // AC7 + the "today's feedback" fix
   const marker = `SabihTesting CSV-check ${Date.now()}`;
   await c.getByRole('button', { name: /Open feedback menu/i }).click();
   await c.getByText('This is helpful').first().click();
@@ -164,8 +148,7 @@ test('Catering - User Feedback - Cybersoft Admin dashboard: cards, charts, inbox
   const fs = await import('fs');
   const csv = fs.readFileSync((await download.path())!, 'utf8');
   const header = (csv.split(/\r?\n/)[0] || '').replace(/"/g, '').toLowerCase();
-  // AC7 columns (the "id" column was dropped from the AC):
-  // type, sentiment, comment, page_name, user_email, created_at.
+  // AC7 columns (the "id" column was dropped from the AC)
   for (const col of ['type', 'sentiment', 'comment', 'page_name', 'user_email', 'created_at']) {
     expect(header).toContain(col);
   }
@@ -188,8 +171,7 @@ test('Catering - User Feedback - a non-Cybersoft-Admin cannot see or access the 
   try {
     await cust.goto(getK12CateringLoginUrl());
     await cust.waitForLoadState('domcontentloaded');
-    // The customer portal login uses #email-input / #password-input (the password
-    // field has no textbox role, so target by id).
+    // The customer portal login uses #email-input / #password-input (the password field has no
     await expect(cust.locator('#email-input')).toBeVisible({ timeout: 20000 });
     await cust.locator('#email-input').fill(CUSTOMER_EMAIL);
     await cust.locator('#password-input').fill(CUSTOMER_PASSWORD);

@@ -9,18 +9,7 @@ import {
   clickNext,
 } from '../../utils/orders';
 
-/**
- * Catering - Orders - 'Event Name' + 'Paid' status (ADO PBI 117619).
- *
- * ONE test covering the whole feature on a single placed order: the required Event
- * Name at checkout (shown on Review, persisted to list + details), the Payment
- * Status field + "All Payments" filter, Mark as Paid (-> Payment Accepted) with
- * delivery/payment decoupling, and the Orders Export CSV containing the Event Name.
- * Manual (out of band): the payment-received email landing in the contacts' inboxes.
- *
- * The Payment-Status FILTER check runs LAST, because selecting a status leaves the
- * list filtered and would hide our (Pending) order from the earlier steps.
- */
+/** Catering - Orders - 'Event Name' + 'Paid' status (ADO PBI 117619). */
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -33,8 +22,7 @@ test.describe('Orders - Event Name & Payment Status [ADO 117619]', () => {
     // Captured in step 1 and used by the export in step 5.
     let eventDate = '';
 
-    // Open OUR order's details (re-auth via the launcher link if the long flow tripped
-    // the token refresh). No filter is applied before this, so find it by Event Name.
+    // Open OUR order's details (re-auth via the launcher link if the long flow tripped the token
     async function openOurOrderDetails(): Promise<void> {
       if (await cat.getByRole('heading', { name: /Admin Actions/i }).first().isVisible({ timeout: 1500 }).catch(() => false)) return;
       await ensureInK12CateringApp(cat);
@@ -47,8 +35,7 @@ test.describe('Orders - Event Name & Payment Status [ADO 117619]', () => {
       await cat.waitForTimeout(800);
     }
 
-    // Click the first VISIBLE admin button (matched by aria-label, e.g. "Mark this
-    // order as paid"; skip the hidden mobile duplicate), then confirm in the popup.
+    // Click the first VISIBLE admin button (matched by aria-label, e.g.
     async function adminAction(name: RegExp, confirmText?: RegExp): Promise<void> {
       let btn: Locator | null = null;
       await expect(async () => {

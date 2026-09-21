@@ -1,4 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/117620
+// Test Link
 
 import { test, expect, Page } from '@playwright/test';
 import { loginToK12Catering } from '../../utils/helpers';
@@ -6,8 +6,7 @@ import { ensureInK12CateringApp } from '../../utils/dataSync';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-// T-119591 relabelled two of these: "Something's off / Confusing" became
-// "I have questions", and "Report a bug" became "Report an issue".
+// T-119591 relabelled two of these
 const ACTIONS = ['This is helpful', 'I have questions', 'Report an issue', 'Share an idea'];
 
 async function openMenu(page: Page): Promise<void> {
@@ -50,8 +49,7 @@ test('Catering - User Feedback - feedback widget: expand, flyouts, validation, s
   await c.getByRole('heading', { name: 'Dashboard' }).first().click();
   await expect(c.getByText('Share an idea').first()).toBeHidden({ timeout: 8000 });
 
-  // AC3: "This is helpful" -> rate flyout (Helpful/Confusing toggle, optional
-  // comment, Send feedback, the "may not receive a direct response" footer).
+  // AC3: "This is helpful" -> rate flyout (Helpful/Confusing toggle
   await openMenu(c);
   await c.getByText('This is helpful').first().click();
   await expect(c.getByRole('button', { name: /^Send feedback$/i })).toBeVisible({ timeout: 8000 });
@@ -63,16 +61,14 @@ test('Catering - User Feedback - feedback widget: expand, flyouts, validation, s
   await c.getByRole('button', { name: /Helpful/i }).first().click();
   await closeForm(c);
 
-  // AC3: "Report an issue" -> flyout with the required textarea + its submit
-  // button. T-119591 renamed both the option and the button away from "bug".
+  // AC3: "Report an issue" -> flyout with the required textarea + its submit button.
   await openMenu(c);
   await c.getByText('Report an issue').first().click();
   await expect(c.getByRole('button', { name: /^Report issue$/i })).toBeVisible({ timeout: 8000 });
   await expect(c.locator('textarea:visible').first()).toHaveAttribute('placeholder', /What happened/i);
   // only one flyout at a time: the rate flyout's "Send feedback" is gone.
   await expect(c.getByRole('button', { name: /^Send feedback$/i })).toHaveCount(0);
-  // AC3: submitting with an empty textarea shows a validation error and does NOT
-  // submit (no toast).
+  // AC3: submitting with an empty textarea shows a validation error and does NOT submit (no
   await c.getByRole('button', { name: /^Report issue$/i }).click();
   await expect(
     c.getByText(/required|please|can.?t be (blank|empty)|enter|provide/i).first(),
@@ -87,8 +83,7 @@ test('Catering - User Feedback - feedback widget: expand, flyouts, validation, s
   await closeForm(c);
   await expect(c.getByRole('button', { name: /^Submit idea$/i })).toHaveCount(0); // flyout closed
 
-  // AC4: submit an idea -> the "Thank you for your feedback" toast appears and the
-  // widget collapses back to the FAB.
+  // AC4: submit an idea -> the "Thank you for your feedback" toast appears and the widget
   await openMenu(c);
   await c.getByText('Share an idea').first().click();
   await c.locator('textarea:visible').first().fill(`QA automation ${Date.now()}`);

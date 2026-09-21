@@ -1,18 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/119591
-//
-// T-119591 — Catering - User Feedback - Allow basic file attachments, allow admins
-// to mark feedback as 'Resolved', update options.
-//
-// Three changes: feedback can carry one attachment (jpg/jpeg/png/pdf/doc/docx/
-// xls/xlsx, max 5 MB) which is openable from the Feedback Inbox; admins can move
-// an item through New / In Progress / Resolved with matching filters and the
-// resolver's username recorded; and the options were relabelled — "Something's
-// Off / Confusing" to "I have questions", "Report a bug" to "Report an issue".
-//
-// Attachments are supplied as in-memory buffers rather than fixture files.
-// setInputFiles talks to the input directly, so the native file dialog (and its
-// "Custom files" filter) never opens, nothing is written to disk, and the 5 MB
-// case needs no large file checked into the repo.
+// Test Link… T-119591
 
 import { test, expect, Locator, Page } from '@playwright/test';
 import {
@@ -33,7 +19,6 @@ const OPT_ISSUE = /Report an issue/i;
 const OPT_IDEA = /Share an idea/i;
 
 // Retired by this ticket — these must not appear anywhere in the feedback UI.
-// Both spellings: the option said "Report a bug", the submit button said "Report bug".
 const OLD_LABELS = [/Something's Off/i, /Report a bug/i, /Report bug/i];
 
 const FB_COMMENT = '#fb-comment';
@@ -66,9 +51,7 @@ const oversizePng = () => ({
   buffer: Buffer.concat([PNG_1x1, Buffer.alloc((MAX_ATTACHMENT_MB + 1) * 1024 * 1024, 0)]),
 });
 
-// Minimal but structurally real files for the other supported types, so the check
-// still holds if the server sniffs content rather than trusting the extension.
-// docx/xlsx are ZIP containers, hence the empty-archive header.
+// Minimal but structurally real files for the other supported types
 const EMPTY_ZIP = Buffer.from('504b0506000000000000000000000000000000000000', 'hex');
 const TINY_PDF = Buffer.from(
   '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\n' +
@@ -108,13 +91,9 @@ async function openFeedbackMenu(c: Page): Promise<void> {
   await expect(c.getByRole('button', { name: OPT_ISSUE }).first()).toBeVisible();
 }
 
-/**
- * Escape does not dismiss the feedback panel, and while it is open it covers the
- * left navigation — so close it explicitly before navigating anywhere.
- */
+/** Escape does not dismiss the feedback panel */
 async function closeFeedbackWidget(c: Page): Promise<void> {
-  // Dismiss the form with its own X first. While it is open the page behind still
-  // scrolls but is not interactable, so anything that follows silently misses.
+  // Dismiss the form with its own X first.
   const formClose = c
     .locator('div.fixed, [role="dialog"]')
     .getByRole('button', { name: /^(x|close)$/i })
@@ -148,9 +127,7 @@ async function submitFeedback(c: Page, text: string): Promise<void> {
   await closeFeedbackWidget(c);
 }
 
-// The form's button is worded slightly shorter than the menu option: the option
-// is "Report an issue", the button "Report issue". Both are accepted — what this
-// ticket actually requires is that neither says "bug" any more.
+// The form's button is worded slightly shorter than the menu option
 const submitButton = (c: Page) =>
   c.getByRole('button', { name: /^(Report (an )?issue|Send|Submit)$/i }).last();
 
@@ -159,11 +136,7 @@ const submitButton = (c: Page) =>
 const inbox = (c: Page) =>
   c.getByRole('heading', { name: INBOX_HEADING }).first().locator('xpath=ancestor::div[3]');
 
-/**
- * The status segmented control. Scoped to the pill row rather than the page,
- * because every feedback card also carries a "New" badge button — those are
- * distinguishable only by their aria-label ("Change status, currently New").
- */
+/** The status segmented control. */
 const statusPill = (c: Page, name: string) =>
   c.locator('button').filter({ hasText: new RegExp('^' + name + '$') });
 
@@ -176,16 +149,14 @@ const statusFilter = (c: Page, name: string) =>
     .first();
 
 async function goToUserFeedback(c: Page): Promise<void> {
-  // A token refresh can bounce the tab onto the PrimeroEdge re-auth interstitial
-  // mid-test, which replaces the page and loses the nav; clear it and retry.
+  // A token refresh can bounce the tab onto the PrimeroEdge re-auth interstitial mid-test
   for (let attempt = 1; attempt <= 3; attempt++) {
     await dismissReauthInterstitial(c);
     await navigateK12CateringMenu(c, 'User Feedback').catch(() => undefined);
     await c.waitForLoadState('domcontentloaded').catch(() => undefined);
     if (await appears(c.getByRole('heading', { name: INBOX_HEADING }).first(), 20000)) {
       await expect(c.locator('h1')).toContainText('User Feedback');
-      // The inbox renders its controls a beat after the heading; "In Progress" is
-      // the only status pill whose text cannot collide with a per-item badge.
+      // The inbox renders its controls a beat after the heading
       await expect(statusPill(c, 'In Progress').first()).toBeVisible({ timeout: 25000 });
       return;
     }
@@ -241,8 +212,7 @@ test.describe('T-119591', () => {
       expect(accept, `attachment accepts ${ext}`).toContain(ext);
     }
 
-    // The submit button carried the old "Report bug" wording when this was first
-    // tested; fixed 08/18, so it is asserted rather than logged now.
+    // The submit button carried the old "Report bug" wording when this was first tested
     await expect(
       submitButton(c),
       'the submit button dropped the old "bug" wording',
@@ -326,8 +296,7 @@ test.describe('T-119591', () => {
     });
 
     await test.step('and it opens', async () => {
-      // The app previews the file in an in-page overlay rather than opening a tab or
-      // starting a download, so assert the overlay rather than a navigation.
+      // The app previews the file in an in-page overlay rather than opening a tab or starting a
       await attachment.click();
       await expect(
         c.locator('[role="dialog"], div.fixed').filter({ hasText: /qa-attachment\.png/i }).last(),
@@ -350,23 +319,20 @@ test.describe('T-119591', () => {
         timeout: 15000,
       });
     }
-    // The selected pill is styled differently from the unselected ones, so on a
-    // fresh load "New" must not look like the others.
+    // The selected pill is styled differently from the unselected ones
     const newClass = (await statusFilter(c, 'New').getAttribute('class')) ?? '';
     const allClass = (await statusFilter(c, 'All').getAttribute('class')) ?? '';
     const progressClass = (await statusFilter(c, 'In Progress').getAttribute('class')) ?? '';
     expect(newClass, 'New is the default filter on load').not.toBe(allClass);
     expect(allClass, 'the unselected pills share a style').toBe(progressClass);
 
-    // Resolve a piece of feedback this test submitted, so the assertion has a
-    // unique string to follow and no real user's item is touched.
+    // Resolve a piece of feedback this test submitted
     await statusFilter(c, 'New').click();
     await c.waitForTimeout(1500);
     const card = feedbackCard(c, marker);
     await expect(card, 'the submitted feedback is in New').toBeVisible({ timeout: 25000 });
 
-    // The status menu renders inside the control's own relative wrapper, so scope
-    // the option to that — a page-wide "Resolved" would also hit the filter pill.
+    // The status menu renders inside the control's own relative wrapper
     const statusControl = card.locator('button[aria-label^="Change status"]').first();
     await statusControl.click();
     await statusControl
@@ -397,10 +363,7 @@ test.describe('T-119591', () => {
       'the resolver username is recorded',
     ).toBeVisible();
 
-    // The ticket says an Unresolve is "not needed", but the control is a plain
-    // status picker: a Resolved item still lists New and In Progress, both
-    // enabled, so an admin can move it back. Recorded as built and raised with
-    // Daimien on 08/18 — asserted here so a later change to one-way is noticed.
+    // The ticket says an Unresolve is "not needed", but the control is a plain status picker
     const resolvedControl = c.getByRole('button', { name: /Change status, currently Resolved/i }).first();
     if (await appears(resolvedControl, 8000)) {
       await resolvedControl.click();
@@ -482,8 +445,7 @@ test.describe('T-119591', () => {
     });
 
     await test.step('the type filters still work alongside the status filters', async () => {
-      // Matched on plain substrings: the pills carry emoji and a count
-      // ("⭐ Ratings (50)"), so an anchored pattern is more trouble than it is worth.
+      // Matched on plain substrings
       await statusFilter(c, 'All').click();
       await c.waitForTimeout(1500);
       for (const type of ['Ratings', 'Positive', 'Questions', 'Issues', 'Ideas']) {

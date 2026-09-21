@@ -238,12 +238,7 @@ export async function placeBasicCheckoutOrder(page: Page): Promise<void> {
   ]);
 }
 
-/**
- * Make sure at least one order exists in the district. Navigates to Orders,
- * checks for an existing order card, and only places a new one if none are
- * found. Use in beforeAll for tests that depend on having order data
- * (Dashboard widgets, calendars, recent/upcoming order lists, etc.).
- */
+/** Make sure at least one order exists in the district. */
 export async function ensureAtLeastOneOrder(page: Page): Promise<void> {
   await navigateK12CateringMenu(page, 'Orders');
   await page.waitForLoadState('domcontentloaded');

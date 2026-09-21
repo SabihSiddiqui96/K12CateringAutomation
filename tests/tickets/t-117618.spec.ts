@@ -1,9 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/117618
-//
-// 117618 — Catering > Menus: duplicate a menu (the copy must have the SAME items
-// as the original, and the original must be unchanged) and the "Select all" button
-// in the Add-Items pop-up. The duplicate this test creates is removed in a finally
-// block so it never lingers under Manage Menus.
+// Test Link… 117618 — Catering > Menus
 
 import { expect, Page, test } from '@playwright/test';
 import { loginToK12Catering } from '../../utils/helpers';
@@ -21,8 +16,7 @@ function randomFourDigits(): number {
   return Math.floor(1000 + Math.random() * 9000);
 }
 
-// Re-auth through the PrimeroEdge launcher token-refresh page if it appeared,
-// without pressing Escape (which would close our menu modals).
+// Re-auth through the PrimeroEdge launcher token-refresh page if it appeared
 async function reauthIfLauncher(page: Page): Promise<void> {
   const link = page.locator('a[href*="/login?token="]').first();
   if (await link.isVisible({ timeout: 1500 }).catch(() => false)) {
@@ -41,8 +35,7 @@ async function ensureMenuPage(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
-// The menu-item names currently on the selected menu (read from the "Edit <name>
-// menu item" card buttons), trimmed + de-duped + sorted for a stable compare.
+// The menu-item names currently on the selected menu (read from the "Edit <name> menu item"
 async function menuItemNames(page: Page): Promise<string[]> {
   await page
     .getByText(/Loading Menu/i)
@@ -124,9 +117,7 @@ async function closeManageMenus(page: Page): Promise<void> {
     .catch(() => { });
 }
 
-// Confirm the duplicate exists (its Manage Menus row). The PrimeroEdge launcher
-// frequently fires right after "Create menu" and can interrupt the submit, so this
-// re-auths and re-creates the copy if it isn't there yet.
+// Confirm the duplicate exists (its Manage Menus row).
 async function ensureDuplicateExists(
   page: Page,
   originalName: string,
@@ -196,9 +187,7 @@ async function checkboxStats(
   return stats;
 }
 
-// Best-effort teardown: delete the duplicate directly. As of ADO 117618 a menu
-// with items can be deleted without clearing them first (the app clears them),
-// so no Deselect-all step is needed. Never throws — runs from finally.
+// Best-effort teardown: delete the duplicate directly.
 async function deleteMenu(page: Page, menuName: string): Promise<void> {
   try {
     await openManageMenus(page);
@@ -262,8 +251,7 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
       const dupNameInput = catering.locator('#duplicate-menu-name');
       await expect(dupNameInput).toBeVisible();
 
-      // A new name is required: with the field empty the "Create menu" button is
-      // disabled (or, if clickable, no menu is created).
+      // A new name is required
       const createBtn = catering.getByRole('button', { name: /^Create menu$/i });
       await dupNameInput.fill('');
       if (await createBtn.isDisabled().catch(() => false)) {
@@ -273,9 +261,7 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
         await expect(dupNameInput).toBeVisible(); // still on the prompt — not created
       }
 
-      // Enter a unique name and create the copy. The launcher often fires right
-      // after submit (wiping the transient toast), so confirm via the durable
-      // Manage Menus row — re-creating if the launcher ate the submit.
+      // Enter a unique name and create the copy.
       await dupNameInput.fill(dupName);
       await createBtn.click();
       await catering
@@ -301,9 +287,7 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
     });
 
     await test.step('"Sort Items" per-menu warning (ADO 117618 comment)', async () => {
-      // The per-category "Sort menu items in <category>" dialog warns the reorder
-      // applies to THIS menu only. Verify that text, then Cancel (the actual drag
-      // reorder + cross-menu comparison stay manual).
+      // The per-category "Sort menu items in <category>" dialog warns the reorder applies to THIS
       const sortItemsBtn = catering
         .locator('#main-content')
         .getByRole('button', { name: /^Sort menu items in /i })
@@ -348,8 +332,7 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
         catering.getByText(/updated|saved|success/i).first(),
       ).toBeVisible();
 
-      // Re-open the pop-up: the saved selection persisted — every item except the
-      // one we deselected (count is order-independent, so reordering is fine).
+      // Re-open the pop-up
       await ensureMenuPage(catering);
       await openItemsDialog(catering, dupName);
       const after = await checkboxStats(catering);
@@ -365,9 +348,7 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
     });
 
     await test.step('Delete-with-items just deletes (ADO 117618 comment)', async () => {
-      // The duplicate still has items (Select all added them). Deleting it now must
-      // JUST delete — the app clears the items for us — with NO "remove items first"
-      // error; only the Delete Menu prompt warns.
+      // The duplicate still has items (Select all added them).
       await catering
         .getByRole('button', { name: menuButtonName('Delete', dupName) })
         .click();

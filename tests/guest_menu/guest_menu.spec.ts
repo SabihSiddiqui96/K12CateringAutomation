@@ -34,9 +34,7 @@ test.describe('Guest Menu', () => {
       .filter({ has: page.locator('h2, h3, h4') });
 
   test('Guest Menu - Header shows district name, item count, and navigation buttons', async () => {
-    // The header shows the current/guest district name as the banner's level-2
-    // heading. On shared UAT the active district can differ from the env value,
-    // so assert a non-empty district heading rather than a hardcoded name.
+    // The header shows the current/guest district name as the banner's level-2 heading.
     const districtHeading = catering.locator('header').first().getByRole('heading', { level: 2 }).first();
     await expect(districtHeading).toBeVisible();
     await expect(districtHeading).not.toHaveText(/^\s*$/);

@@ -27,9 +27,7 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
     await catering.getByRole('button', { name: 'Manage allergens' }).click();
     const dialog = catering.getByRole('dialog', { name: 'Manage Allergens' });
     await expect(dialog).toBeVisible();
-    // Edit buttons are now per-row "Edit <name>" (was a generic "Edit allergen"),
-    // and the inline-edit input is #allergen-edit-<id> (distinct from the new
-    // #allergen-search box, which getByRole('textbox').first() would have hit).
+    // Edit buttons are now per-row "Edit <name>" (was a generic "Edit allergen")
     const editFirst = () => dialog.getByRole('button', { name: /^Edit / }).first();
     const editInput = dialog.locator('input[id^="allergen-edit-"]').first();
     await expect(editFirst()).toBeVisible();
@@ -132,8 +130,7 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
     const dialog = catering.getByRole('dialog', { name: 'Manage Ingredients' });
     await expect(dialog).toBeVisible();
 
-    // Per-row "Edit <name>" buttons; inline-edit input is #ingredient-edit-<id>
-    // (distinct from the #ingredient-search box).
+    // Per-row "Edit <name>" buttons
     const editFirst = () => dialog.getByRole('button', { name: /^Edit / }).first();
     const editInput = dialog.locator('input[id^="ingredient-edit-"]').first();
 
@@ -169,8 +166,7 @@ test.describe('Menu - Configuration (Allergens, Categories, Ingredients, Sort)',
   // ── Sort Categories ──
 
   test('Menu - Sort Categories modal shows drag handles, drag reorders and Save shows success', async () => {
-    // The sort flow now starts with a per-menu confirm modal; clicking "Sort for
-    // this menu" opens the inline reorder panel (drag handles + Save Order).
+    // The sort flow now starts with a per-menu confirm modal
     await catering.getByRole('button', { name: 'Sort category order' }).click();
     await expect(catering.getByRole('heading', { name: 'Sort category order' })).toBeVisible();
     await catering.getByRole('button', { name: 'Sort for this menu' }).click();

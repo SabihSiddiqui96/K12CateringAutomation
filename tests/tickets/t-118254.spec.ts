@@ -1,26 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/118254
-//
-// T-118254 — Catering - Settings - Complementary Items - Configure Complimentary
-// Items as a List.
-//
-// Settings > Order Settings "Complimentary Items" changed from a single large text
-// field to a list of individual items (each with its own note), plus an overall
-// note and a "Minimum Order Amount for Complimentary Items" amount. At the checkout Review
-// step the items render as a selectable card above the Order Disclaimer, unchecked
-// by default; whatever the customer checks shows on the Order Details page and on
-// the invoice, and the invoice download offers per-section include/exclude options.
-//
-// Covered from BOTH sides. An admin is exempt from the customer minimum (the card
-// shows a "Staff override" badge), so the admin tests alone cannot prove what a
-// customer actually sees — the customer tests sign in as the real customer account
-// and repeat the same journey.
-//
-// Two district settings are involved and they are easy to confuse:
-//   * "Minimum Order Amount"                     — blocks checkout entirely
-//   * "Minimum Order Amount for Complimentary Items" — only gates the free items
-// The checkout tests drop the first to $1 so a single menu item is enough to check
-// out, then drive the second to whichever side of the cart total they are testing.
-// Both are put back at the end of the run.
+// Test Link
 
 import { test, expect, Browser, Locator, Page } from '@playwright/test';
 import {
@@ -62,8 +40,7 @@ const SPECIAL_INSTRUCTIONS = '#special-instructions-textarea';
 const ITEMS_SEARCH = '#complimentary-items-search';
 const ITEMS_PAGE_SIZE = '#complimentary-items-pagination';
 
-// Round 2 (Daimien, 08/17): the section blurb, the renamed item-note label, and
-// the helper line that was removed as redundant.
+// Round 2 (Daimien, 08/17)
 const SECTION_BLURB =
   'List any items that customers can individually opt into receiving at no extra charge, such as plates or napkins, during checkout';
 const SHORT_DESCRIPTION_LABEL = 'Short Description (optional)';
@@ -78,42 +55,25 @@ const COMP_HEADING = /^Complimentary Items$/i;
 const BASELINE_MIN_ORDER = '25';
 const BASELINE_UNLOCK = '30';
 
-// Dropped before any checkout so one menu item is enough to place an order —
-// otherwise the cart has to be padded just to get past the door.
+// Dropped before any checkout so one menu item is enough to place an order
 const CHECKOUT_MIN_ORDER = '1';
 // Below any cart, so the complimentary items are unlocked.
 const UNLOCK_OPEN = '1';
 
-// Every item this spec creates uses this note, so anyone scanning Settings can
-// tell instantly which rows are automation data.
+// Every item this spec creates uses this note
 const ITEM_NOTE = 'Testing...';
 
-/**
- * The checkout tests select this item on a real order, and the app refuses to
- * delete an item that is in use ("Failed to delete complimentary item. It may
- * already be used on an order. Try deactivating it instead."). A fresh per-run
- * name would therefore leave a new undeletable row in the district's settings
- * every night, so this ONE item is created once and reused. Every other item this
- * spec makes never reaches an order, so it is deleted normally.
- */
+/** The checkout tests select this item on a real order */
 const SHARED_CHECKOUT_ITEM = 'SabihAutomation';
 
-/**
- * For the "locked" cases the unlock amount has to sit above the cart total (one
- * menu item comes to roughly $85), while still reading like a plausible district
- * setting on the card rather than a silly 9999.
- */
+/** For the "locked" cases the unlock amount has to sit above the cart total (one menu item */
 function lockedUnlockAmount(): string {
   return String(100 + Math.floor(Math.random() * 60));
 }
 
 // ─── Waiting ─────────────────────────────────────────────────────────────────
 
-/**
- * `locator.isVisible()` does NOT retry — it samples the DOM once and returns, so
- * passing it a `timeout` reads like a wait but never actually waits. Anywhere we
- * mean "wait for this to appear", go through here instead.
- */
+/** `locator.isVisible()` does NOT retry */
 async function appears(locator: Locator, timeout = 15000): Promise<boolean> {
   return locator.waitFor({ state: 'visible', timeout }).then(
     () => true,
@@ -151,11 +111,7 @@ const compBlock = (c: Page) =>
 const itemsFilter = (c: Page, name: 'Active' | 'Inactive' | 'All') =>
   compBlock(c).locator('button').filter({ hasText: new RegExp('^' + name + ' \\(') }).first();
 
-/**
- * Deactivate an item. Wait for the Deactivate control to go away rather than for
- * an Activate control to appear: under the "Active" filter the row leaves the
- * list entirely, so the flipped button is never rendered in place.
- */
+/** Deactivate an item. */
 async function deactivateComplimentaryItem(c: Page, name: string): Promise<void> {
   await c.locator(`button[aria-label="Deactivate ${name}"]`).click();
   const confirm = c.locator('[role="dialog"]').getByRole('button', { name: /^Deactivate$/ });
@@ -171,22 +127,10 @@ async function activateComplimentaryItem(c: Page, name: string): Promise<void> {
   await expect(c.locator(`button[aria-label="Activate ${name}"]`)).toBeHidden();
 }
 
-/**
- * Every complimentary item this spec creates, so the sweep at the end removes
- * exactly those and nothing else. Names carry a run timestamp, so an item added by
- * a person (or another spec) can never match and is never touched.
- */
+/** Every complimentary item this spec creates */
 const createdItems = new Set<string>();
 
-/**
- * Edit one of the amount dialogs and confirm the value actually landed.
- *
- * The dialog closes instantly for a person, but it animates in (opacity + scale)
- * and a click fired mid-transition can land on the overlay instead of the button,
- * leaving it open. So wait for the button to settle and, if the dialog is still
- * there, cancel and redo it once. The displayed value is re-read at the end, so a
- * genuine failure to save still fails the test.
- */
+/** Edit one of the amount dialogs and confirm the value actually landed. */
 async function setAmountSetting(
   c: Page,
   opts: { editLabel: string; input: string; dialogTitle: RegExp; heading: string; value: string },
@@ -270,10 +214,7 @@ async function addComplimentaryItem(c: Page, name: string, note: string): Promis
   await expect(itemCard(c, name)).toBeVisible();
 }
 
-/**
- * Create the item only if it is not already there, and make sure it is active —
- * a deactivated item does not appear at checkout. Never touches any other item.
- */
+/** Create the item only if it is not already there, and make sure it is active */
 async function ensureComplimentaryItem(c: Page, name: string, note: string): Promise<void> {
   if (!(await appears(c.locator(`button[aria-label="Edit ${name}"]`), 5000))) {
     await addComplimentaryItem(c, name, note);
@@ -300,12 +241,7 @@ async function editComplimentaryItemNote(c: Page, name: string, newNote: string)
   });
 }
 
-/**
- * Delete one complimentary item. The row's own control is aria-labelled
- * "Delete <item name>"; the confirmation dialog's is exactly "Delete Item" —
- * matched exactly and scoped to the dialog so this can never re-resolve to the row
- * button we just clicked.
- */
+/** Delete one complimentary item. */
 async function deleteComplimentaryItem(c: Page, name: string): Promise<void> {
   const del = c.locator(`button[aria-label="Delete ${name}"]`);
   await expect(del).toBeVisible();
@@ -318,11 +254,7 @@ async function deleteComplimentaryItem(c: Page, name: string): Promise<void> {
   await expect(del).toBeHidden();
 }
 
-/**
- * Tear-down for test items. An item already selected on a placed order cannot be
- * deleted, so fall back to Deactivate — the app's own prescribed path. Only that
- * documented refusal is absorbed; anything else surfaces.
- */
+/** Tear-down for test items. */
 async function removeComplimentaryItem(c: Page, name: string): Promise<void> {
   const del = c.locator(`button[aria-label="Delete ${name}"]`);
   if (!(await appears(del, 5000))) return;
@@ -350,10 +282,7 @@ async function removeComplimentaryItem(c: Page, name: string): Promise<void> {
 
 // ─── Admin navigation ────────────────────────────────────────────────────────
 
-/**
- * The PrimeroEdge launcher can bounce a long admin session onto its re-auth
- * interstitial. Clear it wherever it appears rather than guarding every step.
- */
+/** The PrimeroEdge launcher can bounce a long admin session onto its re-auth interstitial. */
 async function autoDismissReauth(c: Page): Promise<void> {
   await c.addLocatorHandler(
     c.getByText(/automatically authenticated and redirected to Catering/i).first(),
@@ -365,21 +294,15 @@ async function autoDismissReauth(c: Page): Promise<void> {
   );
 }
 
-// `.first()` matters: the detail page renders "Order Summary" both as the section
-// heading and in Quick Navigation, and a strict multi-match makes waits throw.
+// `.first()` matters
 const orderDetailHeading = (c: Page) => c.getByRole('heading', { name: /^Order Summary$/i }).first();
 const sidebar = (c: Page) => c.locator('aside[aria-label="Main navigation"]');
 
-/**
- * Land on the Orders list wherever a token refresh left the tab. Going straight to
- * the app route is far more reliable than clicking through the launcher
- * interstitial, which can bounce more than once before it settles.
- */
+/** Land on the Orders list wherever a token refresh left the tab. */
 async function gotoOrdersList(c: Page): Promise<boolean> {
   await dismissReauthInterstitial(c);
 
-  // Placing an order leaves a success toast over the list that swallows the nav
-  // click, so the list never loads behind it.
+  // Placing an order leaves a success toast over the list that swallows the nav click
   const closeToast = c.getByRole('button', { name: /Close success notification/i }).first();
   if (await appears(closeToast, 3000)) {
     await closeToast.click().catch(() => undefined);
@@ -403,8 +326,7 @@ async function openNewestOrderDetail(c: Page): Promise<string> {
     if (await gotoOrdersList(c)) {
       await c.getByRole('button', { name: /View details for order/i }).first().click().catch(() => undefined);
       await c.waitForLoadState('domcontentloaded').catch(() => undefined);
-      // The route flips to /orders/details before the content mounts, so anchor on
-      // the heading rather than the URL.
+      // The route flips to /orders/details before the content mounts
       if (await appears(orderDetailHeading(c), 20000)) {
         const title = await c.locator('h1').first().innerText();
         const id = title.match(/#\s*([A-Z0-9]+)/i)?.[1];
@@ -433,11 +355,7 @@ async function ensureOnOrderDetail(c: Page, orderId: string): Promise<void> {
   throw new Error(`Could not re-open order ${orderId}`);
 }
 
-/**
- * Add a real Order Note. This is NOT the checkout "special instructions" field —
- * the invoice prints them as separate sections under separate checkboxes in the
- * Download Invoice Options modal (Order Notes vs Instructions).
- */
+/** Add a real Order Note. */
 async function addOrderNote(c: Page, text: string): Promise<void> {
   await c.getByRole('button', { name: /^Add Note$/i }).first().click();
   const dialog = c.locator('[role="dialog"]');
@@ -486,11 +404,7 @@ const detailCompCard = (c: Page) =>
 
 // ─── Customer ────────────────────────────────────────────────────────────────
 
-/**
- * The customer signs in directly to the Catering UI rather than launching it from
- * PrimeroEdge, so this does not go through loginToK12Catering. Same account the
- * other specs use for the customer role.
- */
+/** The customer signs in directly to the Catering UI rather than launching it from PrimeroEdge */
 async function customerPage(browser: Browser): Promise<Page> {
   const ctx = await browser.newContext({ acceptDownloads: true });
   const p = await ctx.newPage();
@@ -505,10 +419,7 @@ async function customerPage(browser: Browser): Promise<Page> {
   return p;
 }
 
-/**
- * The customer dashboard pops district notifications that sit over the page and
- * swallow clicks on the menu and cart. Clear them before interacting.
- */
+/** The customer dashboard pops district notifications that sit over the page and swallow clicks */
 async function dismissCustomerNotifications(p: Page): Promise<void> {
   for (let i = 0; i < 5; i++) {
     const close = p.locator('button[aria-label^="Dismiss notification"]').first();
@@ -538,8 +449,7 @@ async function driveCustomerToReview(c: Page, eventName: string, instructions: s
   const proceed = c.getByRole('button', { name: /Proceed to Checkout/i }).filter({ visible: true }).first();
   await proceed.scrollIntoViewIfNeeded();
   await proceed.click();
-  // If the district Minimum Order Amount is not met the page silently stays put,
-  // so anchor on the first wizard control instead of assuming we advanced.
+  // If the district Minimum Order Amount is not met the page silently stays put
   await expect(
     c.getByRole('button', { name: ORDER.selectEventDate }),
     'customer reached the checkout wizard (district Minimum Order Amount cleared)',
@@ -587,13 +497,7 @@ async function openCustomerOrderDetail(c: Page): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe('T-118254', () => {
-  /**
-   * Whatever this run added, this run removes, and both district minimums go back
-   * to their baseline. Only names in `createdItems` are touched — each carries this
-   * run's timestamp — so an item configured by a person is left alone. The shared
-   * checkout item is kept on purpose: it is attached to a real order and the app
-   * will not delete it, so it is reused instead of re-created every night.
-   */
+  /** Whatever this run added */
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
     try {
@@ -607,8 +511,7 @@ test.describe('T-118254', () => {
       await setUnlockAmount(c, BASELINE_UNLOCK).catch(() => undefined);
       await setMinimumOrderAmount(c, BASELINE_MIN_ORDER).catch(() => undefined);
     } catch {
-      // Tear-down must never turn a green run red; anything left over is reported
-      // by the next run's sweep rather than masked here.
+      // Tear-down must never turn a green run red
     } finally {
       await page.close().catch(() => undefined);
     }
@@ -629,16 +532,13 @@ test.describe('T-118254', () => {
     const originalNote = (await settingValue(c, OVERALL_NOTE_HEADING).innerText()).trim();
 
     try {
-      // AC1 — the setting is a list: an Add control plus per-item cards, not one
-      // large text field.
+      // AC1 — the setting is a list: an Add control plus per-item cards, not one large text field.
       await expect(c.getByLabel(ADD_ITEM_BTN)).toBeVisible();
 
-      // ── Round 2 (Daimien, 08/17) ──────────────────────────────────────────
-      // The reworded section blurb.
+      // ── Round 2 (Daimien, 08/17) ──
       await expect(compBlock(c)).toContainText(SECTION_BLURB);
 
-      // "Item Note" became "Short Description", and the helper line underneath it
-      // was dropped as redundant with the blurb above.
+      // "Item Note" became "Short Description"
       await c.getByLabel(ADD_ITEM_BTN).click();
       const addDialog = c.locator('[role="dialog"]');
       await expect(addDialog.getByText(SHORT_DESCRIPTION_LABEL)).toBeVisible();
@@ -667,27 +567,20 @@ test.describe('T-118254', () => {
       await expect(itemCard(c, itemB)).toBeVisible();
       await search.fill('');
 
-      // Deactivating moves an item out of Active and into Inactive, and the eye
-      // icon flips to its Activate state. The counts move with it.
+      // Deactivating moves an item out of Active and into Inactive
       await itemsFilter(c, 'Active').click();
       const activeBefore = await itemsFilter(c, 'Active').innerText();
       await deactivateComplimentaryItem(c, itemB);
       await expect(itemsFilter(c, 'Active')).not.toHaveText(activeBefore);
       await itemsFilter(c, 'Inactive').click();
-      // The Inactive list is long enough to paginate, so a freshly deactivated item
-      // is not necessarily on page 1 — search for it rather than assuming.
+      // The Inactive list is long enough to paginate
       await search.fill(itemB);
       await expect(c.locator(`button[aria-label="Activate ${itemB}"]`)).toBeVisible();
       await expect(itemCard(c, itemB)).toContainText(/Inactive/i);
       await activateComplimentaryItem(c, itemB);
       await search.fill('');
 
-      // Pagination, which only renders once the selected filter holds more items
-      // than the page size — so its absence is a fact about the district, not a
-      // defect. QA carries a long enough list that the control is always there;
-      // Release starts near-empty, where asserting it outright fails on a district
-      // that is behaving correctly. Assert the controls only when they are present,
-      // and say so in the log when they are not.
+      // Pagination, which only renders once the selected filter holds more items than the page size
       await itemsFilter(c, 'All').click();
       const pageSize = c.locator(ITEMS_PAGE_SIZE);
       const total = Number((await itemsFilter(c, 'All').innerText()).match(/\((\d+)\)/)?.[1] ?? 0);
@@ -759,8 +652,7 @@ test.describe('T-118254', () => {
 
     await driveToReview(c, `AdminOrder ${stamp}`, instructions);
 
-    // AC2 — the card sits above the Order Disclaimer, shows the overall note once
-    // and each item with its own note, and every checkbox starts unchecked.
+    // AC2 — the card sits above the Order Disclaimer
     const headings = await c.locator('h1,h2,h3,h4').allInnerTexts();
     const compIdx = headings.findIndex((h) => /^Complimentary Items$/i.test(h.trim()));
     const discIdx = headings.findIndex((h) => /^Order Disclaimer$/i.test(h.trim()));
@@ -796,8 +688,7 @@ test.describe('T-118254', () => {
     await expect(detailCompCard(c)).toBeVisible({ timeout: 20000 });
     await expect(detailCompCard(c)).toContainText(SHARED_CHECKOUT_ITEM);
 
-    // AC4 needs a genuine Order Note. The checkout field filled earlier is "special
-    // instructions", which the invoice prints under a different toggle.
+    // AC4 needs a genuine Order Note.
     await addOrderNote(c, adminNote);
 
     // AC3 + AC4 — with everything included, all three sections print.
@@ -858,10 +749,7 @@ test.describe('T-118254', () => {
     page,
     browser,
   }) => {
-    // The longest test in the file: it does the admin's Settings setup AND a whole
-    // customer login, checkout wizard, order placement and two invoice downloads.
-    // It lands within a few seconds of the 90s default, so an ordinary slow moment
-    // anywhere in that chain tips it over and it reads as a broken feature.
+    // The longest test in the file
     test.slow();
 
     const stamp = Date.now();
@@ -877,8 +765,7 @@ test.describe('T-118254', () => {
 
     const c = await customerPage(browser);
     try {
-      // NB: keep the item name out of the event name — the invoice prints the event
-      // name too, and the exclusion assertions would match that instead.
+      // NB: keep the item name out of the event name
       await driveCustomerToReview(c, `CustOrder ${stamp}`, instructions);
 
       const card = reviewCompCard(c);

@@ -1,14 +1,5 @@
 #!/usr/bin/env node
-/**
- * Read-only Azure DevOps build test-failure fetcher used by the `fixtests`
- * workflow. Lists the failed test display names for a given build.
- *
- * Usage:
- *   node scripts/ado-build-failures.js <buildId | full build results URL>
- *
- * Reads AZURE_DEVOPS_PAT from the repo .env (never the shell env).
- * GET only — safe to allowlist for prompt-free execution.
- */
+/** Read-only Azure DevOps build test-failure fetcher used by the `fixtests` workflow. */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');

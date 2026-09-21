@@ -2,18 +2,10 @@
 
 import { test, expect, Page } from '@playwright/test';
 import { loginToK12Catering } from '../../utils/helpers';
-// safeNavigate, not navigateK12CateringMenu: the PrimeroEdge launcher's token
-// refresh parks the page on the SSO interstitial part-way through a run, and a
-// bare navigate then reads as a missing control several lines later. Every other
-// spec already re-enters the app this way.
+// safeNavigate, not navigateK12CateringMenu
 import { safeNavigate } from '../../utils/dataSync';
 
-// ---------------------------------------------------------------------------
-// Locators
-// ---------------------------------------------------------------------------
-// State-agnostic: the accessible name flips between "Disable auto-sync" and
-// "Enable auto-sync" with the toggle, so pinning either one only works from one
-// starting state. Same locator shape t-113438 uses.
+// --- Locators
 const AUTO_SYNC_SWITCH = /Auto[\s-]?sync/i;
 const AUTO_SYNC_SAVED_ALERT = 'Auto-sync settings saved';
 const ORDER_STATUS_FILTER = 'Filter orders by status';
@@ -25,17 +17,14 @@ const DISTRICT_GROUP_DIALOG = 'District Group';
 const GROUP_NAME_FIELD = 'Group Name *';
 const DUPLICATE_GROUP_ALERT = 'District group name already exists.';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
+// --- Helpers
 const autoSyncSwitch = (page: Page) =>
   page.getByRole('switch', { name: AUTO_SYNC_SWITCH }).first();
 
 const autoSyncIsOn = async (page: Page) =>
   (await autoSyncSwitch(page).getAttribute('aria-checked').catch(() => null)) === 'true';
 
-/** Flip the auto-sync switch to `on` and wait for the save, or do nothing if it is already there. */
+/** Flip the auto-sync switch to `on` and wait for the save */
 async function setAutoSync(page: Page, on: boolean): Promise<void> {
   const toggle = autoSyncSwitch(page);
   await expect(toggle).toBeVisible();
@@ -59,15 +48,10 @@ async function disableAutoSync(page: Page): Promise<boolean> {
 
 /** Opens Orders, filters to Accepted and opens the first accepted order. */
 async function openAcceptedOrder(page: Page) {
-  // Deliberately NOT a fixed order id. This step only needs "an accepted order";
-  // the one that was hard-coded here has since moved out of Accepted, and with
-  // 316 accepted orders over 16 pages it had also drifted off page 1 long before
-  // that. Taking whatever the filtered list shows first is immune to both.
+  // Deliberately NOT a fixed order id.
   const firstOrder = page.getByRole('button', { name: VIEW_ORDER_BUTTON }).first();
 
-  // Redo the whole sequence on failure rather than each step: a launcher hit
-  // anywhere in here leaves the page on the interstitial, and safeNavigate at the
-  // top of the next attempt is what puts us back in the app.
+  // Redo the whole sequence on failure rather than each step
   await expect(async () => {
     await safeNavigate(page, 'Orders');
     await expect(page).toHaveURL(/\/orders/);
@@ -107,23 +91,22 @@ test('Data Sync - Orders - Districts - Add district group', async ({
 
   const catering = await loginToK12Catering(page);
 
-  // -- Step 1: Disable auto-sync from Data Sync --
+  // -- Step 1: Disable auto-sync from Data Sync
   const autoSyncWasOn = await disableAutoSync(catering);
 
   try {
-    // -- Step 2: Open the accepted order from Orders --
+    // -- Step 2: Open the accepted order from Orders
     await openAcceptedOrder(catering);
 
-    // -- Step 3: Open the Add district group dialog from Districts --
+    // -- Step 3: Open the Add district group dialog from Districts
     await openAddDistrictGroupDialog(catering);
 
-    // -- Step 4: Submit a duplicate group name and check the error --
+    // -- Step 4: Submit a duplicate group name and check the error
     await catering
       .getByRole('textbox', { name: GROUP_NAME_FIELD, exact: true })
       .fill('test');
     await catering.getByRole('button', { name: 'Add', exact: true }).click();
-    // Scope to the dialog's inline error: a "Failed to save district" toast also
-    // carries this text, so an unscoped role=alert matches two elements.
+    // Scope to the dialog's inline error
     const duplicateGroupAlert = catering
       .getByLabel(DISTRICT_GROUP_DIALOG, { exact: true })
       .getByRole('alert')
@@ -131,8 +114,7 @@ test('Data Sync - Orders - Districts - Add district group', async ({
     await expect(duplicateGroupAlert).toBeVisible();
     await expect(duplicateGroupAlert).toHaveText(DUPLICATE_GROUP_ALERT);
   } finally {
-    // Auto-sync is a district-wide setting, not this test's own data - leaving it
-    // off changed the app for everyone and for every later run. Put it back.
+    // Auto-sync is a district-wide setting, not this test's own data
     if (autoSyncWasOn) {
       await safeNavigate(catering, 'Data Sync')
         .then(() => setAutoSync(catering, true))

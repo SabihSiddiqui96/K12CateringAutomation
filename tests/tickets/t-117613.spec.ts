@@ -1,6 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/117644
-// T-117613 — A newly added multi-tenant district appears immediately in the
-// Primary District dropdown of the District Group it was added to.
+// Test Link… T-117613
 
 import { test, expect, Page } from '@playwright/test';
 import {
@@ -67,30 +65,25 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
 
   const catering = await loginToK12Catering(page, { navigateTo: 'Districts' });
   await catering.waitForLoadState('domcontentloaded');
-  // A mid-session SSO token refresh can bounce us onto the "you will be
-  // automatically authenticated and redirected to Catering" interstitial, which
-  // replaces the page and makes every District Management locator vanish.
+  // A mid-session SSO token refresh can bounce us onto the "you will be automatically
   await dismissReauthInterstitial(catering);
   await expect(
     catering.getByRole('heading', { name: /District Management/i }).first(),
   ).toBeVisible();
 
   try {
-    // ── Add District ──────────────────────────────────────────────────────
+    // ── Add District ──
     await catering.getByRole('button', { name: /Add new district/i }).click();
 
     await catering.locator('#add-district-name').fill(districtName);
 
-    // Multi-Tenant District = Yes. The radio is a visually-hidden custom input,
-    // so check it with force.
+    // Multi-Tenant District = Yes.
     await catering.getByRole('radio', { name: 'Yes' }).first().check({ force: true });
 
     // The District Group select is disabled until Multi-Tenant is enabled.
     const groupSelect = catering.locator('#add-district-group');
     await expect(groupSelect).toBeEnabled();
-    // Pick an existing group dynamically — group data on UAT changes, so a
-    // hardcoded name (e.g. "DBurksGroup1") goes stale. The specific group is
-    // incidental to what this test verifies.
+    // Pick an existing group dynamically — group data on UAT changes, so a hardcoded name (e.g.
     const groupName = (await groupSelect.locator('option').allTextContents())
       .map((o) => o.trim())
       .find((o) => o && !/^select|^choose/i.test(o));
@@ -105,9 +98,7 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
     await catering.locator('#add-timezone-select').selectOption({ index: 1 });
 
     await catering.getByRole('button', { name: /Add District/i }).last().click();
-    // The save round-trip is the most likely moment for the token refresh to
-    // fire; clear the interstitial before asserting on the success toast so we
-    // don't report "toast missing" when the page simply navigated away.
+    // The save round-trip is the most likely moment for the token refresh to fire
     await dismissReauthInterstitial(catering);
     await expect(
       catering
@@ -116,7 +107,7 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
     ).toBeVisible();
     districtCreated = true;
 
-    // ── Edit the District Group the district was added to ─────────────────
+    // ── Edit the District Group the district was added to ──
     const editGroupBtn = catering
       .getByRole('button', {
         name: new RegExp(`Edit .*${escapeRegExp(groupName as string)}`, 'i'),
@@ -133,7 +124,7 @@ test('Catering - Districts - Newly added district appears immediately in the Dis
       { timeout: 10000 },
     );
 
-    // ── Primary District dropdown lists the newly added district ──────────
+    // ── Primary District dropdown lists the newly added district ──
     const primarySelect = dialog.locator('#district-group-primary-select');
     await expect(primarySelect).toBeVisible();
 

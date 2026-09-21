@@ -1,4 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/113438
+// Test Link
 
 import { test, expect, Page } from '@playwright/test';
 import {
@@ -13,9 +13,7 @@ import {
   waitForListSettled,
   LIST_ROW_SELECTOR,
 } from '../../utils/helpers';
-// These used to be private copies in this file. They had drifted from the shared
-// ones - the local ensureInK12CateringApp clicked the launcher link, which opens a
-// new tab and strands this page - so use the shared versions.
+// These used to be private copies in this file.
 import {
   ensureInK12CateringApp,
   clickSidebarItem,
@@ -35,12 +33,10 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-// Timestamp, not Math.random(): two workers drawing the same number would rename
-// each other's item and it would read as a sync bug.
+// Timestamp, not Math.random()
 const RENAMED_MENU_ITEM = `AutoRenamed ${`${Date.now()}`.slice(-6)}`;
 
-// What the Sync Log shows under "Triggered By" - the display name behind
-// PE_USERNAME. Env-driven so another QA user overrides it instead of editing this.
+// What the Sync Log shows under "Triggered By" - the display name behind PE_USERNAME.
 const SYNC_TRIGGERED_BY =
   getEnvVar('SYNC_TRIGGERED_BY', { required: false }) || 'Sabih Siddiqui';
 
@@ -65,8 +61,6 @@ async function openViewDistrictsInGroupDialog(page: Page): Promise<void> {
   await waitForDistrictsPageReady(page);
 
   // The right-hand "District Group" panel exposes a per-group action button.
-  // The exact wording can vary ("View Districts in this Group", "View
-  // Districts", or an aria-label like "View districts in <group name>").
   const viewBtn = page
     .getByRole('button', { name: /View Districts in this Group/i })
     .or(page.getByRole('button', { name: /View Districts/i }))
@@ -96,8 +90,7 @@ async function setPrimaryDistrict(
   page: Page,
   desired: string,
 ): Promise<string> {
-  // App renders a curly apostrophe (Lee’s) where the env value has a straight
-  // one (Lee's); compare/select apostrophe- and whitespace-insensitively.
+  // App renders a curly apostrophe (Lee’s) where the env value has a straight one (Lee's)
   const normApos = (s: string) =>
     s.replace(/['‘’]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
   await safeNavigate(page, 'Districts');
@@ -115,8 +108,7 @@ async function setPrimaryDistrict(
     .first();
   await expect(primaryDistrictControl).toBeVisible();
 
-  // Read the current primary's label so we can pick a *different* option
-  // first to trigger the warning, then switch to the desired one.
+  // Read the current primary's label so we can pick a *different* option first to trigger the
   const currentValue = (
     (await primaryDistrictControl.inputValue().catch(() => '')) ?? ''
   ).trim();
@@ -144,18 +136,13 @@ async function setPrimaryDistrict(
     ) ??
     allOptions.find((o) => normApos(o) !== normApos(currentLabel));
 
-  // Prefer the requested district if it's actually a member of the group being
-  // edited; otherwise fall back to any real member. Group membership on UAT
-  // varies (the requested district may live in a different group), and the
-  // specific district is incidental to what this test verifies. Resolving to an
-  // on-screen label also handles the straight-vs-curly apostrophe difference.
+  // Prefer the requested district if it's actually a member of the group being edited
   const desiredOption =
     allOptions.find((o) => normApos(o) === normApos(desired)) ??
     differentOption ??
     desired;
 
-  // Pick a different option first so the amber warning is triggered, then
-  // assert it's visible.
+  // Pick a different option first so the amber warning is triggered, then assert it's visible.
   if (differentOption) {
     await primaryDistrictControl.selectOption({ label: differentOption });
     await expect(
@@ -168,8 +155,7 @@ async function setPrimaryDistrict(
   // Now select the desired option (resolved to its on-screen label).
   await primaryDistrictControl.selectOption({ label: desiredOption });
 
-  // If the desired option matches the current primary, no save is needed —
-  // close the dialog (warning is gone, nothing to confirm).
+  // If the desired option matches the current primary, no save is needed
   if (normApos(desiredOption) === normApos(currentLabel)) {
     const cancelBtn = page.getByRole('button', { name: /^Cancel$/i }).last();
     if (await cancelBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -218,12 +204,7 @@ async function setPrimaryDistrict(
   return desiredOption;
 }
 
-/**
- * Open the Edit District Group dialog and ensure the Primary District is
- * "Mercer County School District" — re-pick it even when it's already
- * selected so the test always lands in a known state. Returns
- * { chosen, previous } where chosen is always Mercer.
- */
+/** Open the Edit District Group dialog and ensure the Primary District is "Mercer County School */
 async function togglePrimaryDistrict(
   page: Page,
 ): Promise<{ chosen: string; previous: string }> {
@@ -269,12 +250,7 @@ async function togglePrimaryDistrict(
     .waitFor({ state: 'hidden', timeout: 5000 })
     .catch(() => undefined);
 
-  // Set the group's primary to the data-sync district so the rest of the test
-  // is predictable. Data Sync is per-district: on UAT only the secondary
-  // (Alief ISD) is a working data-sync primary, so use it there; on QA the home
-  // district is the data-sync source. setPrimaryDistrict re-selects the option
-  // even when it's already current (still verifies the dropdown + warning) and
-  // returns the actual on-screen label so downstream regex checks match.
+  // Set the group's primary to the data-sync district so the rest of the test is predictable.
   const dataSyncDistrict = isUatDirectLogin()
     ? getSecondaryDistrictName()
     : getDistrictName();
@@ -285,10 +261,7 @@ async function togglePrimaryDistrict(
 
 // ─── Data Sync page ────────────────────────────────────────────────────────
 
-/**
- * Open the Data Sync "Target districts" Manage dialog, toggle the given
- * district's opt-in switch to the desired state (on/off), then close.
- */
+/** Open the Data Sync "Target districts" Manage dialog */
 async function toggleTargetDistrictOptIn(
   page: Page,
   districtName: string,
@@ -305,9 +278,7 @@ async function toggleTargetDistrictOptIn(
   const dialog = page.getByRole('dialog').first();
   await expect(dialog).toBeVisible();
 
-  // The toggle is a <button role="switch"> with an aria-label that flips
-  // between "Opt out <District> for data sync" (when currently on) and
-  // "Opt in <District> for data sync" (when currently off). Match either.
+  // The toggle is a <button role="switch"> with an aria-label that flips between "Opt out
   const toggle = dialog
     .getByRole('switch', {
       name: new RegExp(
@@ -343,8 +314,7 @@ async function toggleTargetDistrictOptIn(
 async function getTargetDistrictsFromManageDialog(
   page: Page,
 ): Promise<string[]> {
-  // The "Manage" trigger sits under the "Target districts" header — it can
-  // be a link or a button depending on the build
+  // The "Manage" trigger sits under the "Target districts" header
   const manageBtn = page
     .getByRole('button', { name: /^Manage$/i })
     .or(page.getByRole('link', { name: /^Manage$/i }))
@@ -370,10 +340,7 @@ async function getTargetDistrictsFromManageDialog(
     await expect(optInAllBtn).toBeDisabled();
   }
 
-  // The dialog renders rows like:
-  //   "Berkeley School District   Primary (source)"
-  //   "Mercer County School District   Opted in"
-  // Grab all visible text nodes and pull the "<name> District<...>" prefix
+  // The dialog renders rows like
   const rawTexts = await dialog
     .locator('div')
     .evaluateAll((els) =>
@@ -403,10 +370,7 @@ async function getTargetDistrictsFromManageDialog(
   return districtNames;
 }
 
-// Clean up leftover local overrides from a prior interrupted run (which renamed a
-// target item to "AutoRenamed ..." and died before its reset step). Name-agnostic:
-// uses the home district's Data Sync "Local Overrides" filter and resets each row,
-// so the target's items start from a synced baseline. Best-effort; never throws.
+// Clean up leftover local overrides from a prior interrupted run (which renamed a target item
 async function resetAllLocalOverrides(page: Page): Promise<void> {
   let resetAny = false;
   try {
@@ -457,10 +421,7 @@ async function resetAllLocalOverrides(page: Page): Promise<void> {
       resetAny = true;
     }
 
-    // "Reset Local Overrides" only clears the flag so sync may overwrite again —
-    // the target's actual value (e.g. a renamed item) reverts to the home value
-    // only on the next push sync. Run one so the target items truly go back to
-    // their synced names (otherwise the "first item" still reads "AutoRenamed …").
+    // "Reset Local Overrides" only clears the flag so sync may overwrite again
     if (resetAny) {
       await goToDataSync(page);
       await runPushSyncNow(page);
@@ -524,26 +485,18 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     await expect(primaryRow).toContainText(/Primary/i);
     await closeOpenDialog(catering);
 
-    // Note: previousPrimary captured for traceability; we intentionally don't
-    // restore it here because doing so requires re-opening the same group dialog
-    // before the previous save fully settles, and sometimes a different group
-    // dialog opens. The override flow below is tolerant of unsynced state.
+    // Note: previousPrimary captured for traceability
     void previousPrimary;
   });
 
   await test.step('Step 5 — Data Sync: header, auto-sync, frequency, targets, sync log', async () => {
     // ── Step 5: Data Sync — verify top-level controls ──
-    // Data Sync only exists when the active district is a data-sync primary. On
-    // UAT switch into the primary we just set (Alief ISD) so the sidebar item is
-    // present and the sub-header shows that district.
     if (isUatDirectLogin()) {
       await switchDistrict(catering, chosenPrimary);
     }
     await goToDataSync(catering);
 
-    // Verify the Data Sync sub-header reads:
-    //   "Push shared catalog from <Primary District> (primary) to opted-in districts"
-    // and the primary district name matches whatever we just set above.
+    // Verify the Data Sync sub-header reads
     await expect(
       catering.getByText(
         new RegExp(
@@ -561,18 +514,14 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .first();
     await expect(autoSyncToggle).toBeVisible();
 
-    // Sync frequency dropdown — verify both day-based and weekly options
-    // produce the right scheduled-time text below the dropdown
+    // Sync frequency dropdown
     const frequencySelect = catering
       .getByRole('combobox', { name: /Sync\s*frequency/i })
       .or(catering.getByLabel(/Sync\s*frequency/i))
       .first();
     await expect(frequencySelect).toBeVisible();
 
-    // The frequency dropdown is disabled while Auto-sync is off. Enable Auto-sync
-    // (if needed) and wait for it to become enabled. The PrimeroEdge launcher
-    // (token refresh) can fire here on a long session — recover via goToDataSync
-    // (re-auths + returns to Data Sync) and retry rather than failing.
+    // The frequency dropdown is disabled while Auto-sync is off.
     if (await frequencySelect.isDisabled().catch(() => false)) {
       await autoSyncToggle.click();
       await catering
@@ -606,8 +555,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       ).toBeVisible();
     }
 
-    // The "daily" option is sometimes labelled Daily, Nightly, etc — pick any
-    // option that produces a "<time> <tz> daily" sub-text
+    // The "daily" option is sometimes labelled Daily, Nightly, etc
     const dailyCandidate =
       frequencyOptions.find((o) => /daily|nightly/i.test(o)) ??
       frequencyOptions.find((o) => o && !/weekly/i.test(o));
@@ -624,9 +572,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     targetDistricts = await getTargetDistrictsFromManageDialog(catering);
     expect(targetDistricts.length).toBeGreaterThan(0);
 
-    // Last Sync Completed format: Month Date, Year, Time
-    // (After we just toggled the primary district above, Last sync may show "—"
-    // because no sync has run for the new primary yet — accept that case.)
+    // Last Sync Completed format
     const lastSyncRegion = catering
       .locator(
         'xpath=//*[contains(normalize-space(.),"Last sync completed") or contains(normalize-space(.),"Last Sync Completed")][1]',
@@ -658,9 +604,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     ).toBeVisible();
     await closeOpenDialog(catering);
 
-    // Push sync now → opens confirmation dialog → click Cancel (the actual
-    // sync is exercised later in the flow). The dialog uses a "Push sync now?"
-    // confirmation block with Cancel / Yes,Push Now buttons.
+    // Push sync now → opens confirmation dialog → click Cancel (the actual sync is exercised later
     await catering.getByRole('button', { name: /Push sync now/i }).first().click();
     await expect(
       catering
@@ -706,9 +650,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .first();
     await expect(syncSearch).toBeVisible();
 
-    // All types dropdown — it's a native <select aria-label="Filter by item
-    // type">. Verify it's visible and that "Holiday" is one of its options
-    // (read directly from the select; no need to open the native popup).
+    // All types dropdown — it's a native <select aria-label="Filter by item type">.
     const allTypes = catering
       .getByRole('combobox', { name: /Filter by item type|All types|Type/i })
       .or(catering.locator('select[aria-label*="item type" i]'))
@@ -737,14 +679,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .first();
     await expect(paginationCombo).toBeVisible();
 
-    // Toggle one item, then open its details. Both were `if (isVisible)` guards,
-    // so whenever the session dropped here - several minutes into one PrimeroEdge
-    // session, which happens often - the checks quietly did nothing and the test
-    // still went green.
-    //
-    // Locator factories, not fixed locators, so a retry re-resolves after a
-    // relaunch. Filtered on the Details button so this is a real item row: an
-    // unfiltered .first() can land on the header row, which has no controls.
+    // Toggle one item, then open its details.
     const itemRow = () =>
       catering
         .locator(LIST_ROW_SELECTOR)
@@ -761,15 +696,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       }
       await expect(itemToggle()).toBeVisible();
 
-      // Only the disable direction is reported by the status column. This used to
-      // assert "Synced" when the row started disabled, which cannot pass -
-      // re-enabling does not restore that until a sync runs. It went unnoticed
-      // because the item is normally enabled, until a run died between the two
-      // clicks and left it disabled.
-      //
-      // So: make sure it is enabled, disable it (column must say "Disabled"), then
-      // put it back and check the switch itself rather than the lagging column.
-      // That also repairs an item a previous run left half-toggled.
+      // Only the disable direction is reported by the status column.
       if (!(await itemToggle().isChecked().catch(() => false))) {
         await itemToggle().click();
         await expect(itemToggle()).toBeChecked();
@@ -781,22 +708,14 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       await expect(itemToggle()).toBeChecked();
 
       await itemRow().getByRole('button', { name: /^Details$/i }).first().click();
-      // Assert the dialog itself rather than a heading named "Item Details": the
-      // dialog carries no such heading, so this could never pass, and it burned the
-      // full 180s toPass budget every run looking for it. Step 12 below opens the
-      // very same dialog and checks getByRole('dialog') — match that.
+      // Assert the dialog itself rather than a heading named "Item Details"
       await expect(catering.getByRole('dialog').first()).toBeVisible();
       await closeOpenDialog(catering);
     }).toPass({ timeout: 180000, intervals: [2000, 5000, 8000] });
   });
 
   await test.step('Step 7 — Rename a menu item on the target district', async () => {
-    // ── Step 7: Pick a target district + first menu item, then switch ──
-    // Always switch to Berkeley as the target district. Mercer (home) is the
-    // primary; Berkeley is the opted-in sibling we edit on.
-    // Home = the data-sync primary/source; target = the opted-in sibling we edit
-    // overrides on. The Lees group on UAT is Alief ISD (primary) + Lees (sibling);
-    // on QA it's Mercer (home) + Berkeley (target).
+    // ── Step 7: Pick a target district + first menu item
     homeDistrict = isUatDirectLogin()
       ? getSecondaryDistrictName()
       : getDistrictName();
@@ -806,14 +725,10 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       `No target districts parsed from the Manage dialog: [${targetDistricts.join(', ')}]`,
     ).toBeGreaterThan(0);
 
-    // Clean any leftover local overrides from a prior interrupted run BEFORE we
-    // create ours — otherwise the target's first menu item still reads a stale
-    // "AutoRenamed ..." name (a previous run died before its reset step), and the
-    // later Data Sync search (by the home name) never finds the row.
+    // Clean any leftover local overrides from a prior interrupted run BEFORE we create ours
     await resetAllLocalOverrides(catering);
 
-    // Switch to the target district first — we capture the item title there
-    // (after the switch) and edit it on the same district.
+    // Switch to the target district first
     await switchDistrict(catering, targetDistrict);
 
     // switchDistrict already waits for the header and re-anchors the app.
@@ -826,9 +741,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .waitFor({ state: 'hidden', timeout: 30000 })
       .catch(() => undefined);
 
-    // Switch the menu-name dropdown to "TheRealMenu" on the target district — only
-    // if the selector exists. Some target districts (e.g. Lees on UAT) have a
-    // single menu and render no selector; in that case the current menu is used.
+    // Switch the menu-name dropdown to "TheRealMenu" on the target district
     const menuSelect = catering.locator('#admin-menu-select');
     if (await menuSelect.isVisible({ timeout: 8000 }).catch(() => false)) {
       await menuSelect.click();
@@ -842,15 +755,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       }
     }
 
-    // Pick the target-district menu item to rename, from the cards' Edit-pencil
-    // aria-labels (e.g. "Edit apple juice menu item"). IMPORTANT: skip any item
-    // whose name is itself a leftover from a prior run — a rename that a failed
-    // run never restored (e.g. "AutoRenamed 8144", "AutoSync 144264"). Those are
-    // target-LOCAL names with no matching item in the home district's shared
-    // catalog, so the home Data Sync view can never show an Overrides row for
-    // them. Choosing a genuine shared item (Cereal, Spaghetti, …) is what makes
-    // the override appear; a successful run then restores it, breaking the
-    // rename-leftover accumulation cycle.
+    // Pick the target-district menu item to rename, from the cards' Edit-pencil aria-labels (e.g.
     const targetEditBtns = catering
       .locator('#main-content')
       .getByRole('button', { name: /^Edit\s+\S/i });
@@ -858,12 +763,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     const targetEditLabels = await targetEditBtns.evaluateAll((els) =>
       els.map((e) => e.getAttribute('aria-label') || ''),
     );
-    // No \b after the prefixes: t-117617 names its items "AutoSyncAI <stamp>", and
-    // "AutoSync\b" does NOT match that (the next char, "A", is a word char). Such an
-    // item was therefore treated as a genuine shared item, and since it is really a
-    // target-local leftover the home Data Sync view can never show an Overrides row
-    // for it — the whole 90s override lookup below timed out. Match any AutoRenamed*
-    // / AutoSync* prefix so every generated leftover is skipped.
+    // No \b after the prefixes
     const LEFTOVER_ITEM_RE = /^Edit\s+(?:AutoRenamed|AutoSync)/i;
     let chosenIdx = targetEditLabels.findIndex(
       (l) => /^Edit\s+\S/i.test(l) && !LEFTOVER_ITEM_RE.test(l),
@@ -904,9 +804,6 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
 
   await test.step('Step 8 — Overrides badge appears, clears on opt-out, and resets', async () => {
     // ── Step 8: Data Sync — find the renamed item, expect Overrides ──
-    // Search Data Sync by the ORIGINAL item name (not the renamed one) — the home
-    // district still has the original name; the override flag indicates the target
-    // district has a local change to that item.
     const overrideRow = catering
       .locator(LIST_ROW_SELECTOR)
       .filter({ hasText: new RegExp(escapeRegExp(originalMenuItemName), 'i') })
@@ -915,9 +812,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .getByRole('textbox', { name: /Search( syncable| items)?/i })
       .first();
 
-    // The PrimeroEdge launcher (token refresh) can kick us to the relaunch page
-    // mid-flow, so re-enter Data Sync (goToDataSync re-auths), re-apply 100/page +
-    // the search, and re-find the row — retrying until it actually appears.
+    // The PrimeroEdge launcher (token refresh) can kick us to the relaunch page mid-flow
     await expect(async () => {
       await goToDataSync(catering);
 
@@ -939,14 +834,9 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .first();
     await expect(overridesBadge).toBeVisible();
 
-    // ── Step 8a: Opt the target district OUT via Manage → push sync →
-    // verify Overrides badge disappears (no target opted in = no override).
-    // This only works when the group has another opted-in target: with a single
-    // target (e.g. Lees on UAT), opting it out leaves 0 opted in, push sync is
-    // disabled, and the override can't be cleared — so skip the check there. ──
+    // ── Step 8a: Opt the target district OUT via Manage → push sync → verify Overrides badge
     await toggleTargetDistrictOptIn(catering, targetDistrict, false);
-    // ensureTargetOptedIn:false, or the helper opts the district back in and
-    // undoes the opt-out we just made.
+    // ensureTargetOptedIn:false
     const pushedWithTargetOut = await runPushSyncNow(catering, { ensureTargetOptedIn: false });
     if (pushedWithTargetOut) {
       await expect(syncSearch2).toBeVisible();
@@ -958,8 +848,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       });
     }
 
-    // ── Step 8b: Opt the target district back IN, push sync, verify the
-    // Overrides badge is shown again ──
+    // ── Step 8b: Opt the target district back IN
     await toggleTargetDistrictOptIn(catering, targetDistrict, true);
     await runPushSyncNow(catering);
     await syncSearch2.fill('');
@@ -973,9 +862,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     await overrideRow.getByRole('button', { name: /^Details$/i }).first().click();
     const itemDetailsDialog = catering.getByRole('dialog').first();
     await expect(itemDetailsDialog).toBeVisible();
-    // The dialog renders these as two separate elements: a "Local overrides"
-    // section header and an "Overrides detected in 1 target district." line
-    // (with the count in a nested span). Verify both independently.
+    // The dialog renders these as two separate elements
     await expect(
       itemDetailsDialog.getByText(/^Local overrides$/i).first(),
     ).toBeVisible();
@@ -997,9 +884,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .first();
     await expect(resetDialog).toBeVisible();
 
-    // The dialog has an "Opted-in target districts" section listing the
-    // districts where the override exists — verify the target we edited is
-    // shown there (could be Berkeley or Mercer depending on which is primary).
+    // The dialog has an "Opted-in target districts" section listing the districts where the
     await expect(resetDialog).toContainText(/Opted-?in target districts?/i);
     await expect(resetDialog).toContainText(
       new RegExp(escapeRegExp(targetDistrict), 'i'),
@@ -1010,12 +895,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .last()
       .click();
 
-    // Don't pin the row count. The toast reports how many rows the reset actually
-    // touched, and that depends on how many districts hold an override for this
-    // item at the time — which a previous run, or someone working in the app, can
-    // change. Asserting "(1 row updated)" made a passing reset look like a failure
-    // whenever the number was anything else. What matters here is that the reset
-    // reported success.
+    // Don't pin the row count.
     await expect(
       catering.getByText(/Local overrides reset/i).first(),
     ).toBeVisible();
@@ -1056,19 +936,13 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .first();
     await expect(syncLogDialog).toBeVisible();
 
-    // The Sync Log table's first <tr> is the header row
-    // ("StartedTriggered ByStatusSyncedSkippedDurationNotes"). Scope to the
-    // tbody so we get the first actual data row.
+    // The Sync Log table's first <tr> is the header row ("StartedTriggered
     const topEntry = syncLogDialog
       .locator('tbody tr, li, [role="row"]:not(:has(th)), article')
       .first();
     await expect(topEntry).toBeVisible();
 
-    // The toast says "Sync complete — 89 items synced, 0 skipped." but the
-    // top Sync Log row is a table row with columns
-    //   Started | Triggered By | Status | Synced | Skipped | Duration | Notes
-    // So we verify the row's individual cells contain the same Synced and
-    // Skipped numbers, plus Sabih Siddiqui and today's date.
+    // The toast says "Sync complete
     const countsMatch = syncCompleteCanonical.match(
       /(\d+)\s*items?\s*synced,\s*(\d+)\s*skipped/i,
     );
@@ -1093,8 +967,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     await expect(topEntry).toContainText(
       new RegExp(escapeRegExp(SYNC_TRIGGERED_BY), 'i'),
     );
-    // Accept both full and abbreviated month names — the Sync Log renders dates
-    // like "Jun 01, 2026 11:13 AM" (abbreviated), not "June 01, 2026".
+    // Accept both full and abbreviated month names
     await expect(topEntry).toContainText(
       /(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},\s+\d{4}[,\s]+\d{1,2}:\d{2}/i,
     );
@@ -1115,8 +988,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       .waitFor({ state: 'hidden', timeout: 30000 })
       .catch(() => undefined);
 
-    // Select "TheRealMenu" again if the selector exists (single-menu target
-    // districts like Lees on UAT render none — the current menu is used).
+    // Select "TheRealMenu" again if the selector exists (single-menu target districts like Lees on
     const finalMenuSelect = catering.locator('#admin-menu-select');
     if (await finalMenuSelect.isVisible({ timeout: 8000 }).catch(() => false)) {
       await finalMenuSelect.click();
@@ -1130,8 +1002,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       }
     }
 
-    // Search for the ORIGINAL item name on the target district — after the
-    // reset + push sync, the renamed item should be back to its original name.
+    // Search for the ORIGINAL item name on the target district
     const finalSearch = catering
       .getByRole('textbox', { name: /Search.*items?/i })
       .first();
@@ -1152,10 +1023,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
   });
 
   await test.step('Step 11 — A customer account cannot reach Data Sync', async () => {
-    // ── Step 11: Verify non-admin/customer role cannot access Data Sync ──
-    // First reset the customer's password from the admin session so the
-    // upcoming customer login is guaranteed to succeed (Accounts → search by
-    // email → Actions ⋯ → Change Password → "Password1!").
+    // ── Step 11: Verify non-admin/customer role cannot access Data Sync ── First reset the
     const customerEmail = getCustomerAccountEmail();
     const customerPassword = getCustomerPassword();
     await resetCustomerPasswordFromAccounts(
@@ -1164,8 +1032,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
       customerPassword,
     );
 
-    // Now open a fresh browser context (no shared auth) and log in as the
-    // customer, then assert the Data Sync sidebar item is not present.
+    // Now open a fresh browser context (no shared auth) and log in as the customer
     const customerContext = await browser.newContext();
     const customerPage = await customerContext.newPage();
     try {

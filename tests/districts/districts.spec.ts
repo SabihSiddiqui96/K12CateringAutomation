@@ -18,9 +18,7 @@ test.describe('Districts', () => {
     catering = await loginToK12Catering(page);
   });
 
-  // safeNavigate, not a bare navigate: these five tests share one login and the
-  // token refresh parks the page on the SSO interstitial part-way through, which
-  // then reads as a missing control several lines later.
+  // safeNavigate, not a bare navigate
   test.beforeEach(async () => {
     await safeNavigate(catering, 'Districts');
   });
@@ -37,21 +35,13 @@ test.describe('Districts', () => {
 
     const editBtn = catering.getByRole('button', { name: /Edit district/i }).or(catering.getByRole('button', { name: /Edit/i }).first()).first();
     const deleteBtn = catering.getByRole('button', { name: /Delete district/i }).or(catering.getByRole('button', { name: /Delete/i }).first()).first();
-    // A web-first assertion rather than isVisible() probes: isVisible() is an
-    // immediate, non-retrying check, so it triggers neither Playwright's
-    // auto-waiting nor the shared re-auth interstitial handler registered in
-    // loginToK12Catering. When a mid-test SSO token refresh bounced the page onto
-    // the "you will be automatically authenticated and redirected" screen, both
-    // probes silently returned false and this reported "no edit/delete actions"
-    // — a lost session dressed up as a missing feature. toBeVisible() retries,
-    // which lets the handler dismiss the interstitial and the assertion recover.
+    // A web-first assertion rather than isVisible() probes
     await expect(editBtn.or(deleteBtn).first()).toBeVisible();
   });
 
   test('Districts - Search filters and clearing search restores list', async () => {
     const searchInput = catering.getByRole('textbox', { name: /Search districts/i });
-    // Search by the first apostrophe-free token (e.g. "Lee" from "Lee's Summit
-    // R-7") so a straight-vs-curly apostrophe can't break the server-side match.
+    // Search by the first apostrophe-free token (e.g.
     await searchInput.fill(getDistrictName().split(/[\s'‘’]/)[0]);
     await catering.waitForTimeout(600);
     await expect(catering.getByText(getDistrictNameRegex()).first()).toBeVisible();

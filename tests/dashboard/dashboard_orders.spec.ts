@@ -15,8 +15,7 @@ test.describe('Dashboard - Orders (Calendar & Lists)', () => {
     const page = await context.newPage();
     catering = await loginToK12Catering(page, { navigateTo: 'Dashboard' });
 
-    // Seed an order if the district has none, so widgets that depend on
-    // order data (calendar, recent / upcoming lists) have something to render
+    // Seed an order if the district has none
     await ensureAtLeastOneOrder(catering);
   });
 

@@ -31,9 +31,7 @@ test.describe("What's New", () => {
     await catering.getByRole('tab', { name: /Release Notes/i }).click();
     await catering.waitForTimeout(500);
 
-    // The redesigned Release Notes view renders a "Version History" panel
-    // with version badges (e.g. "v16.4.1 ACTIVE") and a "Version <number>"
-    // heading for each release card. Treat any of those as "has content".
+    // The redesigned Release Notes view renders a "Version History" panel with version badges
     const hasVersionHistory = await catering 
       .getByRole('heading', { name: /Version History/i })
       .first()

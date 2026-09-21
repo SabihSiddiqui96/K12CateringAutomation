@@ -1,41 +1,5 @@
 #!/usr/bin/env node
-/**
- * Freshdesk -> RingCentral ticket notifier for the Front Office (development) queue.
- *
- * Mirrors Freshdesk filter 201806 (Groups: Development Team - Front Office; Status
- * Include: the 8 statuses in FILTER_STATUSES below) and posts a message when tickets
- * appear in it that we haven't announced before. Freshdesk's own webhook automation would be instant, but it
- * lives under Admin -> Workflows which this account can't reach, so this polls instead
- * (run it from Task Scheduler).
- *
- * Usage:
- *   node scripts/freshdesk-notify.js              # normal run
- *   node scripts/freshdesk-notify.js --dry-run    # print, don't post
- *   node scripts/freshdesk-notify.js --reset      # mark everything current as seen
- *
- * What gets posted:
- *   1-5 new tickets  -> ONE message listing them all, separated by dividers
- *   6+ new tickets   -> a single "N new tickets came in" notice linking to the queue
- * Never one message per ticket: a batch is one event and should read as one message.
- *
- * Why membership and not created_at: a ticket can be raised in another queue and moved
- * into this one later, which is normal for dev escalations. Watching "tickets in the
- * group we haven't seen" catches those; watching creation dates would miss them
- * silently.
- *
- * A ticket is announced at most ONCE, ever. Announced ids are kept permanently and
- * never pruned, so a ticket that is closed and later reopened does not announce a
- * second time. At a handful of tickets a week the list stays tiny.
- *
- * Secrets / config are read from the repo .env (never the shell env):
- *   - FRESHDESK_API_KEY           agent API key (Profile Settings -> Your API Key)
- *   - FRESHDESK_RC_WEBHOOK_URL    RingCentral incoming webhook to post into
- *   - FRESHDESK_DOMAIN            optional, defaults to primeroedge.freshdesk.com
- *   - FRESHDESK_GROUP_ID          optional, defaults to Front Office (development)
- *
- * State lives in .freshdesk-notify.json (gitignored) so a ticket is never announced
- * twice, even if the schedule double-fires or a run is interrupted.
- */
+/** Freshdesk -> RingCentral ticket notifier for the Front Office (development) queue. */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -48,22 +12,11 @@ const DEFAULT_DOMAIN = 'primeroedge.freshdesk.com';
 // Front Office (development). This is the group the API key's own agent belongs to.
 const DEFAULT_GROUP_ID = '22000158621';
 
-// Freshdesk's search endpoint pages at 30 and caps at 10 pages. The queue holds ~145
-// tickets in total, so this comfortably covers it.
+// Freshdesk's search endpoint pages at 30 and caps at 10 pages.
 const SEARCH_PAGE_SIZE = 30;
 const MAX_PAGES = 10;
 
-// The exact "Status Include" list of Freshdesk filter 201806, which is the queue the
-// team actually watches. Copied from the filter's own sidebar — keep the two in sync;
-// if someone edits the filter, edit this.
-//
-// This is an ALLOWLIST, not an exclusion list. It used to exclude {Resolved, Closed,
-// Development} and admit everything else, which drifted from the filter in both
-// directions: it dropped Resolved (the filter includes it, so those tickets would
-// never have been announced) and admitted statuses the filter has no interest in
-// (Pending Release, On Hold, the ExpressPoint/Sodexo workflow states, Assigned to AI
-// Agent, ...). Matching the filter literally is the only version that can't silently
-// diverge from what the team sees.
+// The exact "Status Include" list of Freshdesk filter 201806
 const FILTER_STATUSES = new Set([
   2,  // Open
   3,  // Pending
@@ -75,13 +28,10 @@ const FILTER_STATUSES = new Set([
   18, // Tracker Linked
 ]);
 
-// Freshdesk's built-in priority ids. These four are fixed platform values, not a
-// per-account custom field, so they don't drift the way FILTER_STATUSES can.
+// Freshdesk's built-in priority ids.
 const PRIORITY_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Urgent' };
 
-// RingCentral renders markdown but has no way to colour text, so the priority
-// colour is carried by a dot emoji. These match the swatches Freshdesk shows in
-// its own ticket list: Low green, Medium blue, High orange, Urgent red.
+// RingCentral renders markdown but has no way to colour text
 const PRIORITY_DOTS = { 1: '🟢', 2: '🔵', 3: '🟠', 4: '🔴' };
 
 // Above this many new tickets at once, post a count + link instead of the full list.
@@ -89,9 +39,7 @@ const DIGEST_THRESHOLD = 5;
 
 const DIVIDER = '────────────────────────────';
 
-// Task Scheduler throws away stdout/stderr, so an unattended failure shows up as a bare
-// exit code with no way to tell a network blip from a bad API key. Mirror every line to
-// a log file, trimmed to the last MAX_LOG_LINES so it can't grow without bound.
+// Task Scheduler throws away stdout/stderr
 const LOG_FILE = path.join(ROOT, '.freshdesk-notify.log');
 // Presence of this file pauses the notifier entirely — see the kill switch below.
 const PAUSE_FILE = path.join(ROOT, '.freshdesk-notify.paused');
@@ -179,16 +127,7 @@ function apiGet(domain, apiKey, urlPath) {
   });
 }
 
-/**
- * Returns true only if RingCentral actually accepted the message (2xx). Anything else
- * — no webhook configured, a non-2xx reply, a network error — returns false so the
- * caller leaves the tickets unannounced and retries them on the next run.
- *
- * This used to resolve unconditionally while the caller recorded the tickets anyway,
- * so a failed post marked them announced and they were never seen again. The common
- * trigger is the machine waking from sleep: the task fires before the network is up,
- * the request errors, and the ticket is silently lost.
- */
+/** Returns true only if RingCentral actually accepted the message (2xx). */
 function postWebhook(webhookUrl, text) {
   return new Promise((resolve) => {
     if (!webhookUrl) {
@@ -242,10 +181,7 @@ async function fetchOpenGroupTickets(domain, apiKey, groupId) {
   return collected.filter((t) => FILTER_STATUSES.has(Number(t.status)));
 }
 
-/**
- * Big catch-up: say how many arrived and link to the queue. Listing them would be an
- * unreadable wall of text in a single chat message.
- */
+/** Big catch-up: say how many arrived and link to the queue. */
 function buildCountOnly(tickets, domain) {
   return (
     `**${tickets.length} New Support Tickets**\n\n` +
@@ -255,24 +191,18 @@ function buildCountOnly(tickets, domain) {
   );
 }
 
-/**
- * The one message a normal run posts: every new ticket in a single message, separated
- * by dividers. One message per ticket was rejected as too noisy — a batch is one event.
- */
+/** The one message a normal run posts */
 function buildSummary(tickets, domain) {
   const entries = tickets.map((t) => {
     const cf = t.custom_fields || {};
     const modulePath = [cf.cf_module_selection, cf.module_subsection, cf.module_subsection_item]
       .filter(Boolean)
       .join(' > ');
-    // Priority sits directly under Subject — it's the one field that decides whether
-    // someone picks the ticket up now or after lunch.
+    // Priority sits directly under Subject
     const priority = PRIORITY_LABELS[Number(t.priority)];
     const dot = PRIORITY_DOTS[Number(t.priority)];
 
-    // Labelled rows, one per line. Empty fields are dropped rather than printed as
-    // blanks, since a ticket logged without a district or module still deserves a
-    // usable notification.
+    // Labelled rows, one per line.
     const rows = [
       ['Subject', t.subject],
       ['Priority', priority ? `${dot ? `${dot} ` : ''}${priority}` : ''],
@@ -299,10 +229,7 @@ function buildSummary(tickets, domain) {
 
   trimLog();
 
-  // Kill switch. The Task Scheduler entry lives in the root folder and its ACL refuses
-  // a non-elevated Disable, so the scheduled run cannot be turned off from outside the
-  // script. Bail here instead: the task still fires every 15 minutes, does nothing, and
-  // exits clean. Delete PAUSE_FILE to resume; --force runs once regardless.
+  // Kill switch.
   if (fs.existsSync(PAUSE_FILE) && !args.includes('--force')) {
     console.log('Paused (' + path.basename(PAUSE_FILE) + ' present) — no polling, no posting.');
     return;
@@ -326,11 +253,7 @@ function buildSummary(tickets, domain) {
     return;
   }
 
-  // First run: adopt the current queue as the baseline rather than announcing a backlog
-  // that the team has already been working for weeks. Gated on an explicit `baselined`
-  // flag, NOT on the list being empty — with an empty queue the baseline list is itself
-  // empty, and keying off that would re-baseline on every run and silently swallow the
-  // first real ticket instead of announcing it.
+  // First run: adopt the current queue as the baseline rather than announcing a backlog that the
   if (!state.baselined) {
     state.announced = open.map((t) => t.id);
     state.baselined = true;
@@ -360,9 +283,7 @@ function buildSummary(tickets, domain) {
 
   console.log(`Posting ${fresh.length} ticket(s) in one message...`);
   const posted = await postWebhook(webhookUrl, text);
-  // Only record after a genuinely successful post, so a webhook failure retries next
-  // run rather than losing the notification entirely. Exit non-zero on failure so a
-  // dead webhook shows up as a failed task in Task Scheduler instead of looking fine.
+  // Only record after a genuinely successful post
   if (!posted) {
     console.error(`Post failed — ${fresh.length} ticket(s) left unannounced for the next run.`);
     process.exitCode = 1;

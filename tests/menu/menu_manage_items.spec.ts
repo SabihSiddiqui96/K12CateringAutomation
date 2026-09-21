@@ -24,8 +24,7 @@ test.describe('Menu - Add & Edit Items', () => {
   const editDialog = () => catering.getByRole('dialog', { name: 'Edit Menu Item' });
 
   async function closeModal() {
-    // The combined "Cancel and close modal" button was replaced by the "Close
-    // modal" (X) button on the item dialogs.
+    // The combined "Cancel and close modal" button was replaced by the "Close modal" (X) button on
     await catering.getByRole('button', { name: 'Close modal' }).click();
   }
 

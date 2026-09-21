@@ -32,9 +32,7 @@ test.describe('Accounts', () => {
       has: catering.getByRole('button', { name: /View details for/i }),
     });
 
-  // Pending accounts show Approve/Reject instead of the Actions kebab, and a
-  // pending account can sort to the top of the list — so for Actions-kebab
-  // assertions target the first card that actually has an "Actions for" button.
+  // Pending accounts show Approve/Reject instead of the Actions kebab
   const actionableCard = () =>
     accountCards().filter({
       has: catering.getByRole('button', { name: /Actions for/i }),
@@ -91,8 +89,7 @@ test.describe('Accounts', () => {
   });
 
   test('Accounts - Account Details modal opens with all sections and closes correctly', async () => {
-    // Use an active account (one with an Actions kebab); a pending account's
-    // details modal shows Approve/Reject instead of Deactivate/Update Details.
+    // Use an active account (one with an Actions kebab)
     await actionableCard()
       .getByRole('button', { name: /View details for/i })
       .click();

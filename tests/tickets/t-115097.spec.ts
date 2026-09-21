@@ -1,4 +1,4 @@
-//Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/115507
+// Test Link
 
 import { test, expect, Page } from '@playwright/test';
 
@@ -20,9 +20,7 @@ import { getK12CateringLoginUrl, getK12CateringUrl } from '../../utils/baseUrl';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-// ─────────────────────────────────────────────
-// Dashboard Revenue Calculation
-// ─────────────────────────────────────────────
+// ───────────────────────────────────────────── Dashboard Revenue Calculation
 test.describe('Dashboard Revenue Calculation', () => {
   let catering: Page;
 
@@ -64,9 +62,7 @@ test.describe('Dashboard Revenue Calculation', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// Reports Status Filter
-// ─────────────────────────────────────────────
+// ───────────────────────────────────────────── Reports Status Filter
 test.describe('Reports Status Filter', () => {
   let catering: Page;
 
@@ -172,9 +168,7 @@ test.describe('Reports Status Filter', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// Accounts Change Password
-// ─────────────────────────────────────────────
+// ───────────────────────────────────────────── Accounts Change Password
 const randomDigits = String(Math.floor(1000 + Math.random() * 9000));
 const NEW_PASSWORD = `Sabih${randomDigits}!`;
 const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
@@ -208,8 +202,7 @@ async function openChangePasswordModal(catering: Page) {
   await switchToCustomerDistrict(catering);
   await navigateK12CateringMenu(catering, 'Accounts');
   await catering.waitForLoadState('domcontentloaded');
-  // A mid-session PrimeroEdge token refresh can bounce us onto the SSO relaunch
-  // interstitial; wait it out before interacting with Accounts.
+  // A mid-session PrimeroEdge token refresh can bounce us onto the SSO relaunch interstitial
   await dismissReauthInterstitial(catering);
 
   const searchBox = catering.getByRole('textbox', {
@@ -217,8 +210,7 @@ async function openChangePasswordModal(catering: Page) {
   });
   await expect(searchBox).toBeVisible();
   await searchBox.fill(CUSTOMER_EMAIL);
-  // Let the filtered account list settle before opening the kebab menu — the
-  // list re-renders after the search and can detach the menu mid-click.
+  // Let the filtered account list settle before opening the kebab menu
   await catering.waitForLoadState('networkidle').catch(() => undefined);
   await catering.waitForTimeout(800);
 
@@ -229,11 +221,7 @@ async function openChangePasswordModal(catering: Page) {
     name: /Change Password/i,
   });
   const dialog = getChangePasswordDialog(catering);
-  // Retry the whole open→click→dialog. The account row/menu can re-render mid-click
-  // (detached element — happens most after a fresh re-login), and clicking "Change
-  // Password" can itself trigger a PrimeroEdge SSO relaunch (the interstitial pops
-  // instead of the dialog). Only stop once the dialog is actually open, dismissing
-  // any interstitial between attempts.
+  // Retry the whole open→click→dialog.
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     await dismissReauthInterstitial(catering);
     if (!(await actionsButton.first().isVisible({ timeout: 10000 }).catch(() => false))) {
@@ -360,10 +348,6 @@ test.describe('Accounts Change Password', () => {
     const districtUserLogin = catering.locator('#UserNameTextBox, #email-input');
     if (await districtUserLogin.isVisible({ timeout: 5000 }).catch(() => false)) {
       // The reset must be done by an admin who can reach the customer's district.
-      // On UAT the customer lives in Alief ISD and the district user (Amanda) is
-      // stuck in Edge County with no switch control, so re-login as the Cybersoft
-      // Admin who can switch there. On QA the district user shares the customer's
-      // district, so keep using it.
       if (isUatDirectLogin()) {
         catering = await loginToK12Catering(catering);
       } else {
@@ -387,9 +371,7 @@ test.describe('Accounts Change Password', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// Accounts Sorting
-// ─────────────────────────────────────────────
+// ───────────────────────────────────────────── Accounts Sorting
 test.describe('Accounts Sorting', () => {
   let catering: Page;
 
@@ -400,9 +382,7 @@ test.describe('Accounts Sorting', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// Districts — SKIPPED per user instruction
-// ─────────────────────────────────────────────
+// ───────────────────────────────────────────── Districts
 
 function parseCurrency(value: string) {
   return parseFloat(value.replace(/[$,]/g, '').trim() || '0');
@@ -728,9 +708,7 @@ test.describe('Settings Order Lead Time', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// Minimum Order Amount
-// ─────────────────────────────────────────────
+// ───────────────────────────────────────────── Minimum Order Amount
 test.describe('Minimum Order Amount', () => {
   let catering: Page;
 
@@ -742,9 +720,7 @@ test.describe('Minimum Order Amount', () => {
 
   test('Setting visible, admin bypasses restriction, non-admin blocked, set to $0 removes restriction', async ({ browser }) => {
 
-    // Minimum Order Amount is per-district, so set it in the customer's district
-    // (Alief ISD on UAT) — otherwise the non-admin customer who lives there isn't
-    // affected by it. No-op on QA, where the customer is in the default district.
+    // Minimum Order Amount is per-district
     await switchToCustomerDistrict(catering);
 
     // ── Step 1-3: Navigate to Settings, verify Minimum Order Amount ──
@@ -756,9 +732,7 @@ test.describe('Minimum Order Amount', () => {
     await expect(
       catering.getByRole('heading', { name: 'Minimum Order Amount', exact: true }),
     ).toBeVisible();
-    // The heading + Edit button confirm the section. The displayed value varies
-    // ("$X minimum" when set, nothing/unset in a fresh district like Alief ISD on
-    // UAT), and the test sets the value next — so don't assert on it here.
+    // The heading + Edit button confirm the section.
     await expect(
       catering.getByRole('button', { name: /Edit minimum order amount/i }),
     ).toBeVisible();
@@ -878,9 +852,7 @@ test.describe('Minimum Order Amount', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// Checkout Backdate Order
-// ─────────────────────────────────────────────
+// ───────────────────────────────────────────── Checkout Backdate Order
 test.describe('Checkout Backdate Order', () => {
   let catering: Page;
 
@@ -1031,8 +1003,7 @@ test.describe('Checkout Backdate Order', () => {
     } finally {
       await nonAdminContext.close().catch(() => undefined);
 
-      // Guard the cleanup so a closed `catering` page doesn't mask the real
-      // test failure with a "Target page... has been closed" error.
+      // Guard the cleanup so a closed `catering` page doesn't mask the real test failure with a
       if (!catering.isClosed()) {
         try {
           await catering.getByRole('button', { name: 'Go to home page' }).click();
@@ -1053,9 +1024,7 @@ test.describe('Checkout Backdate Order', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// Districts — New District Visibility
-// ─────────────────────────────────────────────
+// ───────────────────────────────────────────── Districts
 
 test.describe('Districts - New District Visibility', () => {
   let catering: Page;
@@ -1120,11 +1089,7 @@ test.describe('Districts - New District Visibility', () => {
       catering.getByText(/district.*created|created.*successfully|success/i).first(),
     ).toBeVisible();
 
-    // ── Switch to the newly created district. switchDistrict opens the switch
-    //    dialog, searches (falling back to Browse-by-Letter when the district
-    //    isn't on the first page), clicks the matching card, confirms, and waits
-    //    for the header to reflect it — i.e. it verifies the new district shows
-    //    up in the switch list and that the switch succeeds. ──
+    // ── Switch to the newly created district.
     await switchDistrict(catering, districtName);
 
     // ── Refresh, then switch back to the home district. ──

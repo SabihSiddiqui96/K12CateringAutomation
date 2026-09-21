@@ -1,22 +1,4 @@
 // Env-aware local test runner with RingCentral webhooks.
-//
-// Wraps `npx playwright test` with webhooks worded per environment so the
-// channel can tell runs apart (nightly QA vs. a Release/UAT pass):
-//   1. START       — "<env> Testing has started".
-//   2. run         — the full suite against the chosen env.
-//   3. COMPLETION  — pipeline-style result card (✅/❌/📊/⏱ + grouped Failed Tests).
-//   4. CANCELED    — if the run is interrupted (Ctrl-C / killed), a clearly
-//                    worded cancellation notice fires instead of a result card,
-//                    so nobody mistakes a stopped run for a finished one.
-//
-// Usage:
-//   node scripts/run-tests.js release        # full UAT/Release run + webhooks
-//   node scripts/run-tests.js qa             # full QA run + webhooks
-//   node scripts/run-tests.js release --cancel   # just post a CANCELED notice
-//   node scripts/run-tests.js qa --cancel        # (no run; used for manual stops)
-//
-// The webhook URL is read from .env (RINGCENTRAL_WEBHOOK_URL). If it's missing
-// the run still happens and the messages are printed instead of posted.
 
 const fs = require('fs');
 const path = require('path');
@@ -28,7 +10,7 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 const RESULTS = path.join(ROOT, 'test-results', 'results.json');
 
-// --- Per-environment config ------------------------------------------------
+// --- Per-environment config
 const ENVS = {
   release: {
     key: 'release',
@@ -53,7 +35,7 @@ function resolveEnv(arg) {
   return e;
 }
 
-// --- Webhook ---------------------------------------------------------------
+// --- Webhook
 function readEnvValue(key) {
   // Webhook URL lives in .env regardless of which env we test against.
   try {
@@ -92,8 +74,7 @@ function sendWebhook(text) {
   });
 }
 
-// Synchronous webhook POST — for signal handlers, where the event loop won't
-// reliably drain an async request before the process exits.
+// Synchronous webhook POST
 function sendWebhookSync(text) {
   const webhookUrl = readEnvValue('RINGCENTRAL_WEBHOOK_URL');
   if (!webhookUrl) {
@@ -110,7 +91,7 @@ function sendWebhookSync(text) {
   else console.log('Cancellation webhook could not be sent (curl status ' + res.status + ').');
 }
 
-// --- Messages --------------------------------------------------------------
+// --- Messages
 function startedMessage(env) {
   return '🚀 K12Catering ' + env.label + ' has started.\n\n'
     + 'Running the full regression suite against ' + env.label + '.\n'
@@ -121,7 +102,7 @@ function canceledMessage(env) {
   return '🛑 K12Catering ' + env.label + ' was canceled manually.';
 }
 
-// --- Result parsing --------------------------------------------------------
+// --- Result parsing
 function tagFor(file) {
   const base = (file || '').split(/[\\/]/).pop().replace(/\.spec\.(ts|js)$/i, '');
   const m = base.match(/t-?(\d+)/i);
@@ -191,14 +172,13 @@ function completionMessage(env, s) {
     + '\n' + envLine;
 }
 
-// --- Main ------------------------------------------------------------------
+// --- Main
 (async () => {
   const args = process.argv.slice(2);
   const env = resolveEnv(args[0]);
   const cancelOnly = args.includes('--cancel');
 
-  // Force the chosen env file (playwright.config.ts honors ENV_FILE first), and
-  // load it so BASE_URL etc. are available to the messages.
+  // Force the chosen env file (playwright.config.ts honors ENV_FILE first)
   process.env.ENV_FILE = env.envFile;
   require('dotenv').config({ path: path.resolve(ROOT, env.envFile) });
 

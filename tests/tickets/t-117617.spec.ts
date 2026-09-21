@@ -21,34 +21,14 @@ import {
   setIntendedDistrict,
 } from '../../utils/dataSync';
 
-/**
- * Catering - Data Sync - Add granular overrides for specific fields  (ADO PBI 117617).
- *
- * Kept as THREE tests on a shared session (not merged into one long test — a combined
- * district-switch-heavy run reliably trips the PrimeroEdge launcher token refresh,
- * whereas several shorter tests pass and a launcher hit only fails, and cheaply
- * retries, the affected one). Test A is the quick toggles + Push-sync check. Test B is
- * the cross-district sync + local-override flow for Price. Test C is the same
- * override/reset flow for Allergens + Ingredients together — added after a dev report
- * that those two weren't updating correctly around a local override; Test B only ever
- * exercised Price through that sequence, so Allergens/Ingredients had no coverage of
- * the override-wins / reset-restores-sync behavior specifically.
- *
- * NOT automated (manual): the schedule-triggered auto-sync (~9 PM CDT).
- */
+/** Catering - Data Sync - Add granular overrides for specific fields (ADO PBI 117617). */
 
 const ATTRS = [
   'Sync Name', 'Sync Description', 'Sync Price', 'Sync Image',
   'Sync Allergens', 'Sync Ingredients', 'Sync Categories', 'Sync Varieties',
 ] as const;
 
-// Data Sync runs from a "primary" district (the default landing district, which
-// pushes) to an opted-in "target" district. Both differ per environment but the
-// roles mirror each other, so keep them configurable:
-//   QA  -> primary = Mercer County School District (default), target = Berkeley
-//   UAT -> primary = Lee's Summit R-7 (DISTRICT_NAME), target = sabihLocal
-// PRIMARY defaults to the env's default district (getDistrictName) just like QA;
-// TARGET is set via DATA_SYNC_TARGET_DISTRICT in .env.release.
+// Data Sync runs from a "primary" district (the default landing district
 const PRIMARY_DISTRICT =
   getEnvVar('DATA_SYNC_PRIMARY_DISTRICT', { required: false }) || getDistrictName();
 const TARGET_DISTRICT =
@@ -61,10 +41,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     const context = await browser.newContext();
     const page = await context.newPage();
     catering = await loginToK12Catering(page);
-    // Data Sync only shows for districts where it's enabled. Some envs (e.g. UAT,
-    // whose default district is "Edge County Schools") don't have it on the
-    // default district — switch to the Data Sync-enabled district when the nav
-    // item is missing. QA's default district already has it, so this is a no-op there.
+    // Data Sync only shows for districts where it's enabled.
     const dataSyncNav = catering
       .locator('aside[aria-label="Main navigation"]')
       .getByLabel('Navigate to Data Sync');
@@ -77,7 +54,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     await catering.waitForTimeout(1000);
   });
 
-  // ── helpers ────────────────────────────────────────────────────────────────
+  // ── helpers ──
   async function openManage(): Promise<Locator> {
     await catering
       .getByRole('button', { name: /^Manage$/i })
@@ -113,11 +90,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     }
   }
 
-  // On the TARGET district, a pushed change can take a moment to propagate, and
-  // the launcher token-refresh can revert the district mid-wait. So poll: re-open
-  // the menu (district restoration re-applies TARGET each time) and check, until
-  // the synced value holds or we time out. Requires intendedDistrict === TARGET
-  // (set by the preceding switchDistrict(TARGET)).
+  // On the TARGET district
   const SYNC_POLL = { timeout: 90000, intervals: [4000, 4000, 6000, 6000] };
   async function expectItemOnTarget(name: string): Promise<void> {
     await expect(async () => {
@@ -133,17 +106,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       expect(await readMenuItemPrice(catering, name)).toBe(price);
     }).toPass(SYNC_POLL);
   }
-  /**
-   * `mode: 'contains'` for the plain sync cases: a push ADDS the source's values to
-   * the target rather than replacing the list, so a value the source no longer has
-   * legitimately stays behind. Asserting an exact match failed every run for a
-   * behaviour that is working as intended. What matters is that the pushed value
-   * arrives.
-   *
-   * `mode: 'exact'` stays the default and is used for the local-override case,
-   * where the point is that the target keeps ITS OWN values and the sync does not
-   * apply at all. Loosening that one would hide a genuinely broken override.
-   */
+  /** `mode: 'contains'` for the plain sync cases: a push ADDS the source's values to the target */
   async function expectAllergensIngredientsOnTarget(
     name: string,
     allergens: string[],
@@ -165,14 +128,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     }).toPass(poll);
   }
 
-  /**
-   * resetLocalOverride returns as soon as its confirm is clicked, so a push can go
-   * out while the item is still registered as overridden — and an overridden item is
-   * skipped, so the target receives nothing and it reads as "reset does not restore
-   * sync". Driving the same push by hand always worked, which is what pinned this on
-   * the timing rather than the app. The item dropping off the Local Overrides filter
-   * is the app telling us the reset is done.
-   */
+  /** resetLocalOverride returns as soon as its confirm is clicked */
   async function expectNoLongerOverridden(name: string): Promise<void> {
     await expect(async () => {
       let stillOverridden = true;
@@ -207,9 +163,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     await expect(dlg).toBeVisible();
     await expect(dlg.getByText(/Push sync now\?/i)).toBeVisible();
     await expect(dlg.getByText(/Menu item attributes/i)).toBeVisible();
-    // The "...will not be synced (globally off)" notice lists ALL globally-off
-    // attributes together (e.g. "Description, Price, Image will not be synced..."),
-    // so the list varies run to run - assert Price is INCLUDED, plus the 2nd sentence.
+    // The "...will not be synced (globally off)" notice lists ALL globally-off attributes together
     await expect(dlg.getByText('Name', { exact: true }).first()).toBeVisible();
     const offNotice = dlg.getByText(/will not be synced \(globally off\)/i).first();
     await expect(offNotice).toBeVisible();
@@ -230,38 +184,21 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     const TARGET = TARGET_DISTRICT; // QA: Berkeley School District; UAT: sabihLocal
     const stamp = `${Date.now()}`.slice(-6);
     const uniqueName = `AutoSync ${stamp}`;
-    // Varied per run, and deliberately so. A fixed probe price is a trap here:
-    // this test reuses the same menu item every run, and if step 13 fails, steps
-    // 14-17 never execute, leaving TARGET holding exactly that price. The next
-    // run then fails on the leftover value rather than on anything the sync did
-    // — so a single bad day turns into a permanent red that no re-run can clear,
-    // and the failure looks like an app bug when the app is behaving correctly.
-    // (That is exactly what happened from 2026-08-18 onward.) Varying it means
-    // stale data can never satisfy the assertion.
+    // Varied per run, and deliberately so.
     const PRICE_OFF = `7.${stamp.slice(-2)}`; // set while Sync Price OFF -> must NOT propagate
     const PRICE_ON = '8.88';    // set while Sync Price ON  -> must propagate
     const PRICE_LOCAL = '5.55'; // target-district local override
 
-    // Opt in to launcher-revert district restoration for this long, district-
-    // switch-heavy flow: the PrimeroEdge launcher token-refresh reloads the app
-    // mid-test and snaps back to the persisted district, which would otherwise
-    // make the cross-district assertions run on the wrong district. The session
-    // is already on HOME here (set in beforeAll).
+    // Opt in to launcher-revert district restoration for this long, district- switch-heavy flow
     setIntendedDistrict(catering, HOME);
 
-    // Capture the first TheRealMenu item, and clear any leftover override from a
-    // prior interrupted run (keeps this stateful test idempotent).
+    // Capture the first TheRealMenu item
     await selectTheRealMenu(catering);
     const origName = await firstMenuItemName(catering);
     await goToDataSync(catering);
     const clearedLeftover = await resetLocalOverride(catering, origName).catch(() => false);
 
-    // If a leftover override WAS cleared, wait for that to land before doing anything
-    // else. resetLocalOverride returns as soon as its confirm is clicked, and an item
-    // still registered as overridden is skipped by a push - so the run's FIRST sync
-    // silently delivered nothing and the target looked like it never received the
-    // value. Driving the same push by hand always worked, because nothing had been
-    // reset immediately beforehand. Same guard as the reset step later in these tests.
+    // If a leftover override WAS cleared, wait for that to land before doing anything else.
     if (clearedLeftover === true) {
       await expect(async () => {
         let stillOverridden = true;
@@ -303,17 +240,14 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       await switchDistrict(catering, TARGET);
       await expectPriceOnTarget(uniqueName, '8.88');
 
-      // 15 — on the TARGET district, locally edit the Price (creates a local
-      // override); back on HOME, click the "Local Overrides" filter and confirm
-      // the item shows there.
+      // 15 — on the TARGET district, locally edit the Price (creates a local override)
       await selectTheRealMenu(catering);
       await editMenuItem(catering, uniqueName, { newPrice: PRICE_LOCAL });
       await switchDistrict(catering, HOME);
       const filtered = await findItemUnderLocalOverridesFilter(catering, uniqueName);
       await expect(filtered.getByText(/^Overrides$/i).first()).toBeVisible();
 
-      // 16 — Sync Price ON globally but a local override present -> the target
-      // keeps its own Price.
+      // 16 — Sync Price ON globally but a local override present -> the target keeps its own Price.
       await runPushSyncNow(catering);
       await switchDistrict(catering, TARGET);
       await expectPriceOnTarget(uniqueName, '5.55');
@@ -343,19 +277,13 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     }
   });
 
-  // ── Test C: local overrides win + reset restores sync, for Allergens & Ingredients ──
-  // Mirrors Test B's Price flow (steps 15-18), but for the two fields a dev reported
-  // as "not being properly updated" around a local override. Test B only ever proved
-  // the override-wins/reset-restores-sync mechanism with Price, so this closes that gap.
+  // ── Test C: local overrides win + reset restores sync
   test('local overrides win and reset restores sync, for Allergens and Ingredients', async () => {
     test.slow(); // long multi-district flow, same shape as Test B
 
     const HOME = PRIMARY_DISTRICT;
     const TARGET = TARGET_DISTRICT;
-    // Stamped, so a chip left behind by an earlier run can never satisfy an
-    // assertion. Test B pins its item by renaming it; pinning by the values
-    // instead keeps this flow off Sync Name, which it never sets and so must not
-    // depend on — it runs on its own under `-g` during a re-run.
+    // Stamped, so a chip left behind by an earlier run can never satisfy an assertion.
     const stamp = `${Date.now()}`.slice(-6);
     const ALLERGEN_SYNCED = `AutoAllergenSynced${stamp}`;
     const ALLERGEN_LOCAL = `AutoAllergenLocal${stamp}`;
@@ -364,8 +292,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
 
     setIntendedDistrict(catering, HOME);
 
-    // Capture the first TheRealMenu item + its original Allergens/Ingredients (to
-    // restore in cleanup), and clear any leftover override from a prior interrupted run.
+    // Capture the first TheRealMenu item + its original Allergens/Ingredients (to restore in
     await selectTheRealMenu(catering);
     const itemName = await firstMenuItemName(catering);
     const orig = await readMenuItemChips(catering, itemName);
@@ -375,8 +302,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
     }
 
     try {
-      // Both attributes must sync globally for this flow (Test A/B leave them ON;
-      // assert defensively rather than assume).
+      // Both attributes must sync globally for this flow (Test A/B leave them ON
       await setGlobalSyncToggle(catering, 'Sync Allergens', true);
       await setGlobalSyncToggle(catering, 'Sync Ingredients', true);
 
@@ -386,11 +312,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
         newAllergens: [ALLERGEN_SYNCED],
         newIngredients: [INGREDIENT_SYNCED],
       });
-      // Pin HOME's own values BEFORE pushing. setChips clears existing chips then
-      // adds the new ones, so HOME must read back exactly the two test values — if a
-      // stale chip survived here, the mismatch is this edit, not the sync. Asserting
-      // it separates "the edit didn't replace" from "the sync didn't replace" instead
-      // of blaming the target for state that was already wrong on the source.
+      // Pin HOME's own values BEFORE pushing.
       expect(await readMenuItemChips(catering, itemName)).toEqual({
         allergens: [ALLERGEN_SYNCED],
         ingredients: [INGREDIENT_SYNCED],
@@ -398,8 +320,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       await goToDataSync(catering);
       await runPushSyncNow(catering);
 
-      // On the TARGET district, both attributes synced. No separate existence check
-      // first — this polls the item's own dialog, so a missing item fails it anyway.
+      // On the TARGET district, both attributes synced.
       await switchDistrict(catering, TARGET);
       await expectAllergensIngredientsOnTarget(itemName, [ALLERGEN_SYNCED], [INGREDIENT_SYNCED], 'contains');
 
@@ -415,8 +336,7 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
       const filtered = await findItemUnderLocalOverridesFilter(catering, itemName);
       await expect(filtered.getByText(/^Overrides$/i).first()).toBeVisible();
 
-      // Both attributes ON globally but a local override present -> the target keeps
-      // its own (local) values.
+      // Both attributes ON globally but a local override present -> the target keeps its own (local)
       await runPushSyncNow(catering);
       await switchDistrict(catering, TARGET);
       await expectAllergensIngredientsOnTarget(itemName, [ALLERGEN_LOCAL], [INGREDIENT_LOCAL]);

@@ -94,11 +94,7 @@ export class LoginPage {
   }
 
   async clickLogin(): Promise<void> {
-    // The Sign in button triggers an ASP.NET WebForms postback navigation. On a
-    // slow login the click's default 15s action timeout trips while "waiting for
-    // scheduled navigations to finish" — a working-but-slow login then fails
-    // spuriously. Give the click (and its post-click navigation wait) the same
-    // budget as the post-login URL wait so it tolerates a slow postback.
+    // The Sign in button triggers an ASP.NET WebForms postback navigation.
     const submitTimeout = positiveIntFromEnv('LOGIN_SUBMIT_TIMEOUT_MS', process.env.CI ? 60000 : 30000);
     await this.loginButton.click({ timeout: submitTimeout });
   }

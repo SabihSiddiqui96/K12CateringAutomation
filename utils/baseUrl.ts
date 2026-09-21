@@ -1,9 +1,6 @@
 import { getEnvVar } from './env';
 
-/**
- * Same origin/path used for relative navigations (e.g. page.goto('/')).
- * Override in CI or locally with BASE_URL if needed.
- */
+/** Same origin/path used for relative navigations (e.g. */
 export function getPlaywrightBaseUrl(): string {
   return getEnvVar('BASE_URL', { required: false }) || 'https://qa.primeroedge.co';
 }

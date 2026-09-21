@@ -1,18 +1,5 @@
 #!/usr/bin/env node
-/**
- * Read-only Azure DevOps PBI reader — the companion to ado-workitem.js for the
- * ticket-docs flow, where the pasted link is a Product Backlog Item rather than
- * a Test Case.
- *
- * Usage:
- *   node scripts/ado-pbi.js <workItemId | full ADO URL>
- *
- * Prints TYPE / TITLE / STATE, the description + acceptance criteria as plain
- * text, every comment (the QA steps usually live in one containing "Steps to
- * Reproduce"), and the child links (to find the "QA - <title>" child).
- *
- * GET only — never writes — so it is safe to allowlist for prompt-free runs.
- */
+/** Read-only Azure DevOps PBI reader */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');

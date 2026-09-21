@@ -1,16 +1,5 @@
 #!/usr/bin/env node
-/**
- * Read-only Azure DevOps work-item fetcher used by the `regression` workflow to
- * validate a pasted link before anything else.
- *
- * Usage:
- *   node scripts/ado-workitem.js <workItemId | full ADO URL>
- *
- * Prints TYPE / TITLE / STATE and, when the item is a Test Case, the parsed
- * steps. Reads AZURE_DEVOPS_PAT from the repo .env (never the shell env).
- * This script only performs a GET — it never writes — so it is safe to
- * allowlist for automatic (prompt-free) execution.
- */
+/** Read-only Azure DevOps work-item fetcher used by the `regression` workflow to validate a */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');

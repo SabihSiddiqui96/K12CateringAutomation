@@ -1,4 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/117622
+// Test Link
 
 import { test, expect, Page } from '@playwright/test';
 import { loginToK12Catering } from '../../utils/helpers';
@@ -23,7 +23,6 @@ test('Catering - User Feedback - the "Send Digest Now" manual-trigger button is 
   const c = await loginToK12Catering(page);
   await openDashboard(c);
 
-  // The manual digest trigger is on the (Cybersoft-Admin-only) User Feedback
-  // dashboard. We only assert its presence — clicking it sends a real email.
+  // The manual digest trigger is on the (Cybersoft-Admin-only) User Feedback dashboard.
   await expect(c.getByRole('button', { name: /Send Digest Now/i })).toBeVisible();
 });

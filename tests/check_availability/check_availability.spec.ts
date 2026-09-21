@@ -8,12 +8,7 @@ import { getK12CateringUrl } from '../../utils/baseUrl';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-/**
- * A mid-suite PrimeroEdge token refresh replaces the page with the "you will be
- * automatically authenticated and redirected to Catering" interstitial, at which
- * point every wizard locator vanishes and the failure reads as a missing button.
- * Clear it and get back to Check Availability before driving the wizard.
- */
+/** A mid-suite PrimeroEdge token refresh replaces the page with the "you will be automatically */
 async function ensureOnCheckAvailability(page: Page): Promise<void> {
   await dismissReauthInterstitial(page);
   const dateBtn = page.getByRole('button', { name: /Select Event Date/i });
@@ -23,8 +18,7 @@ async function ensureOnCheckAvailability(page: Page): Promise<void> {
     (await backBtn.waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false));
   if (onWizard) return;
 
-  // Clicking through the interstitial is unreliable — it can bounce more than
-  // once. Going straight to the app route recovers in one hop.
+  // Clicking through the interstitial is unreliable — it can bounce more than once.
   const sidebar = page.locator('aside[aria-label="Main navigation"]');
   if (!(await sidebar.waitFor({ state: 'visible', timeout: 4000 }).then(() => true, () => false))) {
     await page
@@ -40,7 +34,6 @@ async function ensureOnCheckAvailability(page: Page): Promise<void> {
 async function resetToStep1(page: Page): Promise<void> {
   await ensureOnCheckAvailability(page);
   // The SPA preserves wizard state across sidebar navigation.
-  // Click "Back" as many times as needed until the Step 1 date button is visible.
   for (let i = 0; i < 3; i++) {
     const dateVisible = await page
       .getByRole('button', { name: /Select Event Date/i })
@@ -108,12 +101,7 @@ async function proceedToTimeStep(page: Page): Promise<void> {
     .catch(() => undefined);
 }
 
-/**
- * Find a control on the result step, re-driving the wizard if it is missing.
- * The token refresh can fire *during* an assertion's own wait, after the helper
- * has already landed us correctly, so retrying inside the lookup is the only
- * thing that survives it.
- */
+/** Find a control on the result step, re-driving the wizard if it is missing. */
 async function resultStepControl(page: Page, name: RegExp) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     const control = page.getByRole('button', { name }).first();
@@ -126,10 +114,7 @@ async function resultStepControl(page: Page, name: RegExp) {
 }
 
 async function proceedToResultStep(page: Page): Promise<void> {
-  // The token refresh can fire part-way through the wizard, replacing the page
-  // and leaving the result-step assertions reading as "button not found". Drive
-  // the wizard, confirm we actually landed on the result step, and redo the whole
-  // run once if we did not.
+  // The token refresh can fire part-way through the wizard
   for (let attempt = 1; attempt <= 2; attempt++) {
     await ensureOnCheckAvailability(page);
     await proceedToTimeStep(page);
@@ -157,14 +142,7 @@ test.describe('Check Availability', () => {
     catering = await loginToK12Catering(page);
   });
 
-  /**
-   * Start a completely fresh session and land back on Check Availability.
-   *
-   * A bare goto to the catering app does NOT carry the PrimeroEdge launcher
-   * token, so it just bounces to the interstitial again — the only thing that
-   * actually recovers is logging in from scratch. Declared here so it can
-   * reassign the shared `catering` page.
-   */
+  /** Start a completely fresh session and land back on Check Availability. */
   async function relogin(browser: Browser): Promise<void> {
     await catering.context().close().catch(() => undefined);
     const context = await browser.newContext();
@@ -188,12 +166,7 @@ test.describe('Check Availability', () => {
   }
 
   test.beforeEach(async ({ browser }) => {
-    // This suite shares one login across 19 tests, and the PrimeroEdge token
-    // expires part-way through — parking the tab on the "you will be
-    // automatically authenticated and redirected to Catering" interstitial,
-    // where every app locator disappears and failures read as missing buttons.
-    // Clicking through that page is unreliable, so start a fresh session
-    // instead when the sidebar is gone.
+    // This suite shares one login across 19 tests
     await dismissReauthInterstitial(catering).catch(() => undefined);
     const alive = await catering
       .locator('aside[aria-label="Main navigation"]')
@@ -335,12 +308,9 @@ test.describe('Check Availability', () => {
   test('Check Availability - Result step shows Browse Menu', async ({
     browser,
   }) => {
-    // A mid-test token refresh forces a full re-login (~20s) before the wizard
-    // can be re-driven, which does not fit the default budget.
+    // A mid-test token refresh forces a full re-login (~20s) before the wizard can be re-driven
     test.setTimeout(180_000);
-    // Browse Menu is the only action offered here on an empty cart. "Proceed to
-    // Checkout" used to be asserted alongside it, but the result step only renders
-    // that button once the cart has items — covered by the "with cart" test below.
+    // Browse Menu is the only action offered here on an empty cart.
     await expect(
       await resultStep(browser, /Browse available menu items/i),
     ).toBeVisible();
@@ -362,10 +332,7 @@ test.describe('Check Availability', () => {
   });
 
   test('Check Availability - Proceed to Checkout is not offered without a cart', async () => {
-    // Inverted from "clicking it goes to /menu": the result step no longer renders a
-    // Proceed to Checkout button on an empty cart, so the behaviour worth pinning is
-    // that it stays absent. resultStep() is deliberately not used here — it retries on
-    // the assumption the control exists, which is the opposite of what we assert.
+    // Inverted from "clicking it goes to /menu"
     await proceedToResultStep(catering);
     await expect(
       catering.getByRole('button', {

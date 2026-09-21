@@ -12,11 +12,7 @@ export function getSecondaryDistrictName(): string {
   return getEnvVar('SECONDARY_DISTRICT_NAME', { required: false }) || 'Berkeley School District';
 }
 
-// Auto-dismiss the "Catering vX.Y.Z is Now Available" What's-New release
-// announcement modal. It pops up on login (notably right after a UAT release)
-// and its full-screen overlay intercepts sidebar/menu clicks until closed.
-// Register on any page that logs into K12 Catering (incl. direct customer/admin
-// logins that don't go through loginToK12Catering).
+// Auto-dismiss the "Catering vX.Y.Z is Now Available" What's-New release announcement modal.
 export async function registerReleaseNotificationHandler(page: Page): Promise<void> {
   await page.addLocatorHandler(
     page.getByRole('button', { name: 'Close notification' }),
@@ -31,13 +27,10 @@ export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Rows in the app's paginated lists. Both shapes are real: Data Sync and the
-// Sync Log are real tables, a few newer lists are ARIA grids.
+// Rows in the app's paginated lists.
 export const LIST_ROW_SELECTOR = 'table tbody tr, [role="row"]';
 
-// Wait for a list to re-render after a filter/search/page-size change instead of
-// sleeping. A list with no spinner is fine, hence the catch. Not [role="status"]:
-// the toasts use that, so a "Sync complete" toast would eat the whole timeout.
+// Wait for a list to re-render after a filter/search/page-size change instead of sleeping.
 export async function waitForListSettled(page: Page): Promise<void> {
   await page
     .locator('[aria-busy="true"], [role="progressbar"], .animate-spin, svg.animate-spin')
@@ -46,10 +39,7 @@ export async function waitForListSettled(page: Page): Promise<void> {
     .catch(() => undefined);
 }
 
-// Build a case-insensitive regex that matches a district name on screen even
-// when the app renders a curly apostrophe (’ U+2019) where the env value has a
-// straight one (') — e.g. "Lee's Summit R-7" stored vs "Lee’s Summit R-7"
-// displayed. Regex-escapes the name, then treats any apostrophe interchangeably.
+// Build a case-insensitive regex that matches a district name on screen even when the app
 export function getDistrictNameRegex(name: string = getDistrictName()): RegExp {
   const escaped = escapeRegExp(name).replace(/['‘’]/g, "['\\u2018\\u2019]");
   return new RegExp(escaped, 'i');
@@ -60,10 +50,7 @@ export function isUatDirectLogin(): boolean {
   return getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
 }
 
-// The demo customer ACCOUNT an admin manages in the Accounts list. QA and UAT
-// use different demo customers; on UAT that account lives under the secondary
-// district (Alief ISD), so callers switch there before searching Accounts (see
-// switchToCustomerDistrict in dataSync). Overridable via env if it ever changes.
+// The demo customer ACCOUNT an admin manages in the Accounts list.
 export function getCustomerAccountEmail(): string {
   return isUatDirectLogin()
     ? getEnvVar('UAT_ACCOUNT_CUSTOMER_EMAIL', { required: false }) || 'SiddiquiUATTesting@outlook.com'
@@ -152,9 +139,7 @@ export async function loginToPrimeroEdge(page: Page): Promise<void> {
   });
 }
 
-// Logs in to SchoolCafé (qa.perseusedge.com) — a separate platform from
-// PrimeroEdge Classic, with its own credentials (qaSchoolCafeEmail /
-// qaSchoolCafePassword, the password stored encrypted in .env like the others).
+// Logs in to SchoolCafé (qa.perseusedge.com)
 export async function loginToSchoolCafe(page: Page): Promise<void> {
   const email = getRequiredEnvVar('qaSchoolCafeEmail');
   const password = decryptPassword(getRequiredEnvVar('qaSchoolCafePassword'));
@@ -168,15 +153,12 @@ export async function loginToSchoolCafe(page: Page): Promise<void> {
   await page.locator('button:has-text("SIGN IN")').click();
 
   // The module nav renders the workspace modules (each is a <div title="…">).
-  // Wait for the always-present Home module to confirm we're logged in.
   await expect(page.locator('nav [title="Home"]')).toBeVisible({
     timeout: positiveIntFromEnv('SCHOOLCAFE_LOGIN_TIMEOUT_MS', process.env.CI ? 60000 : 30000),
   });
 }
 
-// Signs in on a login form that is already on screen. No goto() here, unlike
-// loginToPrimeroEdge: both callers arrive by signing out, and a goto would throw
-// away the page they just landed on. Navigate first if starting cold.
+// Signs in on a login form that is already on screen.
 export async function loginToK12CateringAsDistrictUser(page: Page): Promise<void> {
   const isUAT = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
   const username = getRequiredEnvVar(isUAT ? 'PE_UAT_DISTRICT_EMAIL' : 'PE_DISTRICT_EMAIL');
@@ -190,27 +172,18 @@ export async function loginToK12CateringAsDistrictUser(page: Page): Promise<void
 }
 
 export async function openK12CateringApp(page: Page): Promise<Page> {
-  // The page has TWO links to /K12Catering/K12Catering.aspx — one in the
-  // hidden left-nav module list (off-screen) and the visible Workspace
-  // tile. Use Playwright's `:visible` pseudo to pick the visible one.
+  // The page has TWO links to /K12Catering/K12Catering.aspx
   const cateringLink = page
     .locator('a[href*="K12Catering.aspx" i]:visible')
     .first();
 
-  // The Workspace tile has been observed to disappear entirely from the
-  // PrimeroEdge dashboard (module toggled off / permission change) while the
-  // Catering module itself stays reachable at its own URL. When there is no
-  // link at all, don't burn the click timeout — navigate straight to the module
-  // (same destination the tile points at) and log it, so a genuinely missing
-  // tile is visible in the run output instead of silently swallowed.
+  // The Workspace tile has been observed to disappear entirely from the PrimeroEdge dashboard
   if (await cateringLink.count() === 0) {
     const target = new URL('/K12Catering/K12Catering.aspx', page.url()).toString();
     console.log(
       `[login] no K12 Catering tile on the PrimeroEdge workspace; navigating directly to ${target}`
     );
-    // That page is the same launch interstitial the tile leads to: it
-    // auto-authenticates and pops the catering UI in a NEW tab after ~5s, so
-    // wait for that tab rather than returning the (now idle) workspace tab.
+    // That page is the same launch interstitial the tile leads to
     const redirectedTab = page
       .context()
       .waitForEvent('page', { timeout: 20_000 })
@@ -242,9 +215,7 @@ async function finishK12CateringLaunch(page: Page): Promise<void> {
     .locator(`a[href*="${getK12CateringUrl()}/login?token="]`)
     .first();
 
-  // Navigate rather than click: the launcher link is target="_blank", so a click
-  // lands the app in a new tab and leaves this page on the interstitial (see
-  // ensureInK12CateringApp for the same trap).
+  // Navigate rather than click
   if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
     const href = await launcherLink.getAttribute('href');
     if (href) {
@@ -255,8 +226,7 @@ async function finishK12CateringLaunch(page: Page): Promise<void> {
     }
   }
 
-  // The sidebar is the "launch finished" signal. networkidle never settles here
-  // anyway, the app polls in the background.
+  // The sidebar is the "launch finished" signal.
   if (await sidebar.isVisible({ timeout: 15000 }).catch(() => false)) {
     return;
   }
@@ -314,40 +284,25 @@ export async function loginToK12Catering(
 ): Promise<Page> {
   const { navigateTo } = options;
 
-  // Authenticate to PrimeroEdge once. LoginPage.goto() already retries the
-  // login page itself, and the observed flakiness is downstream (the catering
-  // launch), so this stays outside the launch-retry loop below.
+  // Authenticate to PrimeroEdge once.
   await loginToPrimeroEdge(page);
 
   const directLogin = getEnvVar('DIRECT_K12_LOGIN', { required: false }) === 'true';
 
-  // Smart login-phase retry: opening the K12 Catering app and waiting for its
-  // sidebar is intermittently flaky (the new tab / sidebar sometimes never
-  // renders) even when the test itself is fine. Retry ONLY this login/launch
-  // phase a few times. Once the sidebar is visible we hand control back to the
-  // test — any failure AFTER this point is a genuine test failure and is NOT
-  // retried here (a "fail is a fail" once we're actually inside the app).
+  // Smart login-phase retry
   const maxAttempts = positiveIntFromEnv('K12_LOGIN_RETRIES', 3);
   let cateringPage: Page | undefined;
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      // On a retry, wait a (growing) moment first — the failure is usually a
-      // transiently-slow backend (worst around the 3am scheduled run), so
-      // spacing the attempts out rides over the slow window instead of hammering
-      // back-to-back like a plain Playwright retry does. Then refresh the
-      // workspace (PrimeroEdge stays authenticated) so the catering tile /
-      // sidebar starts from a clean state before re-launch.
+      // On a retry, wait a (growing) moment first
       if (attempt > 1) {
         const backoffMs = positiveIntFromEnv('K12_LOGIN_RETRY_BACKOFF_MS', 5000) * (attempt - 1);
         await page.waitForTimeout(backoffMs);
         await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
 
-        // A backend blip can land us on the PrimeroEdge "Internal Server Error /
-        // Error Code: 500" page. Reloading that URL just re-serves the 500, so
-        // every remaining attempt would burn against a page that can never
-        // recover. Re-authenticate from the login page instead.
+        // A backend blip can land us on the PrimeroEdge "Internal Server Error / Error Code
         const on500 = await page
           .getByText(/Internal Server Error|Error Code:\s*500/i)
           .first()
@@ -376,8 +331,7 @@ export async function loginToK12Catering(
       break; // sidebar is up — login/launch succeeded, stop retrying
     } catch (err) {
       lastError = err;
-      // Discard a half-opened catering tab so the next attempt starts clean
-      // (the main `page` stays on the PrimeroEdge workspace to re-launch from).
+      // Discard a half-opened catering tab so the next attempt starts clean (the main `page` stays
       if (cateringPage && cateringPage !== page) {
         await cateringPage.close().catch(() => { });
       }
@@ -403,20 +357,8 @@ export async function loginToK12Catering(
   );
 
   // Auto-handle the PrimeroEdge SSO re-launch interstitial ("You will be automatically
-  // authenticated and redirected to Catering in N seconds"). A mid-session token refresh
-  // can bounce any long-running test onto that page, at which point every locator on it
-  // "isn't found" and the test fails for a reason unrelated to what it was asserting —
-  // the failure reads as a stale selector when it is really a lost session.
-  //
-  // Registered here rather than per-spec: dismissReauthInterstitial already existed, but
-  // only 5 of the spec files ever called it, so the rest were left exposed. Hanging it
-  // off the shared login means every spec that enters through this helper is covered,
-  // including ones written later that would not know to ask.
   await catering.addLocatorHandler(
-    // .first() is load-bearing. Without it this matches the text node AND its
-    // ancestors, so every visibility check on it throws a strict-mode violation -
-    // which the callers swallow, leaving the handler silently dead. It has been
-    // registered on every spec all along and never once fired.
+    // .first() is load-bearing.
     catering.getByText(/automatically authenticated and redirected to Catering/i).first(),
     async () => {
       await dismissReauthInterstitial(catering);
@@ -446,21 +388,11 @@ export async function navigateK12CateringMenu(
   await menuButton.click();
 }
 
-/**
- * Wait out the PrimeroEdge SSO re-launch interstitial ("You will be automatically
- * authenticated and redirected to Catering in N seconds…"). A mid-session token
- * refresh can bounce a long-running test onto this page; it auto-redirects in ~5s.
- * We click the "please select this link" link to skip the wait, then wait for the
- * banner to clear. Best-effort — never throws, so callers can call it defensively
- * before interacting with the app.
- */
+/** Wait out the PrimeroEdge SSO re-launch interstitial ("You will be automatically */
 export async function dismissReauthInterstitial(page: Page): Promise<void> {
-  // The relaunch can re-trigger (e.g. it pops again right after a redirect), so try
-  // a few times until the banner stays gone.
+  // The relaunch can re-trigger (e.g.
   for (let i = 0; i < 3; i += 1) {
-    // .first() for the same reason as the handler above: an unscoped getByText
-    // matches the ancestors too, isVisible() throws strict-mode, the .catch below
-    // turns that into "no banner", and this returns having done nothing.
+    // .first() for the same reason as the handler above
     const banner = page
       .getByText(/automatically authenticated and redirected to Catering/i)
       .first();
@@ -469,10 +401,7 @@ export async function dismissReauthInterstitial(page: Page): Promise<void> {
       return;
     }
     console.log(`[reauth] interstitial visible, attempt ${i + 1}/3 at ${page.url().slice(0, 80)}`);
-    // The link's accessible name is exactly "link". Click it to skip the ~5s
-    // auto-redirect. Keep the click and the networkidle: navigating to its href
-    // looks tidier, but a locator handler calls this on almost every assertion,
-    // and making that a navigation dropped the session sooner, not later.
+    // The link's accessible name is exactly "link".
     await page
       .getByRole('link', { name: 'link', exact: true })
       .first()
@@ -484,14 +413,6 @@ export async function dismissReauthInterstitial(page: Page): Promise<void> {
 }
 
 // For something merely below the fold use locator.scrollIntoViewIfNeeded().
-// This is for lists that render lazily as you scroll, where the element does not
-// exist until the container moves - the Data Sync items table and the Districts
-// group panels.
-//
-// Each step waits on what the scroll is supposed to produce, not on the clock:
-// the target becoming visible, or failing that the scroll position / content
-// height changing as new rows render. settleMs is only the ceiling on that wait,
-// so a list that renders immediately costs a few milliseconds instead of 500.
 export async function scrollUntilVisible(
   page: Page,
   options: ScrollUntilVisibleOptions = {}
@@ -526,8 +447,7 @@ export async function scrollUntilVisible(
     }
 
     if (locator) {
-      // The target showing up is the whole point of the scroll, so wait for that
-      // rather than a fixed pause. Not finding it just means "keep scrolling".
+      // The target showing up is the whole point of the scroll
       const appeared = await locator
         .waitFor({ state: 'visible', timeout: settleMs })
         .then(() => true)
@@ -537,9 +457,7 @@ export async function scrollUntilVisible(
         return;
       }
     } else {
-      // No target: wait for the view to actually move or for more content to
-      // render. Both are the signal that this step did something; if neither
-      // happens the stagnation counter below ends the loop.
+      // No target: wait for the view to actually move or for more content to render.
       await expect(async () => {
         const now = await readState();
         expect(
@@ -652,11 +570,7 @@ export async function clickAndCaptureNewTab(
   return newTab;
 }
 
-/**
- * Set a paginated list's page-size control (e.g. "20 / page") to `size`
- * (default 100). Handles both a native <select> and a click-to-open combobox.
- * Best-effort: silently returns if no page-size control is on the page.
- */
+/** Set a paginated list's page-size control (e.g. */
 export async function setListPageSize(page: Page, size = 100): Promise<void> {
   const control = page
     .getByRole('combobox', { name: /per page|page size|rows per page/i })
@@ -701,21 +615,7 @@ type FindRowAcrossPagesOptions = {
   timeoutPerPageMs?: number;
 };
 
-/**
- * Find a row in a paginated list, walking pages when needed.
- *
- * Some filters (e.g. Data Sync's "Local Overrides") only evaluate the items on
- * the CURRENT page, so a matching row can hide on page 2+. This first bumps the
- * page size (default 100 / page) to pull more rows onto one page, then — if the
- * row still is not visible — clicks through to the next page until it appears or
- * the pages run out.
- *
- * Returns the matching row Locator (scrolled into view). Throws if not found.
- *
- * Example:
- *   const row = await findRowAcrossPages(catering, { match: itemName });
- *   await expect(row.getByText(/^Overrides$/i)).toBeVisible();
- */
+/** Find a row in a paginated list, walking pages when needed. */
 export async function findRowAcrossPages(
   page: Page,
   options: FindRowAcrossPagesOptions
@@ -739,8 +639,7 @@ export async function findRowAcrossPages(
       return row;
     }
 
-    // Advance to the next page. Prefer an explicit Next control; fall back to
-    // the numbered page button for the next index (e.g. "2", "3", ...).
+    // Advance to the next page.
     const nextByLabel = page
       .getByRole('button', { name: /next page|^next$|^›$|^»$|^>$/i })
       .first();

@@ -1,4 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/80926
+// Test Link
 
 import { test, expect, Page } from '@playwright/test';
 import {
@@ -11,9 +11,7 @@ import {
   waitForListSettled,
 } from '../../utils/helpers';
 import { downloadInvoiceWithOptions } from '../../utils/orders';
-// The PrimeroEdge launcher's token refresh parks the page on the SSO interstitial
-// part-way through a run; safeNavigate re-enters the app instead of leaving the
-// test to read the interstitial as a missing control.
+// The PrimeroEdge launcher's token refresh parks the page on the SSO interstitial part-way
 import { safeNavigate } from '../../utils/dataSync';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -333,12 +331,7 @@ async function selectFirstContactCardInSection(
 async function selectAvailableEventDate(page: Page) {
   await page.getByRole('button', { name: selectEventDate }).click();
 
-  // Year-agnostic: pinning the year silently empties this list the day the calendar
-  // rolls into the next one. (utils/orders.ts had the same literal.)
-  // NOTE: this copy still only searches the CURRENTLY DISPLAYED month, so it can
-  // still come up empty at month-end when every remaining weekday is inside the
-  // order lead time. utils/orderFlow.ts shows the fix — walk forward with the
-  // "Next month" button. Left alone here because this spec was not re-run today.
+  // Year-agnostic: pinning the year silently empties this list the day the calendar rolls into
   const allDateButtons = page.locator(
     'button[aria-label*=", 20"]:not([disabled])',
   );
@@ -372,8 +365,7 @@ async function selectAvailableEventDate(page: Page) {
 test('Catering - Settings - Add district customization settings for Payment display label and requirements', async ({
   page,
 }) => {
-  // Long settings-customization flow (~85s locally) that runs slower in CI;
-  // give it headroom beyond the default per-test timeout so it doesn't time out.
+  // Long settings-customization flow (~85s locally) that runs slower in CI
   test.setTimeout(5 * 60 * 1000);
 
   const catering = await loginToK12Catering(page, { navigateTo: 'Settings' });
@@ -385,9 +377,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
   await waitForListSettled(catering);
 
   await test.step('Payment Display Label', async () => {
-    // First thing this test touches after login, so it is where a launcher hit
-    // lands. Re-enter the app and retry the whole find rather than failing on a
-    // label that is only missing because the app was never on screen.
+    // First thing this test touches after login, so it is where a launcher hit lands.
     await expect(async () => {
       await safeNavigate(catering, 'Settings');
       await waitForListSettled(catering);
@@ -614,8 +604,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
     const numGuestsInput = catering.locator('#num-guests-input');
     await expect(numGuestsInput).toBeVisible();
     await numGuestsInput.fill('2');
-    // Event Name (or Nickname) is a new REQUIRED field at Additional Details (ADO 117619);
-    // without it the "Next" button stays disabled.
+    // Event Name (or Nickname) is a new REQUIRED field at Additional Details (ADO 117619)
     const eventNameInput = catering.locator('#event-name-input');
     if (await eventNameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await eventNameInput.fill('Automation Event');
@@ -740,10 +729,7 @@ test('Catering - Settings - Add district customization settings for Payment disp
     await expect(viewDetailsButton).toBeVisible();
     await viewDetailsButton.click();
 
-    // "Download Invoice" now opens a "Download Invoice Options" modal (T-118254)
-    // before the file is produced, so a bare click-and-wait-for-download never
-    // fires. downloadInvoiceWithOptions keeps every section checked, which is what
-    // this assertion expects.
+    // "Download Invoice" now opens a "Download Invoice Options" modal (T-118254) before the file
     const invoiceText = await downloadInvoiceWithOptions(catering);
     expect(invoiceText).toContain(newAccountingStringDescriptionValue);
   });

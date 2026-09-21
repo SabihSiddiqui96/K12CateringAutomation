@@ -1,43 +1,5 @@
 #!/usr/bin/env node
-/**
- * Daily unattended re-run of the latest nightly build's failed tests.
- *
- * Finds the most recent test run, and if it had failures, hands the build id to
- * rerun-failed.js. Written for Task Scheduler (8 AM daily, catching up whenever the
- * machine wakes), so it must never block on input and never post
- * anything misleading when the machine isn't in a fit state to run.
- *
- * THE PIPELINE POSTS FIRST, THIS SCRIPT CORRECTS IT. Since 2026-09-08 the pipeline's
- * Notify stage runs on always(), so the channel gets the raw 3am count pass or fail.
- * That number still contains the flakes. This script re-runs only the failed set and
- * posts the honest count after it, so a bad morning reads "10 failed" and then
- * "1 failed" rather than going quiet until someone looks. It passes
- * --no-start-webhook, so it adds exactly one message, not two. Anything left under
- * "Confirmed failures" survived a re-run, so a genuine defect stays visible daily
- * instead of being lost among flakes.
- *
- * Guards, in order, each of which exits rather than running:
- *   1. Nothing to do — the latest build had no failures (the pipeline announced it).
- *   2. Already handled — that build is in the re-run ledger, so a scheduled double-fire,
- *      a retry, or a manual run earlier in the day can't re-run it a second time.
- *   3. VPN/DNS — the app host must resolve. A run without the tunnel up fails every test
- *      on getaddrinfo and posts a false "N failed" to RingCentral, which is worse than
- *      not running at all. This happened on 2026-08-26 and is the reason the guard exists.
- *      Because the pipeline is now silent on failures, this path can't just return: it
- *      posts the raw build numbers marked "NOT re-run" (once per build, tracked in
- *      .auto-rerun-notified.json) and leaves the ledger untouched, so the next retry —
- *      or the catch-up firing after the machine wakes — still does the real re-run.
- *
- * The run is fetched BEFORE the VPN check on purpose: dev.azure.com is reachable without
- * the tunnel, so the fallback message can carry real numbers.
- *
- * The build id comes from the Test API, not the Build API: the PAT in .env has Test read
- * but not Build read, and /test/runs carries the build id anyway.
- *
- * Usage:
- *   node scripts/auto-rerun-latest.js            # what Task Scheduler runs (8 AM daily)
- *   node scripts/auto-rerun-latest.js --dry-run  # decide and report, don't re-run
- */
+/** Daily unattended re-run of the latest nightly build's failed tests. */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -54,9 +16,7 @@ const APP_HOST = 'qa.primeroedge.co';
 const MAX_LOG_LINES = 1000;
 
 function log(msg) {
-  // Local time, not UTC. toISOString() made the 8 AM scheduled run read as 13:00,
-  // so the log did not line up with Task Scheduler's own times or the clock on the
-  // machine, and a run that had happened looked like one that never fired.
+  // Local time, not UTC.
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const stamp =
@@ -172,9 +132,7 @@ function alreadyInLedger(buildId) {
   const pat = readEnvValue('AZURE_DEVOPS_PAT');
   if (!pat) { log('SKIP: AZURE_DEVOPS_PAT not found in .env.'); return; }
 
-  // The run is fetched BEFORE the VPN check (dev.azure.com is reachable without the
-  // tunnel) so that if the tunnel is down we can still post the build's real numbers
-  // instead of going silent. Silence must never be mistakable for "all green".
+  // The run is fetched BEFORE the VPN check (dev.azure.com is reachable without the tunnel) so
   const run = await latestRun(pat);
   if (!run) { log('SKIP: no completed test run found in the last 3 days.'); return; }
   log(`Latest: build ${run.buildId} (${run.completed.slice(0, 16)}) - ${run.failed} failed of ${run.total}.`);
@@ -182,16 +140,13 @@ function alreadyInLedger(buildId) {
   // Guard 1: nothing to do. A clean build is announced by the pipeline itself.
   if (!run.failed) { log('SKIP: that build had no failures.'); return; }
 
-  // Guard 2: don't re-run what's already been re-run (a scheduled double-fire, or a
-  // catch-up firing after the machine wakes). The message already went out.
+  // Guard 2: don't re-run what's already been re-run (a scheduled double-fire
   if (alreadyInLedger(run.buildId)) {
     log(`SKIP: build ${run.buildId} is already in the re-run ledger.`);
     return;
   }
 
-  // Guard 3: the tunnel. Without it every test dies on DNS, so we must not re-run.
-  // The pipeline stays silent on failures now, so this path OWNS the message:
-  // post the raw build numbers, clearly marked as not-yet-re-run.
+  // Guard 3: the tunnel.
   if (!(await hostResolves(APP_HOST))) {
     if (fallbackAlreadyPosted(run.buildId)) {
       log(`${APP_HOST} still does not resolve - VPN down. Already notified for build ` +
@@ -222,9 +177,7 @@ function alreadyInLedger(buildId) {
   if (dryRun) { log(`DRY RUN: would re-run ${run.failed} test(s) from build ${run.buildId}.`); return; }
 
   log(`Re-running ${run.failed} failed test(s) from build ${run.buildId}...`);
-  // --no-start-webhook: exactly ONE message per day reaches the channel, at the end,
-  // carrying the post-re-run numbers. The pipeline stays silent when a build has
-  // failures precisely so this message is the single source of truth.
+  // --no-start-webhook
   const child = spawn(process.execPath, [path.join(ROOT, 'scripts', 'rerun-failed.js'), run.buildId, '--no-start-webhook'], {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],

@@ -1,23 +1,5 @@
 #!/usr/bin/env node
-/**
- * Unattended triage of whatever is still failing after the morning re-run.
- *
- * scripts/rerun-failed.js can re-run and report, but it cannot work out WHY a test
- * failed - it is a plain script. So the still-failing set used to just sit there
- * until someone asked about it. This hands that set to a headless Claude session,
- * which reads the errors, fixes what is test-side, re-runs, and updates the report.
- *
- * Runs after the re-run (Task Scheduler). Guards, in order:
- *   1. Nothing still failing in the ledger - normal, exit quietly.
- *   2. Already triaged this build - do not spend a second session on it.
- *   3. VPN down - a triage session cannot re-run anything without the tunnel, and
- *      a run without it produces ENOTFOUND on every test, which reads as failures
- *      that never happened. Skip; the next fire retries.
- *
- * Usage:
- *   node scripts/auto-triage.js              # the scheduled run
- *   node scripts/auto-triage.js --dry-run    # print the prompt, launch nothing
- */
+/** Unattended triage of whatever is still failing after the morning re-run. */
 const fs = require('fs');
 const path = require('path');
 const dns = require('dns');
@@ -112,8 +94,7 @@ commit and push everything you changed.`;
   child.stdout.on('data', relay);
   child.stderr.on('data', relay);
   child.on('close', (code) => {
-    // Marked regardless of exit code: a failed session should not make the next
-    // fire launch a second one against the same build. It retries tomorrow.
+    // Marked regardless of exit code
     done[entry.buildId] = new Date().toISOString();
     const keys = Object.keys(done);
     if (keys.length > 60) for (const k of keys.slice(0, keys.length - 60)) delete done[k];

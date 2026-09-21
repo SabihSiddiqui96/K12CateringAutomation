@@ -1,5 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/117501
-// T-117468 — Editing an order logs an "Order edited" entry under Order Activity.
+// Test Link… T-117468 — Editing an order logs an "Order edited" entry under Order Activity.
 
 import { test, expect, Page } from '@playwright/test';
 import {
@@ -9,13 +8,10 @@ import {
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-// The activity message now reads "Order edited: Event name, guest count, or
-// special instructions updated" (ADO 117619 added "Event name"). Match flexibly
-// so future wording tweaks to the lead-in don't break it.
+// The activity message now reads "Order edited
 const orderEditedActivity = /Order edited:.*special instructions updated/i;
 
-// Re-auth through the PrimeroEdge launcher (token-refresh) page if it took over —
-// it fires on long sessions and resets the session clock when re-entered.
+// Re-auth through the PrimeroEdge launcher (token-refresh) page if it took over
 async function reauthIfLauncher(page: Page): Promise<void> {
   const link = page.locator('a[href*="/login?token="]').first();
   if (await link.isVisible({ timeout: 1500 }).catch(() => false)) {
@@ -57,9 +53,7 @@ async function openFirstNonCancelledOrder(page: Page): Promise<void> {
       .waitFor({ state: 'hidden', timeout: 30000 })
       .catch(() => {});
 
-    // Confirm the order DETAILS opened via its "Order Summary" heading. Don't match a
-    // bare "Order #" heading: the Orders-LIST cards now render "<EventName> Order #..."
-    // headings (ADO 117619), so /Order #/ matches many cards and trips strict mode.
+    // Confirm the order DETAILS opened via its "Order Summary" heading.
     await expect(page.getByRole('heading', { name: /Order Summary/i }).first()).toBeVisible({
       timeout: 15000,
     });
@@ -72,8 +66,7 @@ async function openFirstNonCancelledOrder(page: Page): Promise<void> {
 test('Catering - Orders - Editing an order records an Order Edited entry in Order Activity', async ({
   page,
 }) => {
-  // The edit/verify is wrapped in a launcher-aware retry (re-doing the whole edit
-  // if the launcher interrupts the save), so give the test ample headroom.
+  // The edit/verify is wrapped in a launcher-aware retry (re-doing the whole edit if the
   test.setTimeout(7 * 60 * 1000);
 
   const catering = await loginToK12Catering(page);
@@ -83,10 +76,7 @@ test('Catering - Orders - Editing an order records an Order Edited entry in Orde
   await openFirstNonCancelledOrder(catering);
   const detailsUrl = catering.url();
 
-  // Steps 5-7 — edit the order's special instructions and confirm a NEW
-  // "Order edited" entry appears in Order Activity. The launcher (token refresh)
-  // can interrupt the edit/confirm itself (so nothing saves), so retry the WHOLE
-  // operation — re-baselining the count each attempt — until a new entry lands.
+  // Steps 5-7 — edit the order's special instructions and confirm a NEW "Order edited" entry
   await expect(async () => {
     await reauthIfLauncher(catering);
     if (!/\/orders\/details/.test(catering.url())) {
@@ -99,8 +89,7 @@ test('Catering - Orders - Editing an order records an Order Edited entry in Orde
     ).toBeVisible();
     const before = await catering.getByText(orderEditedActivity).count();
 
-    // Open the editor and change only the special-instructions text (a unique
-    // value, so the edit always registers without altering order pricing).
+    // Open the editor and change only the special-instructions text (a unique value
     await catering.getByRole('button', { name: 'Edit Order' }).click();
     await expect(catering).toHaveURL(/\/orders\/edit/);
     await reauthIfLauncher(catering);

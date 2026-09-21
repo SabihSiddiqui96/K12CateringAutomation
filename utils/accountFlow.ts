@@ -27,13 +27,11 @@ async function openChangePasswordDialog(
   customerEmail: string,
 ): Promise<Locator> {
   await closeChangePasswordDialog(page);
-  // The demo customer lives under a specific district (Alief ISD on UAT); make
-  // sure we're on it before searching Accounts, or the account won't be found.
+  // The demo customer lives under a specific district (Alief ISD on UAT)
   await switchToCustomerDistrict(page);
   await navigateK12CateringMenu(page, 'Accounts');
   await page.waitForLoadState('domcontentloaded');
-  // A mid-session PrimeroEdge token refresh can bounce us onto the SSO relaunch
-  // interstitial; wait it out before interacting with Accounts.
+  // A mid-session PrimeroEdge token refresh can bounce us onto the SSO relaunch interstitial
   await dismissReauthInterstitial(page);
 
   const searchBox = page.getByRole('textbox', {
@@ -54,10 +52,7 @@ async function openChangePasswordDialog(
     name: /Change Password/i,
   });
   const dialog = changePasswordDialog(page);
-  // Retry the whole open→click→dialog. Clicking "Change Password" can itself trigger
-  // a PrimeroEdge SSO relaunch (the interstitial pops instead of the dialog), and the
-  // account row/menu can re-render mid-click (detached element). Only stop once the
-  // dialog is actually open — dismissing any interstitial between attempts.
+  // Retry the whole open→click→dialog.
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     await dismissReauthInterstitial(page);
     if (!(await actionsButton.isVisible({ timeout: 10000 }).catch(() => false))) {

@@ -1,4 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/113440
+// Test Link
 
 import { Browser, expect, Locator, Page, test } from '@playwright/test';
 import {
@@ -428,20 +428,13 @@ async function deleteMenuPermanently(
   ).not.toBeVisible();
 }
 
-// Guaranteed teardown: remove whatever "<num> - SabihTesting" menu THIS run
-// created so it doesn't pile up under Manage Menus when the test fails midway
-// (e.g. the launcher kicks the session before the happy-path delete). Pass both
-// the original and renamed names — only one will still exist; the other's Delete
-// button simply won't be present and is skipped. This runs from a finally block,
-// so it must NEVER throw (that would mask the real test failure) — everything is
-// best-effort and swallowed.
+// Guaranteed teardown
 async function cleanupTestMenu(
   page: Page,
   candidateNames: string[],
 ): Promise<void> {
   try {
-    // The run may have failed anywhere (launcher page, a stray modal); recover
-    // quietly back to Manage Menus, and bail silently if we can't.
+    // The run may have failed anywhere (launcher page, a stray modal)
     await page.keyboard.press('Escape').catch(() => { });
     await ensureMenuPage(page);
 
@@ -464,8 +457,7 @@ async function cleanupTestMenu(
         continue; // not created, or already deleted by the happy path
       }
 
-      // A menu with items can't be deleted, so clear them first:
-      // Manage items -> uncheck everything -> Save -> Back to Manage Menus.
+      // A menu with items can't be deleted, so clear them first
       try {
         await openManageItems(page, name);
         await clearAllMenuItems(page);
@@ -492,14 +484,11 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
   page,
   browser,
 }) => {
-  // Long end-to-end flow (create/rename/toggle/assign items/customer-side
-  // verify/delete) that runs much slower in CI; give it ample headroom so it
-  // doesn't trip the default per-test timeout there.
+  // Long end-to-end flow (create/rename/toggle/assign items/customer-side verify/delete) that
   test.setTimeout(6 * 60 * 1000);
 
   const catering = await loginToK12Catering(page);
-  // Build/assign the menu in the customer's district (Alief ISD on UAT) so the
-  // demo customer who lives there can actually see the items. No-op on QA.
+  // Build/assign the menu in the customer's district (Alief ISD on UAT) so the demo customer who
   await switchToCustomerDistrict(catering);
   await ensureMenuPage(catering);
 
@@ -522,8 +511,7 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
     await deactivateMenu(catering, renamedMenuName);
     await activateMenu(catering, renamedMenuName);
 
-    // Pick the first two available menu items dynamically (the QA catalog
-    // changes over time — hardcoded names like "apple juice" go stale).
+    // Pick the first two available menu items dynamically (the QA catalog changes over time
     await openManageItems(catering, renamedMenuName);
     const checkboxes = catering.getByRole('checkbox');
     await expect(checkboxes.first()).toBeVisible();
@@ -534,9 +522,7 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
         (await checkboxes.nth(i).getAttribute('aria-label')) ??
         (await checkboxes.nth(i).getAttribute('name'));
       const cleaned = (name ?? '').trim();
-      // Skip junk/ambiguous catalog entries: a numeric-only or 1-char name
-      // (e.g. "12") makes a brittle exact-text match downstream and may not
-      // even render on the customer menu. Prefer descriptive item names.
+      // Skip junk/ambiguous catalog entries: a numeric-only or 1-char name (e.g.
       const isDescriptive = /[a-z]/i.test(cleaned) && cleaned.length >= 2;
       if (isDescriptive && !itemNames.includes(cleaned)) itemNames.push(cleaned);
     }
@@ -569,8 +555,7 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
       timeout: 10000,
     });
 
-    // Demo customer for the customer-side verification (QA: SabihQATesting,
-    // UAT: SiddiquiUATTesting under Alief ISD).
+    // Demo customer for the customer-side verification (QA
     const customerEmail = getCustomerAccountEmail();
     await resetCustomerPasswordFromAccounts(catering, customerEmail, customerPassword);
     await verifyMenuItemsAsCustomer(
@@ -596,10 +581,7 @@ test('Catering - Menu - Manage Menus create, rename, toggle, assign items, and d
       catering.getByRole('button', { name: renamedMenuName, exact: true }),
     ).not.toBeVisible();
   } finally {
-    // Always remove the menu this run created — covers the case where the test
-    // failed before the happy-path delete above, so it never lingers under
-    // Manage Menus. (If the delete already ran, neither name is found and this
-    // is a no-op.)
+    // Always remove the menu this run created
     await cleanupTestMenu(catering, [renamedMenuName, menuName]);
   }
 });

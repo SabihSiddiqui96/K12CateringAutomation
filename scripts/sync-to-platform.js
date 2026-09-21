@@ -1,27 +1,5 @@
 #!/usr/bin/env node
-/**
- * Mirror this repo into the Cybersoft.Platform monorepo folder.
- *
- * The platform repo keeps each automation project as a plain folder
- * (ExpressPoint, K12Catering, SchoolCafe, SCTV), not a submodule, so this
- * copies files across and makes its own commit there. Histories stay separate
- * on purpose: the monorepo sees one clean commit per sync instead of this
- * repo's several hundred.
- *
- * Only files git already tracks here are copied, which is what keeps secrets
- * out: .env, .env.release, node_modules and test-results are all gitignored, so
- * they can never reach the shared repo. Files deleted here are deleted there too,
- * so the folder is a true mirror rather than an append.
- *
- * The mirror never lands on AutomationProjects itself. That branch is shared
- * company code, so a sync either cuts its own camelCase branch off it (--branch)
- * or adds a commit to a branch that already has a PR open (--update-branch).
- *
- * Run with --help for usage.
- *
- * Auth: AZURE_DEVOPS_CODE_PAT in .env (needs Code Read & Write; the older
- * AZURE_DEVOPS_PAT is Work Items only and will not work here).
- */
+/** Mirror this repo into the Cybersoft.Platform monorepo folder. */
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -57,8 +35,7 @@ Auth: AZURE_DEVOPS_CODE_PAT in .env (Code Read & Write).`;
 
 class GitError extends Error {}
 
-// Run git in `repo`. Throws so the caller decides what to do. allowFail is for
-// probes where a non-zero exit is a real answer ("that ref does not exist").
+// Run git in `repo`.
 function git(repo, gitArgs, allowFail = false) {
   try {
     return execFileSync('git', ['-C', repo, ...gitArgs], {
@@ -71,10 +48,7 @@ function git(repo, gitArgs, allowFail = false) {
   }
 }
 
-// Parse `git status --porcelain=v1 -z`. Use -z: the default output quotes odd
-// paths and puts a rename on one line as "old -> new", so a filename with a
-// newline or " -> " in it breaks a naive split. With -z each entry is
-// NUL-terminated and a rename spends two records.
+// Parse `git status --porcelain=v1 -z`.
 function porcelainEntries(repo) {
   const raw = (() => {
     try {
@@ -98,10 +72,7 @@ function porcelainEntries(repo) {
   return entries;
 }
 
-// Read one key out of .env. Handles `export KEY=`, comments and quoted values.
-// Small on purpose - .env here is only ever written by hand or by our own
-// tooling - but it no longer hands back the quotes as part of the PAT, which
-// showed up as a 401 that made no sense.
+// Read one key out of .env.
 function readEnvValue(key) {
   let text = '';
   try {
@@ -143,14 +114,11 @@ function run(args) {
   const commitMessage = argValue(args, '-m', '--message') || 'Update K12Catering automation';
 
   // Neither lands on BRANCH itself - it is shared company code.
-  //   --branch        cut a fresh branch off BRANCH (the normal case)
-  //   --update-branch reuse an existing remote branch, so an open PR picks the
-  //                   new commit up instead of needing a second PR
   const featureBranch = argValue(args, '--branch', '-b');
   const updateBranch = argValue(args, '--update-branch', '-u');
   const targetBranch = updateBranch || featureBranch;
 
-  // --- preflight -----------------------------------------------------------
+  // --- preflight
 
   if (!fs.existsSync(TARGET_REPO)) {
     fail(`platform repo not found at ${TARGET_REPO}`);
@@ -161,8 +129,7 @@ function run(args) {
     fail('AZURE_DEVOPS_CODE_PAT not found in .env (needs Code Read & Write).');
   }
 
-  // Refuse to run against a dirty platform checkout — committing someone else's
-  // half-finished work into a shared repo is not ours to do.
+  // Refuse to run against a dirty platform checkout
   const targetDirty = porcelainEntries(TARGET_REPO).filter(
     (l) => l.trim() && !l.includes(PREFIX),
   );
@@ -172,9 +139,7 @@ function run(args) {
     fail('resolve those first — refusing to touch a dirty shared checkout.');
   }
 
-  // The point of this mirror is "what I committed here shows up there", so a
-  // half-edited working tree must not leak into the shared repo. Tracked-file
-  // edits block; untracked scratch files are ignored since they are never copied.
+  // The point of this mirror is "what I committed here shows up there"
   const sourceDirty = porcelainEntries(SOURCE).filter((l) => l.trim() && !l.startsWith('??'));
   if (sourceDirty.length && !args.includes('--allow-dirty')) {
     console.error('This repo has uncommitted changes:');
@@ -208,9 +173,7 @@ function run(args) {
     }
   }
 
-  // Start from what the remote has now, not from whatever this shared checkout
-  // is parked on - a stale checkout is how you get a non-fast-forward push that
-  // fails after the commit is already made.
+  // Start from what the remote has now, not from whatever this shared checkout is parked on
   if (!dryRun) {
     const authFetch = `https://anything:${pat}@${REMOTE_PATH}`;
     git(TARGET_REPO, ['fetch', authFetch, BRANCH], true);
@@ -231,8 +194,7 @@ function run(args) {
         `Continuing ${updateBranch} from its remote tip (${remoteTip.slice(0, 7)}).`,
       );
     } else {
-      // If that branch already exists remotely with commits our base does not
-      // have, the push would be rejected. Say so now, not after committing.
+      // If that branch already exists remotely with commits our base does not have
       git(TARGET_REPO, ['fetch', authFetch, featureBranch], true);
       const existingTip = git(TARGET_REPO, ['rev-parse', 'FETCH_HEAD'], true);
       if (existingTip && existingTip !== baseRef) {
@@ -266,19 +228,15 @@ function run(args) {
   try {
     syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBranch, pat });
   } finally {
-    // Leave the shared checkout back on BRANCH so the next sync starts clean and
-    // nobody finds it parked on a one-off branch.
+    // Leave the shared checkout back on BRANCH so the next sync starts clean and nobody finds it
     if (movedOffBaseBranch) git(TARGET_REPO, ['checkout', BRANCH], true);
   }
 }
 
 function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBranch, pat }) {
-  // --- work out the file set -----------------------------------------------
+  // --- work out the file set
 
   // Tracked files only: this is the gitignore filter that keeps .env out.
-  // Read the index with modes so gitlinks (mode 160000, i.e. submodules) can be
-  // dropped — they are directories on disk, so copying them byte-for-byte throws
-  // EISDIR, and a submodule pointer means nothing in a plain-folder mirror anyway.
   let sourceFiles = [];
   const submodules = [];
   for (const line of git(SOURCE, ['ls-files', '--stage']).split('\n')) {
@@ -292,34 +250,14 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
     console.log(`Skipping ${submodules.length} submodule(s): ${submodules.join(', ')}`);
   }
 
-  // Files that live in this repo but have no business in the shared monorepo. The
-  // mirror is meant to carry the K12 automation suite; freshdesk-notify.js is a
-  // RingCentral notifier whose real home is the FO-SprintBurnDown repo, and the copy
-  // here is dead — it is paused and nothing runs it. Syncing edits to a dead file into
-  // a repo other teams read is noise.
-  //
-  // Excluded paths are left ALONE at the target: not copied over, and not treated as
-  // stale either. Dropping them from the source set without also dropping them from the
-  // removal candidates would silently delete them from the shared repo on the next sync,
-  // which is a much bigger action than "stop mirroring this file".
+  // Files that live in this repo but have no business in the shared monorepo.
   const EXCLUDE = new Set([
-    // Local Task Scheduler tooling for this machine, not shared test automation. The
-    // .vbs hardcodes an absolute path under this user profile, and auto-rerun-latest.js
-    // shells out to scripts/rerun-failed.js, which is gitignored and therefore absent
-    // from the mirror - so both are broken by construction anywhere but here.
+    // Local Task Scheduler tooling for this machine, not shared test automation.
     'scripts/auto-rerun-latest.js',
     'scripts/auto-rerun-hidden.vbs',
   ]);
 
-  // Paths that must NEVER exist in the shared repo. Unlike EXCLUDE, which leaves a
-  // file alone at the target, anything matching here is dropped from the source set
-  // AND left in the removal list, so a copy that is already over there gets deleted
-  // on the next sync.
-  //
-  // Two kinds: assistant/editor tooling that has no meaning outside this machine,
-  // and local scheduler scripts that drive it. This is a hard boundary rather than a
-  // .gitignore rule because .gitignore only stops a file being tracked - it does not
-  // stop one that somebody force-added from riding along into a shared repo.
+  // Paths that must NEVER exist in the shared repo.
   const PURGE_PATTERNS = [
     /(^|\/)CLAUDE\.md$/i,
     /(^|\/)AGENTS\.md$/i,
@@ -327,15 +265,11 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
     /(^|\/)\.cursor\//i,
     /(^|\/)\.aider/i,
     /(^|\/)copilot[^/]*$/i,
-    // Hands the still-failing set to a headless assistant session; local-only, and
-    // it shells out to rerun-failed.js which is gitignored and absent from the mirror.
+    // Hands the still-failing set to a headless assistant session
     /^scripts\/auto-triage\.js$/,
-    // This script itself. It hardcodes an absolute path under one user profile, so
-    // nobody in the monorepo can run it - and mirroring it would copy the patterns
-    // above into the shared repo, which is the very thing they exist to prevent.
+    // This script itself.
     /^scripts\/sync-to-platform\.js$/,
-    // Real home is the FO-SprintBurnDown repo; the copy here is paused and nothing
-    // runs it, so the copy in the shared repo is dead weight.
+    // Real home is the FO-SprintBurnDown repo
     /^scripts\/freshdesk-notify\.js$/,
   ];
   const isPurged = (f) => PURGE_PATTERNS.some((re) => re.test(f));
@@ -350,8 +284,7 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
   if (purged.length) {
     console.log(`Never mirrored (purged): ${purged.join(', ')}`);
   }
-  // Dropped from the source set only. They stay in targetFiles below, so anything
-  // already in the shared repo is picked up as stale and deleted.
+  // Dropped from the source set only.
   sourceFiles = sourceFiles.filter((f) => !isPurged(f));
 
   const targetFiles = git(TARGET_REPO, ['ls-files', PREFIX])
@@ -404,7 +337,7 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
     return;
   }
 
-  // --- apply ---------------------------------------------------------------
+  // --- apply
 
   for (const rel of stale) {
     fs.rmSync(path.join(TARGET_REPO, PREFIX, rel), { force: true });
@@ -416,12 +349,7 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
     fs.copyFileSync(path.join(SOURCE, rel), dest);
   }
 
-  // --force is required, not sloppiness. This repo's .gitignore is itself one of
-  // the copied files, so git re-applies it inside the mirror and refuses paths
-  // that are legitimately tracked here — files added before a later ignore rule,
-  // or force-added at the time. The source repo's tracked set is the authority on
-  // what belongs in the mirror; nothing outside that set is ever copied, so there
-  // is no risk of sweeping in build output or secrets.
+  // --force is required, not sloppiness.
   git(TARGET_REPO, ['add', '--all', '--force', PREFIX]);
 
   const staged = git(TARGET_REPO, ['diff', '--cached', '--name-only', PREFIX], true);
@@ -438,8 +366,7 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
     return;
   }
 
-  // Push over an authenticated URL built at call time so the PAT is never written
-  // into .git/config where it would sit on disk in the shared checkout.
+  // Push over an authenticated URL built at call time so the PAT is never written into
   const authUrl = `https://anything:${pat}@${REMOTE_PATH}`;
   try {
     execFileSync('git', ['-C', TARGET_REPO, 'push', authUrl, `HEAD:${targetBranch}`], {
@@ -463,8 +390,7 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
   }
 }
 
-// One place turns a failure into an exit code, so the helpers above can throw
-// instead of calling process.exit(1) from deep inside and skipping the restore.
+// One place turns a failure into an exit code
 try {
   run(process.argv.slice(2));
 } catch (e) {

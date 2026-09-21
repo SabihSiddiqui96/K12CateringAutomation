@@ -1,4 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/117740
+// Test Link
 
 import { test, expect, Page } from '@playwright/test';
 import {
@@ -75,9 +75,7 @@ async function goToPaymentAnalysis(page: Page): Promise<void> {
   await page.waitForTimeout(1500);
 }
 
-// The two tables are plain <table>s distinguished by their column headers:
-//   Payment Method Usage  → has "Payment Method" AND "Percentage" columns
-//   Outstanding Payments  → has the "Days Outstanding" column
+// The two tables are plain <table>s distinguished by their column headers
 function paymentMethodUsageTable(page: Page) {
   return page
     .locator('table')
@@ -91,8 +89,7 @@ function outstandingPaymentsTable(page: Page) {
     .filter({ has: page.locator('th', { hasText: /Days Outstanding/i }) });
 }
 
-// Settings → edit the Payment Display Label. Returns the previous value so the
-// test can restore it afterward (keeps the shared QA setting clean).
+// Settings → edit the Payment Display Label.
 async function setPaymentDisplayLabel(page: Page, label: string): Promise<string> {
   await goToSettings(page);
   await scrollUntilVisible(page, {
@@ -138,9 +135,7 @@ test('Catering - Reports - Payment Analysis reflects the Payment Display Label i
   const usageTable = paymentMethodUsageTable(catering);
   await expect(usageTable.first()).toBeVisible();
 
-  // ── Step 4: Outstanding Payments table shows the accounting-string label in
-  //    its Payment Method column. Capture the current label to confirm it later
-  //    changes in both tables. ──
+  // ── Step 4: Outstanding Payments table shows the accounting-string label in its Payment
   await expect(
     catering.getByRole('heading', { name: /Outstanding Payments/i }).first(),
   ).toBeVisible();
@@ -158,9 +153,7 @@ test('Catering - Reports - Payment Analysis reflects the Payment Display Label i
     previousLabel = await setPaymentDisplayLabel(catering, updatedLabel);
     expect(updatedLabel).not.toBe(previousLabel);
 
-    // ── Step 6: Back to Reports → Payment Analysis; the updated label is
-    //    reflected in BOTH the Payment Method Usage and Outstanding Payments
-    //    tables' Payment Method column. ──
+    // ── Step 6: Back to Reports → Payment Analysis
     await goToPaymentAnalysis(catering);
 
     const usageAfter = paymentMethodUsageTable(catering);

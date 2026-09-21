@@ -1,12 +1,4 @@
-/**
- * Reusable K12 Catering "Data Sync" + district-switch + menu-edit helpers.
- *
- * These mirror the proven patterns in tests/tickets/t-113438.spec.ts (district
- * switching, Data Sync navigation, the Manage dialog, Push sync now) and
- * tests/menu/menu_manage_items.spec.ts (the Edit Menu Item dialog with
- * #menu-item-name / #price-per-item), pulled into one place so ticket specs can
- * reuse them instead of duplicating. Locators are kept identical to those tests.
- */
+/** Reusable K12 Catering "Data Sync" + district-switch + menu-edit helpers. */
 import { expect, Locator, Page } from '@playwright/test';
 import {
   escapeRegExp,
@@ -23,20 +15,11 @@ import {
 export { escapeRegExp } from './helpers';
 
 // District names can render with a typographic apostrophe (U+2019), e.g.
-// "Lee’s Summit R-7", while config/code use a straight quote ("Lee's ..."). Build
-// a regex source that matches either apostrophe form so the name still matches.
 function districtPattern(name: string): string {
   return escapeRegExp(name).replace(/['’]/g, "['’]");
 }
 
-// The launcher token-refreshes and reloads the app, which snaps the active
-// district back to the persisted one, so a long district-switching flow loses the
-// district it switched to. A test opts in with setIntendedDistrict(page, name) and
-// ensureInK12CateringApp switches back after a relaunch.
-//
-// Keyed by Page, not module scope: module state is shared by every test a worker
-// runs, so one spec's opt-in leaked into the next test in the same file. The
-// WeakMap entry also goes away with the page, so nothing has to reset it.
+// The launcher token-refreshes and reloads the app
 type DistrictState = { intended: string | null; restoring: boolean };
 const districtState = new WeakMap<Page, DistrictState>();
 
@@ -54,8 +37,7 @@ export function setIntendedDistrict(page: Page, name: string | null): void {
 }
 
 function headerShowsDistrict(page: Page, districtName: string): Locator {
-  // (?!\w) so a short name cannot match a longer one starting with it:
-  // "Lees" must not match "Lees Summit R-7".
+  // (?!\w) so a short name cannot match a longer one starting with it
   return page
     .getByRole('button', { name: /Switch district/i })
     .first()
@@ -69,11 +51,7 @@ export async function ensureInK12CateringApp(page: Page): Promise<void> {
   if (!(await sidebar.isVisible({ timeout: 2000 }).catch(() => false))) {
     const launcherLink = page.locator('a[href*="/login?token="]').first();
     if (await launcherLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // The interstitial's launcher link opens the app in a NEW tab (and the page
-      // self-redirects into one too), so clicking it leaves THIS page parked on the
-      // interstitial forever — the test holds this page object, so it would never
-      // see the sidebar and every retry would re-strand on the same screen. Navigate
-      // this tab to the token URL instead, which keeps the test's page valid.
+      // The interstitial's launcher link opens the app in a NEW tab (and the page self-redirects
       const href = await launcherLink.getAttribute('href');
       if (href) {
         await page.goto(href, { waitUntil: 'domcontentloaded' });
@@ -85,12 +63,7 @@ export async function ensureInK12CateringApp(page: Page): Promise<void> {
     await expect(sidebar).toBeVisible({ timeout: 30000 });
   }
 
-  // The launcher token-refresh can revert the active district back to the
-  // persisted one even when the app reloads cleanly (sidebar stays visible), so
-  // this check must run on EVERY call, not only after a relaunch. Restore the
-  // district the test intends to be on (opt-in via setIntendedDistrict). The
-  // `restoring` guard prevents re-entry, since switchDistrict() calls back into
-  // this fn. Tests that don't opt in (intended === null) are unaffected.
+  // The launcher token-refresh can revert the active district back to the persisted one even
   const state = stateFor(page);
   if (state.intended && !state.restoring) {
     const onIntended = await headerShowsDistrict(page, state.intended)
@@ -132,18 +105,11 @@ export async function dismissAnyModal(page: Page): Promise<void> {
 }
 
 type CloseDialogOptions = {
-  /**
-   * Throw if the dialog is still up after the last attempt. Default true: carrying
-   * on behind a modal fails later on the control underneath it, which reads as a
-   * missing element. Pass false on best-effort teardown only.
-   */
+  /** Throw if the dialog is still up after the last attempt. */
   required?: boolean;
 };
 
-// Close whatever dialog is open and check it actually closed. Only named close
-// controls are clicked - an accessible name, an aria-label containing "close", or
-// a bare x. The old `button:has(svg)).last()` catch-all was a coin flip on any
-// dialog whose last icon button is Delete or Reset. Escape covers the rest.
+// Close whatever dialog is open and check it actually closed.
 export async function closeOpenDialog(page: Page, options: CloseDialogOptions = {}): Promise<void> {
   const { required = true } = options;
   const dialog = page.locator('[role="dialog"]').first();
@@ -181,11 +147,9 @@ export async function closeOpenDialog(page: Page, options: CloseDialogOptions = 
 
 export async function switchDistrict(page: Page, districtName: string): Promise<void> {
   let switchBtn = page.getByRole('button', { name: /Switch district/i }).first();
-  // The header switch control isn't rendered on every page; if it's not here,
-  // go to the Districts page where the "Switch district" button reliably lives.
+  // The header switch control isn't rendered on every page
   if (!(await switchBtn.isVisible({ timeout: 3000 }).catch(() => false))) {
-    // Log rather than swallow: a broken navigation here otherwise fails later on
-    // "Switch district button not visible", which sends you to the wrong place.
+    // Log rather than swallow
     await navigateK12CateringMenu(page, 'Districts').catch((err) => {
       const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
       console.log(`[dataSync] could not open Districts before switching district: ${msg}`);
@@ -197,13 +161,7 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
   await switchBtn.click();
   await page.waitForLoadState('domcontentloaded');
 
-  // Two UIs in the wild:
-  //  - Newer (e.g. UAT): a full "Switch District" page listing one card-button
-  //    per district behind a search box (only the first page of districts shows,
-  //    so the target must be searched for). Clicking a card switches directly.
-  //  - Older (QA): a dialog with plain text options plus a separate
-  //    "Switch District" confirm button.
-  // NB: locator.isVisible() does NOT wait, so probe the new page with waitFor().
+  // Two UIs in the wild: - Newer (e.g.
   const searchBox = page.getByRole('textbox', { name: /Search districts/i }).first();
   const usesSearchPage = await searchBox
     .waitFor({ state: 'visible', timeout: 10000 })
@@ -213,9 +171,7 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
     const card = page
       .getByRole('button', { name: new RegExp(`^${districtPattern(districtName)}\\b`, 'i') })
       .first();
-    // Only the first page of districts renders, so narrow the list first. Typing
-    // in the search box is the primary filter; if that doesn't surface the card,
-    // fall back to the "Browse by Letter" button for the district's first letter.
+    // Only the first page of districts renders, so narrow the list first.
     await searchBox.fill(districtName);
     await waitForListSettled(page);
     if (!(await card.isVisible({ timeout: 5000 }).catch(() => false))) {
@@ -230,8 +186,7 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
     }
     await expect(card).toBeVisible();
     await card.click();
-    // Some variants pop a confirm after picking a card; wait briefly for it and
-    // click it if it shows (waitFor, since isVisible() doesn't wait).
+    // Some variants pop a confirm after picking a card
     const confirmAfterCard = page.getByRole('button', { name: /^Switch District$/i }).last();
     if (
       await confirmAfterCard
@@ -242,8 +197,7 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
       await confirmAfterCard.click();
     }
   } else {
-    // Anchored and role-first: an unanchored getByText matches a substring, so
-    // "Lees" could pick "Lees Summit R-7" and switch to the wrong district.
+    // Anchored and role-first
     const exact = new RegExp(`^\\s*${districtPattern(districtName)}\\s*$`, 'i');
     let option = page
       .getByRole('option', { name: exact })
@@ -251,9 +205,7 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
       .or(page.getByText(exact))
       .first();
     if (!(await option.isVisible({ timeout: 5000 }).catch(() => false))) {
-      // Some builds put the name in a row with a status badge, so the text node
-      // is not exactly the name. Fall back to a word-boundary match, last one so
-      // we get the innermost element rather than a wrapping container.
+      // Some builds put the name in a row with a status badge
       option = page
         .getByText(new RegExp(`${districtPattern(districtName)}(?!\\w)`, 'i'))
         .last();
@@ -267,9 +219,7 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
   }
 
   await page.waitForLoadState('domcontentloaded');
-  // Source of truth: the header "Switch district" button shows the active
-  // district name. Wait until it reflects the target — the dialog-gone heuristic
-  // passes vacuously on the full-page UI, so verify the switch actually landed.
+  // Source of truth: the header "Switch district" button shows the active district name.
   await expect(headerShowsDistrict(page, districtName)).toBeVisible({ timeout: 20000 });
   // Track the latest switch so a launcher relaunch restores it (opt-in tests).
   const state = stateFor(page);
@@ -277,22 +227,12 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
   await ensureInK12CateringApp(page);
 }
 
-// Make sure the admin is in the district where the demo customer account lives
-// before searching Accounts. On UAT that's the secondary district (Alief ISD);
-// on QA the customer is in the default district, so this is a no-op. The switch
-// is also skipped when that district is already active (e.g. it's the default),
-// so it's safe to call unconditionally before any customer-account lookup.
+// Make sure the admin is in the district where the demo customer account lives before
 export async function switchToCustomerDistrict(page: Page): Promise<void> {
   if (!isUatDirectLogin()) return;
   const target = getSecondaryDistrictName();
   const targetRe = new RegExp(districtPattern(target), 'i');
-  // Already in the target district? Detect it two ways:
-  //  - a switch-capable (Cybersoft Admin) session shows the district inside the
-  //    "Switch district" button, OR
-  //  - a district-admin session (which has no switch button because it can't
-  //    switch) shows it in a read-only "Current district: <name>" label.
-  // The second case matters when the account already defaults to the customer's
-  // district (e.g. Alief ISD) — there's nothing to switch, so just proceed.
+  // Already in the target district?
   const onTargetViaButton = await headerShowsDistrict(page, target)
     .waitFor({ state: 'visible', timeout: 3000 })
     .then(() => true)
@@ -338,16 +278,7 @@ export async function setGlobalSyncToggle(page: Page, attrLabel: string, on: boo
   await closeOpenDialog(page);
 }
 
-/**
- * Make sure a target district is opted in before a sync runs.
- *
- * A district left opted out makes "Push sync now" finish with 0 synced / 0
- * skipped and NO "Sync complete" toast at all, which reads exactly like a broken
- * sync when it is really just configuration. Berkeley in particular gets opted out
- * by other runs, so check and put it back rather than failing on it.
- *
- * Returns true if it had to opt the district back in.
- */
+/** Make sure a target district is opted in before a sync runs. */
 export async function ensureTargetDistrictOptedIn(page: Page, districtName: string): Promise<boolean> {
   const manageBtn = page
     .getByRole('button', { name: /^Manage$/i })
@@ -385,16 +316,7 @@ export async function ensureTargetDistrictOptedIn(page: Page, districtName: stri
   return changed;
 }
 
-/**
- * Click "Push sync now", confirm, wait for the "Sync complete" toast.
- *
- * Returns false without syncing when the button is disabled, which happens when no
- * target district is opted in and there is nothing to push.
- *
- * ensureTargetOptedIn defaults to true because an opted-out target makes the sync a
- * silent no-op. Pass false where being opted out is the thing under test
- * (t-113438 step 8a), or this undoes the setup.
- */
+/** Click "Push sync now", confirm, wait for the "Sync complete" toast. */
 export async function runPushSyncNow(
   page: Page,
   options: { ensureTargetOptedIn?: boolean } = {},
@@ -415,7 +337,7 @@ export async function runPushSyncNow(
   return true;
 }
 
-// ── Menu (TheRealMenu) item edit helpers ─────────────────────────────────────
+// ── Menu (TheRealMenu) item edit helpers ──
 
 /** Navigate to Menu and ensure the top-right menu dropdown is "TheRealMenu". */
 export async function selectTheRealMenu(page: Page): Promise<void> {
@@ -450,12 +372,7 @@ async function openItemEdit(page: Page, name: string): Promise<void> {
   await expect(page.getByRole('dialog', { name: /Edit Menu Item/i })).toBeVisible();
 }
 
-/**
- * Chip-tag fields (Ingredients, Allergens) in the Edit Menu Item dialog: a free-text
- * input (`#allergens-input` / `#ingredients-input`) where typing a value + Enter adds
- * a chip, and each chip has a "Remove <value> allergen|ingredient" button. Replace ALL
- * existing chips with `values` (empty array clears the field).
- */
+/** Chip-tag fields (Ingredients, Allergens) in the Edit Menu Item dialog */
 async function setChips(page: Page, inputId: string, kind: 'allergen' | 'ingredient', values: string[]): Promise<void> {
   const removeRe = new RegExp(`^Remove .+ ${kind}$`, 'i');
   const chips = page.getByRole('button', { name: removeRe });
@@ -507,9 +424,7 @@ export async function editMenuItem(
   if (changes.newIngredients !== undefined) {
     await setChips(page, 'ingredients-input', 'ingredient', changes.newIngredients);
   }
-  // Description is a required field; an item without one (e.g. a leftover synced
-  // item) leaves the Update button blocked ("Description is required"). Fill a
-  // placeholder ONLY when it's empty so real descriptions are never overwritten.
+  // Description is a required field; an item without one (e.g.
   const description = page.getByRole('textbox', { name: /^Description/i }).first();
   if (await description.isVisible().catch(() => false)) {
     const current = (await description.inputValue().catch(() => '')) || '';
@@ -521,14 +436,9 @@ export async function editMenuItem(
   await expect(page.getByRole('dialog', { name: /Edit Menu Item/i })).not.toBeVisible();
 }
 
-/**
- * On the Data Sync page, find the syncable-item row for `name` (proven pattern
- * from t-113438): re-enter the app if the launcher showed, bump to 100/page,
- * search by name, and return the row. The Overrides badge can then be asserted.
- */
+/** On the Data Sync page, find the syncable-item row for `name` (proven pattern from t-113438) */
 export async function findSyncableItemRow(page: Page, name: string): Promise<Locator> {
-  // Re-navigate (handles the intermittent PrimeroEdge launcher kicking us out of
-  // the SPA after a district switch) so we are reliably on the Data Sync page.
+  // Re-navigate (handles the intermittent PrimeroEdge launcher kicking us out of the SPA after a
   await goToDataSync(page);
 
   // setListPageSize handles both the <select> and combobox flavours.
@@ -547,17 +457,7 @@ export async function findSyncableItemRow(page: Page, name: string): Promise<Loc
   return row;
 }
 
-/**
- * Dedicated to the 117617 "Local Overrides" filter test: go to Data Sync, set
- * 100/page, click the "Local Overrides" filter button (a real <button>), and find
- * the named item's row WITHIN the filtered list (paging via Previous/Next).
- *
- * It owns the whole flow on purpose (rather than handing off to the generic
- * findRowAcrossPages): after a district switch the PrimeroEdge launcher can kick
- * us out of the SPA, so each attempt re-enters via goToDataSync and re-applies the
- * filter; if the launcher reappears mid-paging it bails to the outer retry.
- * Returns the matching row Locator. Throws if not found.
- */
+/** Dedicated to the 117617 "Local Overrides" filter test */
 export async function findItemUnderLocalOverridesFilter(page: Page, name: string, attempts = 3): Promise<Locator> {
   for (let attempt = 0; attempt < attempts; attempt++) {
     await goToDataSync(page); // re-enters the SPA if the launcher kicked us out
@@ -591,17 +491,11 @@ export async function findItemUnderLocalOverridesFilter(page: Page, name: string
   throw new Error(`findItemUnderLocalOverridesFilter: "${name}" not found under the Local Overrides filter.`);
 }
 
-/**
- * On Data Sync, if the named item has a local override, open its Details and
- * "Reset Local Overrides". Tolerant: returns false (no-op) if the item or the
- * override isn't found. Used both to clean up after a run and to clear leftover
- * state from a prior interrupted run (keeps the test idempotent).
- */
+/** On Data Sync, if the named item has a local override, open its Details and "Reset Local */
 export async function resetLocalOverride(page: Page, name: string): Promise<boolean> {
   let row: Locator;
   try {
-    // Find it via the Local Overrides filter (1 attempt) - no search typing. If it
-    // isn't shown there, it has no override, so there is nothing to reset.
+    // Find it via the Local Overrides filter (1 attempt) - no search typing.
     row = await findItemUnderLocalOverridesFilter(page, name, 1);
   } catch {
     return false;
@@ -643,13 +537,7 @@ export async function readMenuItemPrice(page: Page, name: string): Promise<strin
   return Number.isFinite(num) ? String(num) : String(raw).trim();
 }
 
-/**
- * Read a menu item's Allergens AND Ingredients from a SINGLE Edit-dialog open,
- * then cancel (no override created). Both lists live in the same dialog, so
- * reading them one at a time meant opening, reading, cancelling and waiting for
- * the close twice over for one answer — and the sync tests do this inside poll
- * loops, so it was most of their runtime for no extra coverage.
- */
+/** Read a menu item's Allergens AND Ingredients from a SINGLE Edit-dialog open */
 export async function readMenuItemChips(
   page: Page,
   name: string,

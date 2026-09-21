@@ -1,4 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/115748
+// Test Link
 
 import { expect, Page, test } from '@playwright/test';
 import {
@@ -108,8 +108,7 @@ async function getFirstLocationName(page: Page): Promise<string | null> {
 }
 
 async function deleteFirstLocation(page: Page, targetName?: string): Promise<string> {
-  // A specific non-primary location can be targeted by name; the app won't let
-  // you delete the only/Primary address, so callers pass a freshly-added one.
+  // A specific non-primary location can be targeted by name
   const locationName = targetName ?? (await getFirstLocationName(page));
 
   if (!locationName) {
@@ -123,17 +122,14 @@ async function deleteFirstLocation(page: Page, targetName?: string): Promise<str
     'i',
   );
 
-  // The address book can hold several locations sharing the same name (each
-  // run adds an "office"), so target the first match and assert the count
-  // drops by one rather than expecting the name to disappear entirely.
+  // The address book can hold several locations sharing the same name (each run adds an
   const deleteButtons = page.getByRole('button', {
     name: deleteLocationButtonName,
   });
   const countBefore = await deleteButtons.count();
   await deleteButtons.first().click();
 
-  // The confirm dialog's button is now just "Delete" (was "Delete and proceed
-  // with action"), inside a "Delete Location" dialog.
+  // The confirm dialog's button is now just "Delete" (was "Delete and proceed with action")
   const confirmDeleteButton = page
     .getByRole('dialog', { name: /Delete Location/i })
     .getByRole('button', { name: 'Delete', exact: true });
@@ -166,8 +162,7 @@ test('Catering - Address Book - Delete saved location and add it back', async ({
     timeout: 15000,
   });
 
-  // Add a fresh, non-primary "office" location to delete — the existing saved
-  // address may be the Primary one, which the app blocks from deletion.
+  // Add a fresh, non-primary "office" location to delete
   await addTestLocation(catering);
 
   const deletedLocationName = await deleteFirstLocation(catering, 'office');

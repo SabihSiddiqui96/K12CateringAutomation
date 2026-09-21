@@ -1,11 +1,4 @@
-// Test Link: https://dev.azure.com/Cybersoft-Technologies-Inc/PrimeroEdge%20Classic/_workitems/edit/117488
-// T-116454 — "K12 Catering" has been renamed to "Catering" everywhere:
-//   • PrimeroEdge Classic workspace tile is now "Catering"
-//   • launching it opens the K12Catering.aspx interstitial (tab title
-//     "PrimeroEdge - Catering") whose site title is "Catering" and which shows
-//     "You will be automatically authenticated and redirected to Catering in 5 seconds."
-//   • the Catering app tab title is "Catering"
-//   • on SchoolCafé (Perseus) the module tooltip reads "Catering"
+// Test Link… T-116454 — "K12 Catering" has been renamed to "Catering" everywhere
 
 import { test, expect, BrowserContext, Page } from '@playwright/test';
 import {
@@ -17,8 +10,7 @@ import {
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-// Launching Catering opens two tabs at once (the .aspx interstitial and the
-// catering app); grab whichever matches the given URL.
+// Launching Catering opens two tabs at once (the .aspx interstitial and the catering app)
 async function waitForTab(
   context: BrowserContext,
   urlRe: RegExp,
@@ -39,10 +31,7 @@ test('Catering - Rename - "K12 Catering" shows as "Catering" in PrimeroEdge work
 }) => {
   test.setTimeout(3 * 60 * 1000);
 
-  // On UAT (direct K12 login) the PrimeroEdge Classic workspace tile, the .aspx
-  // interstitial, and SchoolCafé don't exist — but the rename is still verifiable
-  // from the app itself: the browser tab title reads "Catering" and "K12
-  // Catering" appears nowhere. Verify that and finish.
+  // On UAT (direct K12 login) the PrimeroEdge Classic workspace tile
   if (isUatDirectLogin()) {
     const catering = await loginToK12Catering(page);
     await expect(

@@ -1,9 +1,4 @@
-/**
- * Reusable K12 Catering order / checkout helpers, extracted from the proven
- * place-order flow in tests/tickets/t-80926.spec.ts (add to cart -> checkout ->
- * event date/times -> contacts -> additional details -> payment -> review ->
- * place order). Locators are kept identical to that test.
- */
+/** Reusable K12 Catering order / checkout helpers */
 import { expect, Page } from '@playwright/test';
 import { navigateK12CateringMenu } from './helpers';
 
@@ -49,15 +44,9 @@ export async function selectFirstContactCardInSection(page: Page, sectionHeading
 export async function selectAvailableEventDate(page: Page): Promise<string> {
   await page.getByRole('button', { name: ORDER.selectEventDate }).click();
 
-  // Search this month, then walk forward. The picker opens on the current month, and
-  // near the end of one every remaining weekday can be inside the order lead time —
-  // so there is nothing bookable left in view and no amount of retrying finds one.
-  // Without advancing the calendar this throws for a calendar reason that looks
-  // exactly like a broken checkout (2026-08-30 and 08-31: both t-118254 tests failed
-  // this way on month-end, having passed all month).
+  // Search this month, then walk forward.
   for (let month = 0; month < 4; month += 1) {
-    // Year-agnostic on purpose: the label carries a 4-digit year, and pinning it to
-    // one silently empties this list the day the calendar rolls into the next year.
+    // Year-agnostic on purpose
     const allDateButtons = page.locator('button[aria-label*=", 20"]:not([disabled])');
     const count = await allDateButtons.count();
     for (let i = count - 1; i >= 0; i--) {
@@ -81,16 +70,7 @@ export async function selectAvailableEventDate(page: Page): Promise<string> {
   throw new Error('Could not find an available event date');
 }
 
-/**
- * "Download Invoice" on the Order Detail page opens a "Download Invoice Options"
- * modal (T-118254) before the file is produced. It offers three checkboxes —
- * Instructions, Order Notes and Complimentary Items — all checked by default.
- * Pass only the ones you want to change; anything omitted keeps its default.
- * Returns the downloaded invoice's PDF text.
- *
- * The checkboxes carry no id, so they are addressed via the stable
- * `aria-describedby` that links each one to its description paragraph.
- */
+/** "Download Invoice" on the Order Detail page opens a "Download Invoice Options" modal */
 export async function downloadInvoiceWithOptions(
   page: Page,
   overrides: {
@@ -149,11 +129,7 @@ export async function downloadAndReadPdfText(page: Page, downloadButtonName: Reg
   return pdfData.text;
 }
 
-/**
- * Add the first menu item to the cart and drive the checkout wizard up to the
- * "Additional Details" step (event date/times/setup/delivery contact done).
- * Leaves the page on Additional Details, where the Event Name field lives.
- */
+/** Add the first menu item to the cart and drive the checkout wizard up to the "Additional */
 export async function startOrderToAdditionalDetails(page: Page): Promise<string> {
   await navigateK12CateringMenu(page, 'Menu');
   await page.waitForLoadState('domcontentloaded');
@@ -192,11 +168,7 @@ export async function startOrderToAdditionalDetails(page: Page): Promise<string>
   return eventDate;
 }
 
-/**
- * On the Payment Information step: pick the first payment type, fill the program
- * name / accounting string if they appear (they are only required for some payment
- * types), skip the optional payment contact, and continue to Review.
- */
+/** On the Payment Information step */
 export async function selectPaymentAndContinue(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: /Payment Information/i }).first()).toBeVisible();
   const firstType = page.locator('#payment-method-group button').first();
@@ -220,10 +192,7 @@ export async function selectPaymentAndContinue(page: Page): Promise<void> {
   await clickNext(page);
 }
 
-/**
- * Full place-order flow with a given Event Name: drive the wizard, fill guests +
- * Event Name, pick payment, accept and place. Leaves the page on Order Management.
- */
+/** Full place-order flow with a given Event Name */
 export async function placeOrderWithEventName(page: Page, eventName: string): Promise<string> {
   const eventDate = await startOrderToAdditionalDetails(page);
   await page.locator(ORDER.numGuestsInput).fill('2');
@@ -237,11 +206,7 @@ export async function placeOrderWithEventName(page: Page, eventName: string): Pr
   return eventDate;
 }
 
-/**
- * Open the Orders "Export Orders" dialog, set the Start + End date to `dateStr`
- * (e.g. "June 13, 2026"), download the CSV, and return its text. The date pickers
- * use the same calendar component as the event date (aria-label contains the date).
- */
+/** Open the Orders "Export Orders" dialog, set the Start + End date to `dateStr` (e.g. */
 export async function exportOrdersCsvText(page: Page, dateStr: string): Promise<string> {
   await page.getByRole('button', { name: /Export Orders/i }).first().click();
   await expect(page.getByRole('heading', { name: /Export Orders/i })).toBeVisible();
@@ -262,8 +227,7 @@ export async function exportOrdersCsvText(page: Page, dateStr: string): Promise<
     throw new Error(`Could not pick date "${dateStr}" in the export calendar`);
   }
 
-  // Filter by Event Date (the date we set) instead of the default Delivery Date,
-  // if that option exists.
+  // Filter by Event Date (the date we set) instead of the default Delivery Date
   const filterTrigger = page.getByText(/Filter By/i).first().locator('xpath=following::button[1]');
   if (await filterTrigger.isVisible({ timeout: 3000 }).catch(() => false)) {
     await filterTrigger.click().catch(() => undefined);
@@ -277,8 +241,7 @@ export async function exportOrdersCsvText(page: Page, dateStr: string): Promise<
     await page.waitForTimeout(300);
   }
 
-  // Set BOTH Start Date and End Date to dateStr, each targeted via its own label
-  // (the trigger button right after the "Start Date" / "End Date" text).
+  // Set BOTH Start Date and End Date to dateStr
   for (const labelRe of [/Start Date/i, /End Date/i]) {
     const trigger = page.getByText(labelRe).first().locator('xpath=following::button[1]');
     await trigger.scrollIntoViewIfNeeded().catch(() => undefined);

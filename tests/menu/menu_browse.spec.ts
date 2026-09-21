@@ -52,8 +52,7 @@ test.describe('Menu - Browse, Search & Cart', () => {
   test('Menu - Page header, all controls and grid/list view toggle are visible', async () => {
     await expect(catering.getByRole('heading', { name: 'Menu', exact: true })).toBeVisible();
     await expect(catering.getByRole('textbox', { name: 'Search menu items' })).toBeVisible();
-    // Filter triggers are now #category-select / #allergen-select (they show the
-    // current value as text, e.g. "All"; were "Select category/allergen filter").
+    // Filter triggers are now #category-select / #allergen-select (they show the current value as
     await expect(catering.locator('#category-select')).toBeVisible();
     await expect(catering.locator('#allergen-select')).toBeVisible();
     await expect(catering.getByRole('button', { name: 'Show advanced filters' })).toBeVisible();
@@ -78,8 +77,7 @@ test.describe('Menu - Browse, Search & Cart', () => {
 
   test('Menu - Search by name, clear, and category/allergen filters work', async () => {
     const searchInput = catering.getByRole('textbox', { name: 'Search menu items' });
-    // Search for a term that actually exists in this catalog (derived from the
-    // first card) — a hardcoded word like "coffee" goes stale as the menu changes.
+    // Search for a term that actually exists in this catalog (derived from the first card)
     const firstItemName = ((await card().first().locator('h3').first().textContent()) ?? '').trim();
     expect(firstItemName.length, 'a menu item card should be present to search').toBeGreaterThan(0);
     const term = firstItemName.split(/\s+/).find((w) => w.length >= 4) ?? firstItemName;
@@ -114,9 +112,7 @@ test.describe('Menu - Browse, Search & Cart', () => {
     const decrease = catering.getByRole('button', { name: 'Decrease quantity' });
     const increase = catering.getByRole('button', { name: 'Increase quantity' });
 
-    // The item may already be in the cart from prior runs (the modal pre-fills the
-    // existing quantity), so drive the stepper down to the minimum first — that's
-    // where Decrease must be disabled — instead of assuming it opens at 1.
+    // The item may already be in the cart from prior runs (the modal pre-fills the existing
     for (let i = 0; i < 60 && (await decrease.isEnabled().catch(() => false)); i++) {
       await decrease.click();
     }
