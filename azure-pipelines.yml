@@ -85,17 +85,26 @@ stages:
               url="$(BASE_URL)$(LOGIN_PATH)"
               echo "Checking ${{ parameters.targetEnv }} login reachability: $url"
               for attempt in 1 2 3 4 5; do
-                curl -sS -o /dev/null -I --location --max-time 30 -w 'HTTP %{http_code}' "$url"
-                rc=$?   # must be captured before anything else runs, echo included
-                echo
-                if [ $rc -eq 0 ]; then
-                  echo "reachable on attempt $attempt"
+                code=$(curl -sS -o /dev/null -I --location --max-time 30 -w '%{http_code}' "$url" 2>/tmp/curlerr)
+                rc=$?
+                code=${code:-000}
+                if [ $rc -eq 0 ] && [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then
+                  echo "attempt $attempt: HTTP $code - reachable"
                   exit 0
                 fi
-                echo "attempt $attempt failed: curl exit $rc (60=TLS cert, 28=timeout, 6=DNS, 7=refused)"
+                if [ $rc -ne 0 ]; then
+                  # 60 covers both an untrusted chain and an EXPIRED certificate.
+                  echo "attempt $attempt: curl exit $rc (60=TLS cert invalid/expired, 35=TLS handshake, 28=timeout, 6=DNS, 7=refused)"
+                  sed 's/^/    /' /tmp/curlerr 2>/dev/null
+                else
+                  # A 502/503 means something answered but the app is not up. curl
+                  # exits 0 on any HTTP status, so without this the gate waves a dead
+                  # host through and the suite posts a false "141 failed".
+                  echo "attempt $attempt: HTTP $code - host answered but is not serving the login page"
+                fi
                 [ $attempt -lt 5 ] && sleep 20
               done
-              echo "##vso[task.logissue type=error]$url unreachable after 5 attempts over ~80s (last curl exit $rc)"
+              echo "##vso[task.logissue type=error]$url not usable after 5 attempts over ~80s (last curl exit $rc, last HTTP $code). Tests were NOT run - this is the environment, not the suite."
               exit 1
             displayName: Check ${{ parameters.targetEnv }} login reachability
 
