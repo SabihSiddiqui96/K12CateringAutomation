@@ -534,6 +534,11 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
         if (await launcher.isVisible({ timeout: 1000 }).catch(() => false)) {
           await goToDataSync(catering);
         }
+        // Re-click if it is still off. A launcher refresh can swallow the click above,
+        // and waiting alone then never sees the dropdown enable.
+        if ((await autoSyncToggle.getAttribute('aria-checked').catch(() => null)) !== 'true') {
+          await autoSyncToggle.click().catch(() => undefined);
+        }
         expect(await frequencySelect.isEnabled().catch(() => false)).toBeTruthy();
       }).toPass({ timeout: 40000, intervals: [3000, 5000, 8000] });
     }

@@ -401,12 +401,23 @@ export async function dismissReauthInterstitial(page: Page): Promise<void> {
       return;
     }
     console.log(`[reauth] interstitial visible, attempt ${i + 1}/3 at ${page.url().slice(0, 80)}`);
-    // The link's accessible name is exactly "link".
-    await page
-      .getByRole('link', { name: 'link', exact: true })
+    // Navigate THIS tab to the token URL rather than clicking the link: the link
+    // opens the app in a new tab, so the page the test holds stays on the
+    // interstitial and every retry re-strands on it. Same fix as ensureInK12CateringApp.
+    const href = await page
+      .locator('a[href*="/login?token="]')
       .first()
-      .click()
-      .catch(() => undefined);
+      .getAttribute('href')
+      .catch(() => null);
+    if (href) {
+      await page.goto(href, { waitUntil: 'domcontentloaded' }).catch(() => undefined);
+    } else {
+      await page
+        .getByRole('link', { name: 'link', exact: true })
+        .first()
+        .click()
+        .catch(() => undefined);
+    }
     await page.waitForLoadState('networkidle').catch(() => undefined);
     await banner.waitFor({ state: 'hidden', timeout: 12000 }).catch(() => undefined);
   }
