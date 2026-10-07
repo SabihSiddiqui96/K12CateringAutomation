@@ -255,6 +255,7 @@ function syncFiles({ args, dryRun, noPush, commitMessage, targetBranch, updateBr
     // Local Task Scheduler tooling for this machine, not shared test automation.
     'scripts/auto-rerun-latest.js',
     'scripts/auto-rerun-hidden.vbs',
+    'scripts/sync-schoolcafe-password.js',
   ]);
 
   // Paths that must NEVER exist in the shared repo.

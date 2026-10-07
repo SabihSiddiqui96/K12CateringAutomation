@@ -58,3 +58,6 @@ rerun-fails.txt
 .ticket-comment.log
 .auto-triage-done.json
 .auto-triage.log
+
+# Last SchoolCafe password pushed to the pipeline (hash only)
+.sc-password-sync.json
