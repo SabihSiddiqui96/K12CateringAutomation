@@ -321,7 +321,7 @@ test.describe('Accounts Change Password', () => {
     await catering.getByRole('menuitem', { name: /Log out|Sign out/i }).click();
     await catering.waitForURL('**/login', { timeout: 10000 });
     await expect(catering).toHaveURL(
-      new RegExp(getK12CateringUrl().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + (getEnvVar('LOGIN_PATH', { required: false }) || '/login'), 'i'),
+      new RegExp(getK12CateringLoginUrl().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
       { timeout: 10000 },
     );
 

@@ -6,10 +6,12 @@ export function getPlaywrightBaseUrl(): string {
 }
 
 export function getK12CateringUrl(): string {
-  return getEnvVar('K12_CATERING_URL', { required: false }) || 'https://qak12cateringui.perseusedge.com';
+  const url = getEnvVar('K12_CATERING_URL', { required: false });
+  // An unset pipeline variable arrives as the literal "$(K12_CATERING_URL)".
+  return url && /^https?:\/\//i.test(url) ? url : 'https://qak12cateringui.perseusedge.com';
 }
 
+// LOGIN_PATH is the PrimeroEdge login (/login.aspx on QA); Catering's is always /login.
 export function getK12CateringLoginUrl(): string {
-  const loginPath = getEnvVar('LOGIN_PATH', { required: false }) || '/login';
-  return `${getK12CateringUrl()}${loginPath}`;
+  return `${getK12CateringUrl()}/login`;
 }
