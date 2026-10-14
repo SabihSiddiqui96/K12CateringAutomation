@@ -48,9 +48,9 @@ function toHtml(text) {
     .join('<br>');
 }
 
-function postComment(text, pat) {
+function postComment(text, pat, isHtml) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ text: toHtml(text) });
+    const body = JSON.stringify({ text: isHtml ? text : toHtml(text) });
     const req = https.request(
       {
         hostname: 'dev.azure.com',
@@ -79,6 +79,8 @@ function postComment(text, pat) {
   const force = process.argv.includes('--force');
 
   const queue = readJson(QUEUE, null);
+  // A queued `html` note is posted as-is, so a PR link renders.
+  if (queue && queue.html) queue.text = queue.html;
   if (!queue || !queue.text || !String(queue.text).trim()) {
     log('nothing queued - no fixes to report. Exiting quietly.');
     return;
@@ -100,7 +102,7 @@ function postComment(text, pat) {
   const pat = readEnvValue('AZURE_DEVOPS_PAT');
   if (!pat) { log('SKIP: AZURE_DEVOPS_PAT not found in .env.'); return; }
 
-  const res = await postComment(text, pat);
+  const res = await postComment(text, pat, Boolean(queue.html));
   if (res.status >= 200 && res.status < 300) {
     log(`comment posted to work item ${WORK_ITEM} (HTTP ${res.status}).`);
     posted[today()] = { at: new Date().toISOString(), text };
