@@ -770,11 +770,23 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     );
     // No \b after the prefixes
     const LEFTOVER_ITEM_RE = /^Edit\s+(?:AutoRenamed|AutoSync)/i;
-    let chosenIdx = targetEditLabels.findIndex(
-      (l) => /^Edit\s+\S/i.test(l) && !LEFTOVER_ITEM_RE.test(l),
-    );
-    if (chosenIdx < 0) chosenIdx = 0; // all items are leftovers — use the first
-    const firstTargetEditBtn = targetEditBtns.nth(chosenIdx);
+    const candidates = targetEditLabels
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => /^Edit\s+\S/i.test(l) && !LEFTOVER_ITEM_RE.test(l))
+      .map(({ i }) => i);
+    if (!candidates.length) candidates.push(0); // all items are leftovers — use the first
+
+    // An item with no description can't be saved, so open the first one that has one.
+    const descriptionInput = catering.getByRole('textbox', { name: /^Description/i }).first();
+    let chosenIdx = -1;
+    for (const i of candidates) {
+      await targetEditBtns.nth(i).click();
+      await expect(descriptionInput).toBeVisible();
+      if ((await descriptionInput.inputValue()).trim()) { chosenIdx = i; break; }
+      await catering.getByRole('button', { name: /^Cancel$/i }).last().click();
+      await expect(descriptionInput).toBeHidden();
+    }
+    expect(chosenIdx, 'a target-district menu item with a description').toBeGreaterThanOrEqual(0);
     const firstTargetLabel = targetEditLabels[chosenIdx] ?? '';
     const firstTargetMatch = firstTargetLabel.match(
       /^Edit\s+(.+?)(?:\s+menu item)?$/i,
@@ -785,8 +797,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     ).not.toBeNull();
     originalMenuItemName = firstTargetMatch![1].trim();
 
-    // Click the Edit pencil for that item, rename it, save
-    await firstTargetEditBtn.click();
+    // The Edit form for that item is open; rename it and save
 
     const nameInput = catering
       .getByRole('textbox', { name: /Menu Item Name|Item Name|^Name$/i })
