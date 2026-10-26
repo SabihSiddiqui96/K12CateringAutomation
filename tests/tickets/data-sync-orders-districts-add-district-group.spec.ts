@@ -3,7 +3,7 @@
 import { test, expect, Page } from '@playwright/test';
 import { loginToK12Catering } from '../../utils/helpers';
 // safeNavigate, not navigateK12CateringMenu
-import { safeNavigate } from '../../utils/dataSync';
+import { safeNavigate, switchToDataSyncPrimaryDistrict } from '../../utils/dataSync';
 
 // --- Locators
 const AUTO_SYNC_SWITCH = /Auto[\s-]?sync/i;
@@ -70,16 +70,20 @@ async function openAcceptedOrder(page: Page) {
   await firstOrder.click();
 }
 
-/** Opens Districts and launches the Add district group dialog. */
-async function openAddDistrictGroupDialog(page: Page) {
+/** Opens Districts, returns the name of a group that already exists, and opens Add district group. */
+async function openAddDistrictGroupDialog(page: Page): Promise<string> {
   await safeNavigate(page, 'Districts');
   await expect(page).toHaveURL(/\/districts/);
+  const deleteGroup = page.getByRole('button', { name: /^Delete district group / }).first();
+  await expect(deleteGroup, 'at least one district group exists').toBeVisible();
+  const existingGroup = ((await deleteGroup.getAttribute('aria-label')) ?? '').replace(/^Delete district group /, '');
   await page
     .getByRole('button', { name: ADD_DISTRICT_GROUP_BUTTON, exact: true })
     .click();
   await expect(
     page.getByRole('dialog').filter({ hasText: DISTRICT_GROUP_DIALOG }),
   ).toBeVisible();
+  return existingGroup;
 }
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -90,6 +94,7 @@ test('Data Sync - Orders - Districts - Add district group', async ({
   test.setTimeout(240_000);
 
   const catering = await loginToK12Catering(page);
+  await switchToDataSyncPrimaryDistrict(catering);
 
   // -- Step 1: Disable auto-sync from Data Sync
   const autoSyncWasOn = await disableAutoSync(catering);
@@ -99,12 +104,12 @@ test('Data Sync - Orders - Districts - Add district group', async ({
     await openAcceptedOrder(catering);
 
     // -- Step 3: Open the Add district group dialog from Districts
-    await openAddDistrictGroupDialog(catering);
+    const existingGroup = await openAddDistrictGroupDialog(catering);
 
     // -- Step 4: Submit a duplicate group name and check the error
     await catering
       .getByRole('textbox', { name: GROUP_NAME_FIELD, exact: true })
-      .fill('test');
+      .fill(existingGroup);
     await catering.getByRole('button', { name: 'Add', exact: true }).click();
     // Scope to the dialog's inline error
     const duplicateGroupAlert = catering

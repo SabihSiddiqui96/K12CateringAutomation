@@ -1,10 +1,15 @@
 /** Test data that more than one spec needs, in one place and overridable by env. */
 import { getEnvVar } from './env';
-import { getSecondaryDistrictName, isUatDirectLogin } from './helpers';
+import { getDistrictName, getSecondaryDistrictName, isUatDirectLogin } from './helpers';
 
 /** Password the specs reset the demo customer account to before signing in as them. */
 export function getCustomerPassword(): string {
   return getEnvVar('QA_CUSTOMER_PASSWORD', { required: false }) || 'Password1!';
+}
+
+/** The district data sync pushes FROM (the group's primary district). */
+export function getDataSyncPrimaryDistrict(): string {
+  return getEnvVar('DATA_SYNC_PRIMARY_DISTRICT', { required: false }) || getDistrictName();
 }
 
 /** The district data sync pushes TO */

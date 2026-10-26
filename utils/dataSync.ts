@@ -10,6 +10,7 @@ import {
   waitForListSettled,
   LIST_ROW_SELECTOR,
 } from './helpers';
+import { getDataSyncPrimaryDistrict } from './testData';
 
 // Lives in ./helpers now; re-exported so existing imports keep working.
 export { escapeRegExp } from './helpers';
@@ -230,7 +231,15 @@ export async function switchDistrict(page: Page, districtName: string): Promise<
 // Make sure the admin is in the district where the demo customer account lives before
 export async function switchToCustomerDistrict(page: Page): Promise<void> {
   if (!isUatDirectLogin()) return;
-  const target = getSecondaryDistrictName();
+  await switchToDistrictIfNeeded(page, getSecondaryDistrictName());
+}
+
+/** The admin lands in their last-used district, so Data Sync specs start from the primary one. */
+export async function switchToDataSyncPrimaryDistrict(page: Page): Promise<void> {
+  await switchToDistrictIfNeeded(page, getDataSyncPrimaryDistrict());
+}
+
+async function switchToDistrictIfNeeded(page: Page, target: string): Promise<void> {
   const targetRe = new RegExp(districtPattern(target), 'i');
   // Already in the target district?
   const onTargetViaButton = await headerShowsDistrict(page, target)
