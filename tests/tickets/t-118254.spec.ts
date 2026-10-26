@@ -10,6 +10,7 @@ import {
 } from '../../utils/helpers';
 import { getRequiredEnvVar } from '../../utils/env';
 import { decryptPassword } from '../../utils/crypto';
+import { switchToCustomerDistrict } from '../../utils/dataSync';
 import { getK12CateringUrl, getK12CateringLoginUrl } from '../../utils/baseUrl';
 import {
   startOrderToAdditionalDetails,
@@ -662,7 +663,7 @@ test.describe('T-118254', () => {
 
     const card = reviewCompCard(c);
     await card.scrollIntoViewIfNeeded();
-    if (overallNote) await expect(card).toContainText(overallNote);
+    if (overallNote && !/^Not set$/i.test(overallNote)) await expect(card).toContainText(overallNote);
     await expect(card).toContainText(SHARED_CHECKOUT_ITEM);
     await expect(card).toContainText(ITEM_NOTE);
     await expect(card.locator('div[class*="grid-cols"]').first()).toHaveClass(/lg:grid-cols-4/);
@@ -757,6 +758,8 @@ test.describe('T-118254', () => {
 
     const admin = await loginToK12Catering(page);
     await autoDismissReauth(admin);
+    // On UAT the customer lives in a different district from the admin's default.
+    await switchToCustomerDistrict(admin);
     await goToSettings(admin);
     await ensureComplimentaryItem(admin, SHARED_CHECKOUT_ITEM, ITEM_NOTE);
     await setMinimumOrderAmount(admin, CHECKOUT_MIN_ORDER);
@@ -773,7 +776,8 @@ test.describe('T-118254', () => {
       await card.scrollIntoViewIfNeeded();
 
       // The customer sees exactly what the admin configured.
-      if (overallNote) await expect(card).toContainText(overallNote);
+      // An empty note reads "Not set" in Settings and shows nothing to the customer.
+      if (overallNote && !/^Not set$/i.test(overallNote)) await expect(card).toContainText(overallNote);
       await expect(card).toContainText(SHARED_CHECKOUT_ITEM);
       await expect(card).toContainText(ITEM_NOTE);
       await expect(card.locator('div[class*="grid-cols"]').first()).toHaveClass(/lg:grid-cols-4/);
@@ -823,6 +827,8 @@ test.describe('T-118254', () => {
 
     const admin = await loginToK12Catering(page);
     await autoDismissReauth(admin);
+    // On UAT the customer lives in a different district from the admin's default.
+    await switchToCustomerDistrict(admin);
     await goToSettings(admin);
     await ensureComplimentaryItem(admin, SHARED_CHECKOUT_ITEM, ITEM_NOTE);
     await setMinimumOrderAmount(admin, CHECKOUT_MIN_ORDER);

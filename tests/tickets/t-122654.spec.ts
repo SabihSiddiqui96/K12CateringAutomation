@@ -26,10 +26,10 @@ async function expectNormalPointer(card: Locator, withButtons: boolean) {
   await expect(card).toBeVisible();
   expect(await cursorOf(card)).toMatch(NORMAL_CURSOR);
   expect(await cursorOf(card.locator('h3').first())).toMatch(NORMAL_CURSOR);
-  const text = card.locator('p, span:not(button span)').filter({ hasText: /\S/ }).first();
-  if (await text.count()) expect(await cursorOf(text)).toMatch(NORMAL_CURSOR);
+  const description = card.locator('p').filter({ hasText: /\S/ }).first();
+  if (await description.count()) expect(await cursorOf(description)).toMatch(NORMAL_CURSOR);
   if (withButtons) {
-    const buttons = card.locator('button:not([aria-label^="View larger photo"])');
+    const buttons = card.locator('button:not([aria-label^="View larger photo"]), [role="button"]');
     expect(await buttons.count()).toBeGreaterThan(0);
     for (const b of await buttons.all()) expect(await cursorOf(b)).toBe('pointer');
   }
