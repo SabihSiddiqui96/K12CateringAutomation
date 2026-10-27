@@ -441,7 +441,7 @@ export async function editMenuItem(
       await description.fill(changes.newName ?? name ?? 'Automated test item');
     }
   }
-  await page.getByRole('button', { name: /Update menu item|Update Menu Item|^Update$|^Save$/i }).first().click();
+  await page.getByRole('button', { name: /^(Update menu item|Update|Save)$/i }).first().click();
   await expect(page.getByRole('dialog', { name: /Edit Menu Item/i })).not.toBeVisible();
 }
 

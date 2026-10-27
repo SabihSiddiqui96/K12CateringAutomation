@@ -138,8 +138,8 @@ stages:
                 DIRECT_K12_LOGIN: 'true'
                 DISTRICT_NAME: "Lee's Summit R-7"
                 SECONDARY_DISTRICT_NAME: Alief ISD
-                DATA_SYNC_PRIMARY_DISTRICT: "Lee's Summit R-7"
-                DATA_SYNC_TARGET_DISTRICT: sabihLocal
+                DATA_SYNC_PRIMARY_DISTRICT: Alief ISD
+                DATA_SYNC_TARGET_DISTRICT: Lees
                 ENVIRONMENT_LABEL: UAT (PrimeroEdge)
               ${{ else }}:
                 PE_USERNAME: $(PE_USERNAME)

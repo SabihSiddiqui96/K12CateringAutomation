@@ -180,8 +180,8 @@ test.describe.serial('Data Sync - Granular Attribute Sync Overrides [ADO 117617]
   test('per-attribute sync respects toggles across districts, and local overrides win', async () => {
     test.slow(); // long multi-district flow
 
-    const HOME = PRIMARY_DISTRICT; // QA: Mercer County School District; UAT: Lee's Summit R-7
-    const TARGET = TARGET_DISTRICT; // QA: Berkeley School District; UAT: sabihLocal
+    const HOME = PRIMARY_DISTRICT; // QA: Mercer County School District; UAT: Alief ISD
+    const TARGET = TARGET_DISTRICT; // QA: Berkeley School District; UAT: Lees
     const stamp = `${Date.now()}`.slice(-6);
     const uniqueName = `AutoSync ${stamp}`;
     // Varied per run, and deliberately so.

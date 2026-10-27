@@ -807,7 +807,7 @@ test('Catering - Districts/Data Sync - Group, primary district, sync log and ove
     await nameInput.fill(RENAMED_MENU_ITEM);
 
     await catering
-      .getByRole('button', { name: /Update Menu Item|^Update$|^Save$/i })
+      .getByRole('button', { name: /^(Update Menu Item|Update|Save)$/i })
       .last()
       .click();
     await expect(
