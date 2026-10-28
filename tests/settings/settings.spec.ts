@@ -2,7 +2,47 @@ import { test, expect, Page } from '@playwright/test';
 import {
   loginToK12Catering,
   navigateK12CateringMenu,
+  getCustomerAccountEmail,
 } from '../../utils/helpers';
+import { getRequiredEnvVar } from '../../utils/env';
+import { decryptPassword } from '../../utils/crypto';
+import { getK12CateringLoginUrl } from '../../utils/baseUrl';
+import { addFirstMenuItemToCart, proceedToCheckout } from '../../utils/orderFlow';
+import { switchToCustomerDistrict } from '../../utils/dataSync';
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+  'September', 'October', 'November', 'December'];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Open the checkout calendar and return the calendar's own "today". */
+async function openEventCalendar(p: Page): Promise<Date> {
+  await p.getByRole('button', { name: /Select Event Date/i }).click();
+  const today = p.getByRole('button', { name: /, today/ });
+  await expect(today).toBeVisible();
+  const [, month, day, year] = ((await today.getAttribute('aria-label')) ?? '')
+    .match(/(\w+) (\d{1,2}), (\d{4})/) ?? [];
+  return new Date(Number(year), MONTHS.indexOf(month), Number(day));
+}
+
+/** The calendar button for `date`, paging forward a month if it is not shown yet. */
+async function dayButton(p: Page, date: Date) {
+  const label = `${WEEKDAYS[date.getDay()]}, ${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+  const btn = p.locator(`button[aria-label^="${label}"]`);
+  if (!(await btn.isVisible().catch(() => false))) {
+    await p.getByRole('button', { name: 'Next month' }).click();
+  }
+  await expect(btn).toBeVisible();
+  return btn;
+}
+
+/** Empty the cart from the checkout sidebar. */
+async function emptyCart(p: Page): Promise<void> {
+  const remove = p.getByRole('button', { name: 'Remove from cart' });
+  for (let i = 0; i < 10 && (await remove.first().isVisible().catch(() => false)); i++) {
+    await remove.first().click();
+    await p.waitForTimeout(500);
+  }
+}
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -104,5 +144,68 @@ test.describe('Settings', () => {
     await expect(catering.getByRole('button', { name: /Add\s+(new\s+)?contact/i })).toBeVisible();
     await expect(catering.getByRole('button', { name: /^Edit .+$/i }).first()).toBeVisible();
     await expect(catering.getByRole('button', { name: /^Delete .+$/i }).first()).toBeVisible();
+  });
+
+  test('Settings - Order Lead Time restricts customers but an admin can pick any date', async ({ browser }) => {
+    test.slow();
+    // On UAT the customer lives in a different district from the admin's default.
+    await switchToCustomerDistrict(catering);
+    await navigateK12CateringMenu(catering, 'Settings');
+    const leadText = (await catering
+      .getByRole('heading', { name: 'Order Lead Time', exact: true })
+      .locator('xpath=following-sibling::p[1]')
+      .innerText()).trim();
+    const leadDays = Number(leadText.match(/\d+/)?.[0]);
+    expect(leadDays, 'Order Lead Time is configured').toBeGreaterThan(0);
+
+    const insideLeadTime = (today: Date) =>
+      Array.from({ length: leadDays }, (_, k) =>
+        new Date(today.getFullYear(), today.getMonth(), today.getDate() + k));
+
+    // Admin: the days inside the lead time stay selectable.
+    try {
+      await addFirstMenuItemToCart(catering);
+      await proceedToCheckout(catering);
+      const today = await openEventCalendar(catering);
+      for (const date of insideLeadTime(today)) {
+        await expect(await dayButton(catering, date)).toBeEnabled();
+      }
+    } finally {
+      await emptyCart(catering).catch(() => undefined);
+    }
+
+    // Customer: the same days are blocked and the lead time is spelled out.
+    const ctx = await browser.newContext();
+    const customer = await ctx.newPage();
+    try {
+      await customer.goto(getK12CateringLoginUrl());
+      await customer.locator('#email-input').fill(getCustomerAccountEmail());
+      await customer.locator('#password-input').fill(decryptPassword(getRequiredEnvVar('K12_CUSTOMER_ENCRYPTED_PASSWORD')));
+      await customer.getByRole('button', { name: /Sign in/i }).click();
+      await expect(customer.locator('aside[aria-label="Main navigation"]')).toBeVisible({ timeout: 30000 });
+      const dismiss = customer.locator('button[aria-label^="Dismiss notification"]').first();
+      for (let i = 0; i < 5 && (await dismiss.isVisible({ timeout: 2000 }).catch(() => false)); i++) {
+        await dismiss.click().catch(() => undefined);
+      }
+
+      await customer.getByLabel('Navigate to Menu').click();
+      await customer.getByText(/Loading Menu/i).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => undefined);
+      await customer.getByRole('button', { name: /^Add to Cart$/i }).first().click();
+      await customer.getByRole('button', { name: /^Add to Cart$/i }).last().click();
+      await expect(customer.getByRole('button', { name: 'Remove from cart' }).first()).toBeVisible();
+      await customer.getByRole('button', { name: /Proceed to Checkout/i }).filter({ visible: true }).first().click();
+      await expect(customer).toHaveURL(/\/checkout/i);
+
+      await expect(
+        customer.getByText(new RegExp(`at least ${leadDays} days? in advance`, 'i')),
+      ).toBeVisible();
+      const today = await openEventCalendar(customer);
+      for (const date of insideLeadTime(today)) {
+        await expect(await dayButton(customer, date)).toBeDisabled();
+      }
+    } finally {
+      await emptyCart(customer).catch(() => undefined);
+      await ctx.close();
+    }
   });
 });

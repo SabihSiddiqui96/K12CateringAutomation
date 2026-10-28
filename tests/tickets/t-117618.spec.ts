@@ -1,6 +1,6 @@
 // Test Link… 117618 — Catering > Menus
 
-import { expect, Page, test } from '@playwright/test';
+import { expect, Locator, Page, test } from '@playwright/test';
 import { loginToK12Catering } from '../../utils/helpers';
 import { selectTheRealMenu, escapeRegExp } from '../../utils/dataSync';
 
@@ -187,6 +187,47 @@ async function checkboxStats(
   return stats;
 }
 
+// Click a "Sort ..." button and confirm the per-menu prompt.
+async function startPerMenuSort(page: Page, button: RegExp, heading: string): Promise<Locator> {
+  await page.locator('#main-content').getByRole('button', { name: button }).first().click()
+    .catch(() => page.getByRole('button', { name: button }).first().click());
+  await page.getByRole('button', { name: 'Sort for this menu' }).click();
+  const title = page.getByRole('heading', { name: heading, exact: true });
+  await expect(title).toBeVisible();
+  return page.locator('[role="dialog"], .fixed').filter({ has: title }).last();
+}
+
+async function categoryOrder(page: Page): Promise<string[]> {
+  const handles = page.getByRole('button', { name: /^Drag to reorder .+ category$/ });
+  await expect(handles.first()).toBeVisible();
+  const labels = await handles
+    .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''));
+  return labels.map((l) => l.replace(/^Drag to reorder (.+) category$/, '$1'));
+}
+
+async function itemOrder(page: Page): Promise<string[]> {
+  const handles = page.getByRole('button', { name: 'Drag to reorder menu item', exact: true });
+  await expect(handles.first()).toBeVisible();
+  const rows = await handles.evaluateAll((els) =>
+    els.map((e) => (e.parentElement?.innerText ?? '').replace(/\s+/g, ' ').trim()));
+  // Row text is "<position> <name> $<price>".
+  return rows.map((r) => r.replace(/^\d+\s+/, '').replace(/\s+\$[\d.,]+$/, ''));
+}
+
+// Move the first drag handle one place down with the keyboard sensor.
+async function moveFirstDown(handles: Locator): Promise<void> {
+  const first = handles.first();
+  await first.focus();
+  await first.press('Space');
+  await first.page().waitForTimeout(200);
+  await first.page().keyboard.press('ArrowDown');
+  await first.page().waitForTimeout(200);
+  await first.page().keyboard.press('Space');
+  await first.page().waitForTimeout(500);
+}
+
+const swapFirstTwo = (list: string[]) => [list[1], list[0], ...list.slice(2)];
+
 // Best-effort teardown: delete the duplicate directly.
 async function deleteMenu(page: Page, menuName: string): Promise<void> {
   try {
@@ -284,6 +325,68 @@ test('Catering - Menus - Duplicate menu copies the same items (original unchange
       await selectMenuFromDropdown(catering, ORIGINAL_MENU);
       const originalAfter = await menuItemNames(catering);
       expect(originalAfter).toEqual(originalItems);
+    });
+
+    await test.step('Category and item order are saved per menu', async () => {
+      // The original's orders, read without saving anything.
+      await selectMenuFromDropdown(catering, ORIGINAL_MENU);
+      await startPerMenuSort(catering, /^Sort category order$/, 'Sort Categories');
+      const originalCategories = await categoryOrder(catering);
+      expect(originalCategories.length, 'at least two categories to reorder').toBeGreaterThan(1);
+      await catering.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+      const sortItemsButtons = await catering
+        .locator('#main-content')
+        .getByRole('button', { name: /^Sort menu items in / })
+        .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''));
+      let category = '';
+      let originalItems: string[] = [];
+      for (const label of sortItemsButtons) {
+        await startPerMenuSort(catering, new RegExp(`^${escapeRegExp(label)}$`), 'Sort Menu Items');
+        const items = await itemOrder(catering);
+        await catering.getByRole('button', { name: 'Close', exact: true }).click();
+        if (items.length > 1) {
+          category = label.replace(/^Sort menu items in /, '');
+          originalItems = items;
+          break;
+        }
+      }
+      expect(category, 'a category with at least two items').not.toBe('');
+      const sortItemsIn = new RegExp(`^Sort menu items in ${escapeRegExp(category)}$`);
+
+      // Reorder both on the copy.
+      await selectMenuFromDropdown(catering, dupName);
+      await startPerMenuSort(catering, /^Sort category order$/, 'Sort Categories');
+      const dupCategories = await categoryOrder(catering);
+      await moveFirstDown(catering.getByRole('button', { name: /^Drag to reorder .+ category$/ }));
+      await expect.poll(() => categoryOrder(catering)).toEqual(swapFirstTwo(dupCategories));
+      await catering.getByRole('button', { name: 'Save Order' }).click();
+      await expect(catering.getByRole('heading', { name: 'Sort Categories', exact: true })).not.toBeVisible();
+
+      await startPerMenuSort(catering, sortItemsIn, 'Sort Menu Items');
+      const dupItems = await itemOrder(catering);
+      await moveFirstDown(catering.getByRole('button', { name: 'Drag to reorder menu item', exact: true }));
+      await expect.poll(() => itemOrder(catering)).toEqual(swapFirstTwo(dupItems));
+      await catering.getByRole('button', { name: 'Close', exact: true }).click();
+
+      // The copy kept the new order.
+      await selectMenuFromDropdown(catering, ORIGINAL_MENU);
+      await selectMenuFromDropdown(catering, dupName);
+      await startPerMenuSort(catering, /^Sort category order$/, 'Sort Categories');
+      expect(await categoryOrder(catering)).toEqual(swapFirstTwo(dupCategories));
+      await catering.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await startPerMenuSort(catering, sortItemsIn, 'Sort Menu Items');
+      expect(await itemOrder(catering)).toEqual(swapFirstTwo(dupItems));
+      await catering.getByRole('button', { name: 'Close', exact: true }).click();
+
+      // The original did not change.
+      await selectMenuFromDropdown(catering, ORIGINAL_MENU);
+      await startPerMenuSort(catering, /^Sort category order$/, 'Sort Categories');
+      expect(await categoryOrder(catering), 'original category order').toEqual(originalCategories);
+      await catering.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await startPerMenuSort(catering, sortItemsIn, 'Sort Menu Items');
+      expect(await itemOrder(catering), 'original item order').toEqual(originalItems);
+      await catering.getByRole('button', { name: 'Close', exact: true }).click();
     });
 
     await test.step('"Sort Items" per-menu warning (ADO 117618 comment)', async () => {

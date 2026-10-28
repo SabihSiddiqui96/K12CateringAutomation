@@ -89,4 +89,43 @@ test.describe('Districts', () => {
       await catering.keyboard.press('Escape');
     }
   });
+
+  test('Districts - Edit district uploads a logo preview and rejects other file types', async () => {
+    // 1x1 transparent PNG
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    // Search past any apostrophe; the app may store it curly (Lee’s Summit).
+    await catering
+      .getByRole('textbox', { name: /Search districts/i })
+      .fill(getDistrictName().split(/['‘’]/).pop()!.trim());
+    await catering
+      .getByRole('button', { name: new RegExp(`^Edit district ${getDistrictNameRegex().source}$`, 'i') })
+      .click();
+    await expect(catering.getByRole('heading', { name: 'Edit District' })).toBeVisible();
+    await expect(catering.getByRole('heading', { name: 'District Logo' })).toBeVisible();
+    await expect(catering.getByRole('button', { name: 'Upload district logo' })).toBeVisible();
+    await expect(catering.getByText('Supported formats: JPG, PNG, GIF')).toBeVisible();
+    const fileInput = catering.locator('input[type="file"]').first();
+    const preview = catering.getByRole('img', { name: 'District Logo Preview' });
+
+    try {
+      await fileInput.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') });
+      const invalid = catering.getByRole('alert').filter({ hasText: 'Invalid File Type' });
+      await expect(invalid).toBeVisible();
+      await expect(invalid).toContainText('Only JPG, PNG, and GIF images are supported.');
+      await expect(preview).not.toBeVisible();
+
+      await fileInput.setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: png });
+      await expect(preview).toBeVisible();
+      expect(await preview.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+      await expect(catering.getByRole('button', { name: 'Edit district logo' })).toBeVisible();
+      await expect(catering.getByRole('button', { name: 'Remove district logo' })).toBeVisible();
+    } finally {
+      // Cancel so the shared district keeps its own logo.
+      await catering.getByRole('button', { name: 'Cancel', exact: true }).click();
+    }
+    await expect(catering.getByRole('heading', { name: 'Edit District' })).not.toBeVisible();
+  });
 });

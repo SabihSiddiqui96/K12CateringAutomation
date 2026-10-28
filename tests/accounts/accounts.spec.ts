@@ -109,4 +109,70 @@ test.describe('Accounts', () => {
     await expect(catering.getByRole('heading', { name: 'Account Details' })).not.toBeVisible();
     await expect(catering.getByRole('heading', { name: 'Account Management' })).toBeVisible();
   });
+
+  const cardNames = async () =>
+    (await accountCards().getByRole('heading', { level: 3 }).allInnerTexts()).map((n) => n.trim());
+
+  const expectAscending = (names: string[]) => {
+    const sorted = [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    expect(names, 'accounts are listed A-Z').toEqual(sorted);
+  };
+
+  test('Accounts - Name A-Z sorts the list and the order holds on the next page', async () => {
+    // The search test above leaves its filters on the shared page.
+    await catering.getByRole('textbox', { name: 'Search accounts by name, username, or email' }).fill('');
+    await catering.getByRole('button', { name: 'Filter accounts by status' }).click();
+    await catering.getByRole('listbox').getByRole('option', { name: 'All Status', exact: true }).click();
+    await catering.getByRole('button', { name: 'Sort accounts' }).click();
+    await catering.getByRole('option', { name: 'Name A-Z' }).click();
+    await expect(catering.getByRole('button', { name: 'Sort accounts' })).toContainText('Name A-Z');
+
+    await expect(accountCards().first()).toBeVisible();
+    const firstPage = await cardNames();
+    expect(firstPage.length).toBeGreaterThan(1);
+    expectAscending(firstPage);
+
+    const next = catering.getByRole('button', { name: 'Next page' });
+    test.skip(await next.isDisabled(), 'only one page of accounts');
+    await next.click();
+    await expect(catering.getByRole('button', { name: 'Sort accounts' })).toContainText('Name A-Z');
+    await expect.poll(async () => (await cardNames())[0]).not.toBe(firstPage[0]);
+    const secondPage = await cardNames();
+    expectAscending(secondPage);
+    expectAscending([firstPage[firstPage.length - 1], secondPage[0]]);
+  });
+
+  test('Accounts - User names show as First Last on Dashboard, Accounts and Reports', async () => {
+    await navigateK12CateringMenu(catering, 'My Profile');
+    const field = (label: string) =>
+      catering.getByRole('group', { name: label }).getByRole('paragraph').first();
+    await expect(field('First name field')).not.toBeEmpty();
+    const first = (await field('First name field').innerText()).trim();
+    const last = (await field('Last name field').innerText()).trim();
+    const fullName = `${first} ${last}`;
+    const profileButton = catering.getByRole('button', { name: `View profile for ${fullName}` });
+
+    for (const page of ['Dashboard', 'Accounts', 'Reports']) {
+      await navigateK12CateringMenu(catering, page);
+      await expect(profileButton, `header name on ${page}`).toBeVisible();
+    }
+
+    await navigateK12CateringMenu(catering, 'Dashboard');
+    await expect(catering.getByText(`Welcome back, ${fullName}!`)).toBeVisible();
+
+    // Each account card's name is that account's first and last name.
+    await navigateK12CateringMenu(catering, 'Accounts');
+    await expect(accountCards().first()).toBeVisible();
+    const names = await cardNames();
+    for (let i = 0; i < Math.min(3, names.length); i++) {
+      const name = names[i];
+      await accountCards().nth(i).getByRole('button', { name: `View details for ${name}`, exact: true }).click();
+      const firstBox = catering.getByRole('textbox', { name: 'First Name *' });
+      await expect(firstBox).not.toHaveValue('');
+      const lastValue = await catering.getByRole('textbox', { name: 'Last Name *' }).inputValue();
+      expect(`${(await firstBox.inputValue()).trim()} ${lastValue.trim()}`).toBe(name);
+      await catering.getByRole('button', { name: 'Close account details modal' }).click();
+      await expect(firstBox).not.toBeVisible();
+    }
+  });
 });
