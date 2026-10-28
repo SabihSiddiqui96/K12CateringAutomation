@@ -6,7 +6,7 @@ const { execFileSync } = require('child_process');
 
 const SOURCE = path.resolve(__dirname, '..');
 const TARGET_REPO = 'C:\\Users\\sabih.siddiqui\\Desktop\\Automation\\Cybersoft.TestAutomation';
-const PREFIX = 'Cybersoft.Platform.TestAutomation/K12CateringAutomation';
+const PREFIX = 'K12CateringAutomation';
 const BRANCH = 'AutomationProjects';
 const REMOTE_PATH =
   'dev.azure.com/Cybersoft-Technologies-Inc/Cybersoft%20Test%20Automation/_git/Cybersoft%20Test%20Automation';
