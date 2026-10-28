@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-/** Mirror this repo into the Cybersoft.Platform monorepo folder. */
+/** Mirror this repo into its folder in the Cybersoft Test Automation repo. */
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
 const SOURCE = path.resolve(__dirname, '..');
-const TARGET_REPO = 'C:\\Users\\sabih.siddiqui\\Desktop\\Automation\\Cybersoft.Platform';
+const TARGET_REPO = 'C:\\Users\\sabih.siddiqui\\Desktop\\Automation\\Cybersoft.TestAutomation';
 const PREFIX = 'Cybersoft.Platform.TestAutomation/K12CateringAutomation';
 const BRANCH = 'AutomationProjects';
 const REMOTE_PATH =
-  'dev.azure.com/Cybersoft-Technologies-Inc/Platform/_git/Cybersoft.Platform';
+  'dev.azure.com/Cybersoft-Technologies-Inc/Cybersoft%20Test%20Automation/_git/Cybersoft%20Test%20Automation';
 
-const USAGE = `Mirror this repo into ${PREFIX} in the Cybersoft.Platform monorepo.
+const USAGE = `Mirror this repo into ${PREFIX} in the Cybersoft Test Automation repo.
 
 Usage:
   node scripts/sync-to-platform.js --dry-run                 show what would change
@@ -28,7 +28,7 @@ Options:
   -u, --update-branch <name> reuse an existing remote branch and commit on top
   -m, --message <text>       commit message (default: "Update K12Catering automation")
       --allow-dirty          sync the working tree even with uncommitted changes
-      --no-push              commit in the platform repo but do not push
+      --no-push              commit in the target repo but do not push
   -h, --help                 show this
 
 Auth: AZURE_DEVOPS_CODE_PAT in .env (Code Read & Write).`;
